@@ -362,3 +362,45 @@ Two conventions the format depends on:
   write docker rules, not to be offered a ready-made set. It stays a
   §14 rule-collections item, precluded by nothing.
 - **Approved by:** operator.
+
+### D-010 — `check` snapshots and restores rather than repairing
+
+- **Date:** 2026-08-19
+- **Step:** `000` (the harness)
+- **Context:** `check` must assert without repairing: fixer hooks
+  (`trailing-whitespace`, `end-of-file-fixer`, `mixed-line-ending`)
+  rewrite files, the commit hook is where they may write, and a check
+  that rewrites the working tree as a side effect is the
+  `--intent-to-add` prohibition one step milder — with the rituals that
+  read `git status --porcelain` for a clean tree sitting downstream of
+  it. No standard mechanism does this. `pre-commit` has no check-only or
+  `--no-fix` mode; its "files were modified by this hook" gives detection
+  but not reversion; `git checkout --` would revert tracked files but is
+  a git write to the working tree, which rule 9 protects, and cannot
+  restore an untracked file at all.
+- **Decision:** `scripts/check.sh` copies its file list to a temporary
+  directory before running the hooks, compares afterwards, restores what
+  was rewritten, names it, and fails. The revert runs from an `EXIT`
+  trap so an interrupt restores too; a failed restore keeps the snapshot
+  and prints its location. No git operation is involved — nothing touches
+  the index, the working tree's git state, or history.
+- **Alternatives considered:** *`git checkout --` / `git stash`,* rejected
+  as git writes to the protected working tree, and blind to untracked
+  files. *Detect-only (fail if the tree changed, leave the edits),*
+  rejected: it repairs, which is the thing forbidden. *A `tar`-based
+  snapshot,* which would also carry symlink-ness and modes — rejected as
+  a portability cost (BSD and GNU `tar` differ on `--null`/`-T`) for a
+  case that cannot arise: pre-commit's `identify` types symlinks as
+  `symlink`, so no fixer hook writes through one. *Dropping the fixer
+  hooks entirely so `check` needs no protection,* rejected: whitespace
+  discipline is owed from `000`, and the commit hook is the right place
+  for it to write.
+- **Approved by:** implementer (within latitude: a workflow choice the
+  bootstrap instructions left open — the harness's shape and names).
+  **Recorded with a process note:** rule 2 says a mechanism written
+  because nothing standard fits is put to the operator *before* it is
+  built, and this one was not. It is ~30 lines of glue rather than a
+  runner, and step `000`'s cold review searched for a standard
+  replacement and found none — but the rule asks for the question, not
+  for the answer to be right, and the question was skipped. Reversible on
+  request.

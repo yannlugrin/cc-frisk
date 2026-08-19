@@ -344,22 +344,31 @@ Rule 1's quarantine survives that deletion, attached to
 
 ## Current state
 
-- **Current step:** `000` — the harness, local only; awaiting the
-  operator's test.
-- **Next step:** `001` — the permission and hook baseline.
-- **World state:** the plan is approved and `D-001`–`D-009` are settled.
-  No harness yet, no tooling, no permission baseline, no code.
-  `.claude/settings.json` carries only `autoMemoryEnabled: false`. No
-  `step-*` tag exists yet; no remote is configured.
-- **Open obligations:** `PLAN.md` §14 carries eleven open questions, all
-  answered at the step that needs them — Q10 (amend §5.4 or deviate) at
+- **Current step:** none — `000` closed 2026-08-19.
+- **Next step:** `001` — the permission and hook baseline (the first step
+  that touches the operator's live Claude Code settings).
+- **World state:** the harness is live and green — `just setup`,
+  `just check [all|changed]`, `just test`, `just verify`, with the same
+  checks in the commit hook. No permission baseline, no tooling, no
+  product code. `.claude/settings.json` still carries only
+  `autoMemoryEnabled: false`. Tag `step-000` exists. `origin` is
+  `github.com/yannlugrin/cc-frisk`, **public**, and its `main` is still
+  the initial commit — nothing this session produced has been pushed.
+- **Open obligations:** `PLAN.md` §14 carries eleven open questions, each
+  answered at the step that needs it — Q10 (amend §5.4 or deviate) at
   `023`, Q11 (a prototype-to-frisk migration aid) at `024`. The sentinel
   may be re-staged before parity if `D-007`'s residue proves
-  uncomfortable.
+  uncomfortable. `D-010` was logged after the fact rather than put to the
+  operator before it was built, and is reversible on request. **The
+  operator rules on `005`'s publish-or-strip question early**: the
+  initial commit already published `.claude/spec-work/` and
+  `.claude/refs/` to a public repository, so that question is now whether
+  to accept it or rewrite published history, not whether to publish.
 - **`.claude/docs/` pointers:** `harness.md` — the measured behaviour of
-  `just check`/`test`/`verify` and the commit hooks; read before changing
-  the `justfile`, `scripts/`, `.pre-commit-config.yaml` or any linter
-  config. `guard-record.md` arrives at step `001`.
+  `just check`/`test`/`verify` and the commit hooks, with four probes and
+  their re-measure recipes; read before changing the `justfile`,
+  `scripts/`, `.pre-commit-config.yaml` or any linter config.
+  `guard-record.md` arrives at step `001`.
 
 *A closed list of item kinds — current and next step, live world-state,
 open obligations, `.claude/docs/` pointers — and nothing else. What a

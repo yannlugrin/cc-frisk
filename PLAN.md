@@ -100,98 +100,21 @@ machine" means shared, public state — the forge; rule 6's close-riding
 backup-ref push to the operator's private backup remote is earlier and
 does not count against this ordering.)
 
-### 000 — The harness, local only — `awaiting test`
+### 000 — The harness, local only — `done`
 
-**Objective.** A repository that can say, in one documented command,
-whether what it contains is well-formed — and can prove it from a fresh
-clone.
-
-**Spec sections.** None (workflow foundation). Constrains everything
-later.
-
-**Deliverables.**
-
-- `.gitignore` at the repository root: the existing entries carried
-  forward, not replaced (`.claude/worktrees/`, `__pycache__/`, both
-  guard paths), plus test/type/lint caches (`.pytest_cache/`,
-  `.mypy_cache/`, `.ruff_cache/`), virtualenvs (`.venv/`), build
-  artifacts (`dist/`, `*.egg-info/`), coverage output,
-  `.claude/reviews/` (the reviewer templates write there and an
-  untracked report would block every clean-tree precondition
-  downstream), and `CLAUDE.local.md`. `.claude/worktrees/` stays ignored
-  for a reason worth keeping: an isolated worktree materializes inside
-  the repository, and a commit made while one exists swallows the
-  checkout — which has happened.
-- `requirements.txt` at the root — the pinned toolchain, installable
-  through one documented setup command. Third-party tools arrive
-  pinned **with their version or digest recorded**; for a third-party
-  binary that pin-and-record is the whole coverage obligation.
-- `justfile` at the root and `scripts/` beside it (`setup.sh`,
-  `check.sh`, `test.sh`): `just setup`, `just check [scope]`,
-  `just test`, `just verify`. **`check` takes a scope argument and is
-  one entry point, never a second recipe** — the whole-tree gate is the
-  default and the narrowed what-changed form is an argument to the same
-  command, because two recipes hold two lists and will eventually differ
-  in *what* they look for rather than only in how much.
-- **The mechanism behind those commands is configured, not written**
-  (rule 11 applied to the harness itself): `scripts/check.sh` is a thin
-  delegate that computes the file list and hands it to
-  `pre-commit run --files …`. It is glue, not a runner: the hook
-  definitions, their pins and the path exclusions all live in
-  `.pre-commit-config.yaml`, in one place. The file list is
-  `git ls-files --cached --others --exclude-standard` — passed
-  explicitly because runners that enumerate from git,
-  `pre-commit run --all-files` among them, see only what git already
-  knows about, and **a lint error in a file that exists but was never
-  added to the index must still fail `check`**. Never
-  `git add --intent-to-add`: it writes to the index as a side effect of
-  a check, turning an untracked `??` line into an added `A` one in
-  `git status --porcelain` —
-  the output the handover and approve rituals read for their clean-tree
-  preconditions — and lets the next `git commit -a` sweep the file into
-  an unrelated commit.
-- Standing path exclusions, keyed on the path and not on tracked status:
-  `.claude/spec-work/` (no session's reading material, rule 1) and
-  `.claude/refs/` (the operator's supplied material, read-only and owned
-  elsewhere — a lint finding there would have no legal resolution: the
-  file cannot be edited, and the bend-the-config escape beside it is
-  written for the specification alone).
-- `.pre-commit-config.yaml` at the root, wired to the **same** harness so
-  the local runners cannot diverge, carrying the check families whose
-  artifacts exist at this step and no others (rule 2's never-ahead rule,
-  **so this step's green gate says nothing about files that are not
-  there**): YAML lint (the hook runner's own configuration is the first
-  artifact of that class), JSON parse (`.claude/settings.json` already
-  exists — and the settings file is the enforcement mechanism itself, so
-  a malformed edit fails exactly as quietly as a skill that never
-  loads), POSIX-shell lint over `scripts/`, Markdown and prose lint over
-  the governance documents (in this repository documents are
-  load-bearing), repository hygiene and security from the runner's stock
-  collection, pinned — large binaries, merge-conflict markers, and
-  secret/private-key scanning per rule 5 — and whitespace/newline
-  discipline. The **fixers** live in the commit hook; `check` asserts and
-  never repairs, because a check that rewrites the working tree as a side
-  effect is the `--intent-to-add` prohibition one step milder.
-- Linter configuration at the root (`.yamllint.yml`, the Markdown
-  linter's config), shaped after `.claude/refs/infra-conventions/` —
-  shape, not content.
-- A lint bend for `SPECIFICATIONS.md` if one proves necessary: read-only
-  under rule 1, so the lint bends to it, the bend is scoped to that file
-  alone and never a global loosening, and **excluding a document from a
-  rule is a logged decision, not a quiet config line**.
-- Families deliberately absent here, each joining with its first
-  artifact: Python and TOML at `006`; governance frontmatter
-  well-formedness at `003`; **the CI workflow at `005`** — nothing local
-  can exercise a workflow, and a tagged step must not carry an artifact
-  its own gate never ran.
-- `.claude/docs/` created with whatever this step learns.
-
-**How the operator tests it.** Clone the repository into scratch space
-outside the working directory, run the documented setup command, run
-`just check` and `just test` (which correctly reports that this
-repository ships no behaviour of its own yet), then make one trivial
-commit in the working copy and watch the commit hooks run the same
-checks. All green. Local and free; delete the scratch clone afterwards.
+- **Outcome (approved 2026-08-19, tag `step-000`):** the repository
+  answers rule 2's two questions through documented commands —
+  `just setup`, `just check [all|changed]` as one entry point taking a
+  scope, `just test`, `just verify` — built as thin glue over `pre-commit`
+  and `just`, with the commit hook running the same configuration so the
+  local runners cannot diverge. Check families present: whitespace,
+  hygiene, private keys, JSON, YAML, POSIX shell, Markdown; the rest join
+  with their first artifacts. Two properties the design turns on are
+  probed rather than assumed — `check` sees untracked files, and asserts
+  without repairing (`D-010`) — with four re-measure recipes in
+  `.claude/docs/harness.md`. `SPECIFICATIONS.md` passes the Markdown lint
+  unmodified, so rule 2's bend for it stays unused. Detail in git history
+  from the initial commit to tag `step-000`.
 
 ### 001 — The permission and hook baseline — `pending`
 
@@ -573,18 +496,26 @@ that deliver what they validate.
 - A one-line status banner in `README.md` saying the repository is public
   but not yet installable — the honest state between this push and `021`,
   where the install channel actually opens.
-- **One deliverable is a decision, not an artifact**: whether
-  `.claude/spec-work/` — the specification phase's history, its review
-  reports, and anything still sitting in it — goes public with the
-  repository or is stripped before the first push. The question is put
-  **twice and ruled separately**, against the future public face of a
-  repository that is also the plugin's install channel:
-  `.claude/spec-work/` is a transparency question, while `.claude/refs/`
-  is the operator's supplied material whose authority lives elsewhere —
-  different questions, one answer each. Whatever is ruled for the rest of
+- **One deliverable is a decision, not an artifact**, and it arrived
+  already half-made: whether `.claude/spec-work/` — the specification
+  phase's history, its review reports, and anything still sitting in
+  it — goes public with the repository, and separately whether
+  `.claude/refs/` does. The question is put **twice and ruled
+  separately**, against the public face of a repository that is also the
+  plugin's install channel: `.claude/spec-work/` is a transparency
+  question, while `.claude/refs/` is the operator's supplied material
+  whose authority lives elsewhere. Whatever is ruled for the rest of
   `.claude/refs/`, **`behavior-corpus.md` stays until parity is
-  declared**: later steps consume it as §8.1's yardstick. Logged, put to
-  the operator, and made before the push it becomes irreversible at.
+  declared**: later steps consume it as §8.1's yardstick.
+  **What changed the question:** the repository's initial commit was
+  pushed to a public `origin` before this plan existed, and it carries
+  both directories. So this is no longer a decision made *before* the
+  push it becomes irreversible at — it is a decision about whether to
+  accept what is already published or to rewrite published history. Both
+  branches are the operator's; the second is a force-push to a public
+  repository and is named here so nobody reaches for it casually. The
+  ruling is wanted early rather than at `005`, since every close from
+  `001` onward attempts a push.
 
 **How the operator tests it.** Authorise the first push and watch the run.
 **Crosses the boundary**: a push publishes to what will be the plugin's
@@ -1755,7 +1686,7 @@ it.
 | `just` installed on this machine | `000` |
 | A working `python3` and `pip` (any version) for the pinned toolchain | `000` |
 | A private backup remote for rule 1's backup ref | `001` |
-| The forge, the remote, and authorisation of the first push (the public repository is also the plugin's install source, so adoption testing waits on it) | `005` |
+| Authorisation to push. The forge and remote already exist — `origin` is the public `github.com/yannlugrin/cc-frisk`, whose `main` is still the initial commit — so what is owed is the operator's go-ahead for the first push of this work, and their ruling on the publish-or-strip question above | `001`'s close (rule 6 attempts a push at every close) |
 | A second strong model for the milestone passes — the state review and the memory compaction must not run on the model that wrote the work | the foundation-milestone close, after `005` |
 | An interpreter at the committed floor (rule 2's floor-pinned checks need it), and either authorisation for the distribution-data lookups item 12 needs or the operator's own table | `006` |
 | The verification-pass trio: consent to drive sessions in the permissive modes, a scratch area outside the working directory, and the platform version recorded with every measurement | `015`, with the permissive modes first needed at `016` |
