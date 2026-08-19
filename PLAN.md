@@ -52,13 +52,20 @@ Three further placements, stated so the ruling is complete:
 
 - **The starter registry's docker shape (§5.4)** is a *should* in the
   specification ("a small set of additional common tools… docker is the
-  recommended candidate"), which would ordinarily invite deferral to
-  shrink the pre-1.0 review surface. It cannot be deferred: the behavior
-  corpus's context A is *git and docker*, and 109 of its rulings run
-  against that registry. Deferring docker would make the parity bar
-  unreachable by item 1. **Keep**, and the reason is worth recording:
-  this is the one place where a specification *should* is pinned by a
-  requirement elsewhere.
+  recommended candidate"). **Move** — out of the shipped starter registry
+  entirely (`D-009`, the operator's ruling). An earlier draft of this
+  plan argued it was pinned by the corpus and could not be deferred.
+  That argument confused two different things. The corpus's context A
+  binds the **engine and the configuration surface**: docker's handoffs,
+  aliases, publish-capable build flags and compose forms are exactly what
+  bar items 1 and 2 owe, and they are reproduced as test fixtures under
+  `tests/corpus/` against **test-only declarations** — which is not a
+  choice but a requirement, §8.1 forbidding engine tests to run against
+  real-tool starter rules at all. What the corpus never speaks to is what
+  the *scaffold* writes into somebody's new project. A rule set that
+  proves the engine can express docker policy is not a reason to gate
+  docker in every project that adopts frisk on day one. The capability is
+  owed at parity and stays; the default content is not, and does not.
 - **The once-per-session visibly-inert notice (§5.4)** is already staged
   at 1.0 by §13 itself, with the residue stated (a vanished config
   before 1.0 is caught only by the sentinel, where adopted). This plan
@@ -1247,11 +1254,13 @@ in a live Claude Code and spends usage. Cleanup as `021`.
 
 ### 023 — The starter registry — `pending`
 
-**Objective.** The boundary a freshly scaffolded project gets on day one.
+**Objective.** The boundary a freshly scaffolded project gets on day
+one: git's ground rules, and nothing the project did not ask for.
 
-**Spec sections.** §5.4 (the starter registry and its two deliberate
-acceptances), §8.2 (starter cases from day one), §3.4 (the first
-collection).
+**Spec sections.** §5.4 (the starter registry, its git ground rules and
+its deliberate acceptances — deviating from its additional-tools
+recommendation per `D-009`), §8.2 (starter cases from day one), §3.4
+(the first collection).
 
 **Deliverables.** Shipped policy content in its own tree —
 `collections/starter/` inside the plugin, separate from `src/frisk/` and
@@ -1269,18 +1278,26 @@ path and the engine suite can be forbidden from importing it.
   a boundary that gates one spelling and not the other gates neither.
   Allow: exactly §6.3's commit-message shape with its hedges, if `017`
   kept the verdict.
-- **docker** with its drop-in equivalents as aliases, shaped per §5.4:
-  ask on every spelling of publishing to a registry including
-  publish-capable build flags, host-global prunes and registry credential
-  operations; handoffs on the run/exec forms and their compose
-  equivalents; the ordinary local loop silent.
+- **And nothing else** (`D-009`). §5.4 recommends "a small set of
+  additional common tools" with docker as the candidate; this project
+  ships none. A scaffolded project gets git's ground rules — the losses
+  that are permanent or expensive — and writes its own policy for
+  everything else. The docker shape §5.4 describes survives in two places
+  that cost a new project nothing: the corpus fixtures of `014`, which
+  prove the engine expresses it, and a **worked example** in the operator
+  configuration reference (`039`), which is how an operator who wants
+  docker gated writes it. This is a deviation from a specification
+  *should*; `D-009` carries the reason, and §14 Q10 asks whether §5.4's
+  text should be amended to match rather than merely deviated from.
 - Starter cases covering **every** starter rule, beside the rules they
   prove, so the coverage gate passes from day one.
-- The two deliberate acceptances stated where an operator reads them:
-  host mounts on `docker run` stay silent (the `-v $(pwd):/app` loop is
-  too common to gate), and `rm` is **not** in the starter registry
-  (unregistered it still meets the default mode's native prompt, while
-  registering it usefully would either over-prompt or under-protect).
+- §5.4's second deliberate acceptance stated where an operator reads it:
+  `rm` is **not** in the starter registry — unregistered it still meets
+  the default mode's native prompt, while registering it usefully would
+  either over-prompt or under-protect. (The first acceptance, that the
+  starter docker shape leaves `docker run` host mounts silent, has
+  nothing left to apply to: with no shipped docker shape there is no
+  silence to accept. Q10 covers it.)
 
 **How the operator tests it.** `frisk selftest` against the starter set
 and `frisk explain` on each ground rule's dangerous spellings, including
@@ -1658,7 +1675,7 @@ Every section of `SPECIFICATIONS.md`, mapped.
 | §5.1 Location, lifecycle, trust | `024`, `021`/`028` (SECURITY.md) |
 | §5.2 What the configuration must express | `007` (API against the whole surface, cases included), staged behaviour across `009`–`012`, `032` |
 | §5.3 Legibility | `007`, `039` (the operator reference) |
-| §5.4 The scaffold | `023`, `024`; the sentinel offer at `035`; the visibly-inert notice at `038` |
+| §5.4 The scaffold | `023` (git ground rules only — `D-009` deviates from the additional-tools recommendation), `024`; the sentinel offer at `035`; the visibly-inert notice at `038` |
 | §6.1 Pairing | `016` (the facts), `024` (`docs/pairing.md`), `028` (the README section) |
 | §6.2 Reasons and citations | `009` |
 | §6.3 The allow doctrine | `017` |
@@ -1751,3 +1768,20 @@ silent assumptions.
    two rows of §7.5's coverage map have no catcher. If the operator wants
    the seatbelt earlier, it is a deliberate quick win under §13's
    "everything else may ship here as a quick win" and moves back.
+
+10. **Should §5.4 be amended, or merely deviated from (`D-009`)?** The
+   starter registry now ships git ground rules only. Two clauses of §5.4
+   describe a world where it also ships docker: "a small set of
+   additional common tools… docker is the recommended candidate", and the
+   deliberate acceptance that "the starter docker shape leaves
+   `docker run` host mounts silent" — the second of which now has no
+   referent. A *should* may be deviated from with a logged reason and no
+   amendment, which is what `D-009` does and what this plan assumes. But
+   the acceptance paragraph is not a recommendation, it is a statement
+   about what the product does, and it is now false. Rule 1 puts that to
+   you rather than letting the implementation decide: **amend §5.4 at
+   step `023`** (decision entry and specification text in one commit), or
+   **leave it and let `D-009` carry the divergence**. I recommend
+   amending — a specification that describes shipped content the product
+   does not ship is the drift rule 1 exists to prevent, and the amendment
+   is two sentences.

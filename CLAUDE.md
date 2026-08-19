@@ -352,8 +352,9 @@ Rule 1's quarantine survives that deletion, attached to
 - **Open obligations:** the operator rules on `D-003` (the foundation
   splits), `D-004` (the §13 re-inventory), `D-005`/`D-006` (engine
   ordering and the verification-pass split) and `D-007` (the sentinel's
-  restaging) at the plan review; `PLAN.md` §14 carries nine open
-  questions.
+  restaging) at the plan review, and on §14 Q10 — whether §5.4 is amended
+  to match `D-009` or merely deviated from; `PLAN.md` §14 carries ten
+  open questions.
 - **`.claude/docs/` pointers:** none yet; `guard-record.md` arrives at
   step `001`.
 

@@ -203,7 +203,7 @@ Two conventions the format depends on:
   registry's docker shape, a specification *should*) turns out to be
   pinned by the parity yardstick, since 109 of the behavior corpus's
   rulings run against a git-and-docker registry. Two placements are
-  noted rather than challenged: docker as just described; §5.4's
+  noted rather than challenged: §5.4's
   once-per-session visibly-inert notice, which §13 already stages at 1.0
   with its residue stated; and the sentinel, which the plan's first draft
   built early and `D-007` returns to the 1.0 stage §13 gives it.
@@ -212,7 +212,9 @@ Two conventions the format depends on:
   by one human" premise most invites — rejected because it is the one
   failure mode the plugin channel introduces and the prototype never
   had: an update that silently flips a verdict. *Moving docker out of
-  the starter registry,* rejected as above; it is pinned by item 1.
+  the starter registry,* initially rejected on a mistaken reading of the
+  corpus and then **accepted** on the operator's correction — see
+  `D-009`, which supersedes that half of this entry.
 - **Approved by:** *pending* — the operator rules at the plan review.
 
 ### D-005 — Declarations before reading the line
@@ -313,3 +315,44 @@ Two conventions the format depends on:
 - **Approved by:** implementer (within latitude: a workflow choice the
   bootstrap instructions left open), with the deviation surfaced in
   `PLAN.md` §14 for the operator to overrule.
+
+### D-009 — The starter registry ships git ground rules only
+
+- **Date:** 2026-08-19
+- **Step:** `023` (the starter registry)
+- **Context:** §5.4 requires the starter registry to carry git's ground
+  rules and recommends, as a *should*, "a small set of additional common
+  tools", naming docker as the candidate with a shape to match. This
+  plan's first re-inventory argued docker could not be deferred because
+  the behavior corpus's context A runs 109 rulings against a git-and-
+  docker registry, so deferring it would make §13's parity item 1
+  unreachable. **That argument was wrong**, and the operator identified
+  why: the corpus's docker rulings demonstrate what the *engine and the
+  configuration surface* must be able to express — handoffs, aliases,
+  publish-capable build flags, compose forms — not what the *scaffold*
+  should write into a project that has just adopted frisk. The two are
+  not merely separable; §8.1 requires them separated, engine tests
+  running "against test-only tool declarations, never against real-tool
+  starter rules". The plan's own step `014` already said so, which is
+  where the contradiction was visible.
+- **Decision:** The shipped starter registry carries the git ground rules
+  and nothing else. Docker's policy shape survives in two places that
+  cost a new project nothing: the corpus fixtures of step `014`, which
+  prove the engine expresses it, and a worked example in the operator
+  configuration reference (step `039`), which is how an operator who
+  wants docker gated writes it. The capability stays owed at parity; the
+  default content does not. §13's bar is unaffected: item 1 is satisfied
+  by the fixtures, item 2 by the expressible surface the corpus's
+  policies define, and item 9 by a scaffold that still gives a meaningful
+  day-one boundary.
+- **Alternatives considered:** *Shipping docker in the starter registry
+  as §5.4 recommends,* rejected by the operator: a rule set proving the
+  engine can express docker policy is not a reason to gate docker in
+  every adopting project by default, and the one-pass review is a poor
+  moment to make somebody accept rules for a tool they may not use.
+  *Shipping docker as an opt-in collection beside the starter registry,*
+  which §3.4's composability would carry cheaply — rejected here as
+  building ahead of need (rule 11): the operator asked to be able to
+  write docker rules, not to be offered a ready-made set. It stays a
+  §14 rule-collections item, precluded by nothing.
+- **Approved by:** operator.
