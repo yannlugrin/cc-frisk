@@ -1,0 +1,4 @@
+.claude/worktrees/
+__pycache__/
+.claude/hooks/bash_guard.py
+.claude/spec-work/handoff/assets/bash_guard.py
