@@ -916,7 +916,9 @@ and docker starter policy, context C's infra tools — against
 shipped starter registry of `023`, so policy changes can never break
 engine tests and the separation is enforceable by path. A run report
 stating how many rulings are asserted and which are knowingly
-outstanding (the allow rulings wait on `015`/`017`). Any ruling the
+outstanding — at this point only context A's allow rulings, which wait on
+open fact (c) at `015` and are asserted by `017` itself, not deferred to
+the parity audit. Any ruling the
 specification contradicts is **reported, not implemented**: the
 specification wins.
 
@@ -1044,6 +1046,12 @@ work and idles with the verdict if (c) retired it; enumerated in the
 operator documentation like every other default layer. The semantic
 precondition is **operator doctrine, not an engine check** — carried by
 documentation and pressed by the skill, never verified by code.
+
+**The corpus's allow rulings are asserted here**, with the machinery they
+exercise — context A's hedged `commit -m` shape and every withholding
+case around it. They are the last of the corpus left outstanding by
+`014`, so after this step the engine's corpus fidelity is complete and
+demonstrable, whatever `026` later declares.
 
 **If `015` retired the allow verdict** (open fact (c) unfavourable), this
 step becomes the retirement instead: the verdict retires to silence,
@@ -1207,12 +1215,15 @@ same-configuration), §8.2 (the CI pin), §13 (what first exposure owes).
 - The engine version the project pins for CI, recorded beside the
   configuration.
 - **The trust statement, brought forward from `028`.** This is the commit
-  that makes the repository installable, and §13 says the first public
-  exposure of a permission-path tool must not lack one: the README gains
-  the **"in development, install only for testing"** warning prominently,
-  and a minimal `SECURITY.md` (the trust model and the
-  vulnerability-reporting path) lands at the root in the same commit.
-  `028` grows both to their full §12 shape.
+  that makes the repository installable by anyone who finds it, and §13
+  says the first public exposure of a permission-path tool must not lack
+  one: the README gains the **"in development, install only for
+  testing"** warning prominently, and a minimal `SECURITY.md` (the trust
+  model and the vulnerability-reporting path) lands at the root in the
+  same commit. `028` grows both to their full §12 shape. **These gate
+  publication, not use**: they exist for a stranger who arrives at the
+  repository, and nothing in them is a precondition for the operator
+  installing frisk from their own clone.
 
 **How the operator tests it.** Install the plugin from the local
 repository into a throwaway project and run `frisk status` and
@@ -1347,11 +1358,25 @@ project).
   is a 1.0 item (§13) and arrives at `035`. The scaffold gains the offer
   there.
 
+**Adoption is complete at this step, and that includes replacement.** A
+project moving off a prototype-generation hook needs nothing later: the
+engine's behaviour is corpus-complete after `017`, the hook, both gates
+and the validation triggers are in place, and the proof that *this
+project's* verdicts did not move is its own cases re-running under
+`019`'s selftest — which is exactly the mechanism §3.5's third layer and
+§8.2 exist for. What arrives after this step is the *project's* release
+paperwork, not the operator's capability. Transcribing an existing
+prototype registry into frisk's declaration form remains hand work; see
+§14 Q11.
+
 **How the operator tests it.** Scaffold a throwaway project, read the
 generated config in one pass (the legibility requirement is this test),
 run its selftest green through the project entry point, and read
-`docs/pairing.md`. Local and free except where the operator chooses to
-apply the settings edits.
+`docs/pairing.md`. Then the replacement case: point a project that
+carries a prototype-generation hook at frisk instead, transcribe a
+handful of its rules and its cases, and watch selftest reproduce the
+verdicts the prototype gave. Local and free except where the operator
+chooses to apply the settings edits.
 
 ### 025 — Gate three: the reachability probe — `pending`
 
@@ -1376,17 +1401,23 @@ with the plugin installed. Cleanup: delete the throwaway project.
 ### 026 — The corpus parity audit — `pending`
 
 **Objective.** Declare parity against the yardstick, or name exactly what
-is missing.
+is missing. **This is the project's release claim, not a gate on anyone's
+adoption**: an operator can adopt frisk, or replace a prototype hook with
+it, from `024` onward. What this step decides is whether the maintainer
+may say *parity* in public and tag a release on it.
 
 **Spec sections.** §8.1 (the corpus as the parity yardstick), §13 (the
 pre-1.0 bar).
 
-**Deliverables.** Every corpus ruling reproduced or accounted for:
-asserted, superseded by a verification-pass outcome (the allow rulings if
-open fact (c) retired the verdict — these **count as satisfied** and do
-not block the declaration), or reported as a specification conflict where
-a ruling and the specification disagree — the specification wins and the
-conflict is reported, never silently implemented. A written parity
+**Deliverables.** An audit, not new behaviour: the corpus is asserted by
+`014` and `017` between them, and this step verifies that every ruling is
+accounted for — asserted, superseded by a verification-pass outcome (the
+allow rulings if open fact (c) retired the verdict — these **count as
+satisfied** and do not block the declaration), or reported as a
+specification conflict where a ruling and the specification disagree, the
+specification winning and the conflict reported, never silently
+implemented. If the audit finds nothing outstanding, its whole output is
+the statement below; that is a correct result, not an empty step. A written parity
 statement at `docs/` against §13's bar, item by item, with anything
 outstanding named — including the residues this staging accepts: no
 sentinel before 1.0, and no once-per-session visibly-inert notice.
@@ -1785,3 +1816,13 @@ silent assumptions.
    amending — a specification that describes shipped content the product
    does not ship is the drift rule 1 exists to prevent, and the amendment
    is two sentences.
+
+11. **A prototype-to-frisk migration aid — wanted, or hand work?** Parity
+   proves the engine and the configuration API can *express* what a
+   prototype-generation registry expressed; it does not transcribe one.
+   §10's migration capability is engine-version migration inside frisk,
+   and the specification never asked for a translator, so this is not a
+   coverage gap. But if several prototype-guarded projects are to move,
+   the transcription is the real cost of adoption and it lands entirely
+   on the operator. Say so and it becomes a step with its own gate,
+   placed after `024`; say nothing and the plan assumes hand work.
