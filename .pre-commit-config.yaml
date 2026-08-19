@@ -44,10 +44,11 @@ repos:
 
       # Security — CLAUDE.md rule 5. A committed secret is a rotated
       # secret, so this is the one family whose breach cannot be undone
-      # by noticing it afterwards.
+      # by noticing it afterwards. This project has no secrets story of
+      # its own (§15: nothing at runtime touches a network or holds a
+      # credential), so what this guards against is an accidental paste,
+      # and a pasted private key is the shape that would actually appear.
       - id: detect-private-key
-      - id: detect-aws-credentials
-        args: [--allow-missing-credentials]
 
       # JSON parse. .claude/settings.json is the permission enforcement
       # mechanism itself, so a malformed edit to it fails exactly as

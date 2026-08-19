@@ -160,6 +160,14 @@ rule 1 makes it no session's reading material; `refs/` because it is the
 operator's supplied material, read-only under rule 3 and owned elsewhere,
 so a finding inside one would have no legal resolution.
 
+`detect-aws-credentials` was dropped at the operator's instruction: this
+project uses no AWS, so the hook could not fire on anything the
+repository could contain. Rule 5's mechanism is unchanged in substance —
+`detect-private-key` is the shape an accidental paste would actually
+take here, and §15 means the project holds no credentials of its own to
+leak. If broader credential scanning is ever wanted, it is a pinned hook
+away (`gitleaks`, `detect-secrets`) and needs no code.
+
 `check-added-large-files` carries `--enforce-all` deliberately: without
 it the hook intersects its file list with what is *staged*, so outside a
 commit it checks nothing and always passes — inert in `just check` and in
@@ -177,7 +185,7 @@ so a green gate never says anything about files that are not there.
 | Family | Since | Tool |
 |---|---|---|
 | Whitespace / newline | `000` | pre-commit-hooks (fixers) |
-| Hygiene, secrets | `000` | pre-commit-hooks (`detect-private-key`, `detect-aws-credentials`, large files with `--enforce-all`, merge conflicts, symlinks, case conflicts) |
+| Hygiene, secrets | `000` | pre-commit-hooks (`detect-private-key`, large files with `--enforce-all`, merge conflicts, symlinks, case conflicts) |
 | JSON parse | `000` | `check-json` |
 | YAML | `000` | yamllint `--strict` (which already fails on a parse error, so `check-yaml` would be redundant) |
 | POSIX shell | `000` | shellcheck-py (ships its own pinned binary — not a system prerequisite) |
