@@ -184,7 +184,7 @@ Two conventions the format depends on:
   (guard, settings, probes),* rejected: the guard decides the shape of
   the settings, so proposing one without the other asks the operator to
   review half a boundary.
-- **Approved by:** *pending* — put to the operator at the plan review.
+- **Approved by:** operator (2026-08-19, at the plan review).
 
 ### D-004 — The §13 re-inventory ruling
 
@@ -215,7 +215,10 @@ Two conventions the format depends on:
   the starter registry,* initially rejected on a mistaken reading of the
   corpus and then **accepted** on the operator's correction — see
   `D-009`, which supersedes that half of this entry.
-- **Approved by:** *pending* — the operator rules at the plan review.
+- **Approved by:** operator (2026-08-19, at the plan review). The ruling
+  is the recommendation as recorded in `PLAN.md` §1: the bar stands as
+  §13 draws it, with the starter registry's content settled separately by
+  `D-009`.
 
 ### D-005 — Declarations before reading the line
 
@@ -241,8 +244,7 @@ Two conventions the format depends on:
   inverted. *Leaving the order and testing `008` by unit suite alone,*
   rejected: rule 2 requires each step testable by the operator, and a
   suite the operator does not read is not that test.
-- **Approved by:** *pending* — put to the operator at the plan review
-  (step reordering is a joint decision, rule 4).
+- **Approved by:** operator (2026-08-19, at the plan review).
 
 ### D-006 — The verification pass split into two gates
 
@@ -265,7 +267,7 @@ Two conventions the format depends on:
   own buys a heading rather than a decision point. *Leaving one step,*
   rejected on the reviewer's reasoning — it was the plan's most expensive
   step and the hardest to resume from mid-flight.
-- **Approved by:** *pending* — put to the operator at the plan review.
+- **Approved by:** operator (2026-08-19, at the plan review).
 
 ### D-007 — The sentinel restaged to 1.0
 
@@ -289,7 +291,11 @@ Two conventions the format depends on:
   rather than settled: the sentinel is the only layer that catches a
   fresh clone with no plugin, and testers are exactly the population that
   clones.
-- **Approved by:** *pending* — put to the operator at the plan review.
+- **Approved by:** operator (2026-08-19, at the plan review, by approving
+  the plan that stages the sentinel at 1.0). Recorded explicitly because
+  the alternative was put to the operator as a live choice rather than a
+  formality: pulling the sentinel back before parity remains available as
+  a re-staging decision if the residue proves uncomfortable in use.
 
 ### D-008 — Milestone 9's entries are deliberately coarse
 

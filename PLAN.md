@@ -100,7 +100,7 @@ machine" means shared, public state — the forge; rule 6's close-riding
 backup-ref push to the operator's private backup remote is earlier and
 does not count against this ordering.)
 
-### 000 — The harness, local only — `pending`
+### 000 — The harness, local only — `in progress`
 
 **Objective.** A repository that can say, in one documented command,
 whether what it contains is well-formed — and can prove it from a fresh
@@ -1752,7 +1752,7 @@ it.
 | Prerequisite | First needed |
 |---|---|
 | `just` installed on this machine | `000` |
-| A working `python3` and `pip` (any version) for the pinned toolchain, and `shellcheck` if it is not reachable through it | `000` |
+| A working `python3` and `pip` (any version) for the pinned toolchain | `000` |
 | A private backup remote for rule 1's backup ref | `001` |
 | The forge, the remote, and authorisation of the first push (the public repository is also the plugin's install source, so adoption testing waits on it) | `005` |
 | A second strong model for the milestone passes — the state review and the memory compaction must not run on the model that wrote the work | the foundation-milestone close, after `005` |
