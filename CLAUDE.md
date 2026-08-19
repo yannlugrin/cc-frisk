@@ -359,11 +359,11 @@ Rule 1's quarantine survives that deletion, attached to
   `023`, Q11 (a prototype-to-frisk migration aid) at `024`. The sentinel
   may be re-staged before parity if `D-007`'s residue proves
   uncomfortable. `D-010` was logged after the fact rather than put to the
-  operator before it was built, and is reversible on request. **The
-  operator rules on `005`'s publish-or-strip question early**: the
-  initial commit already published `.claude/spec-work/` and
-  `.claude/refs/` to a public repository, so that question is now whether
-  to accept it or rewrite published history, not whether to publish.
+  operator before it was built, and is reversible on request.
+  `005`'s publish-or-strip question stays at `005` (operator, 2026-08-19)
+  even though the initial commit already published `.claude/spec-work/`
+  and `.claude/refs/`: the intervening pushes add nothing to either, so
+  the ruling is about accepting that or rewriting published history.
 - **`.claude/docs/` pointers:** `harness.md` — the measured behaviour of
   `just check`/`test`/`verify` and the commit hooks, with four probes and
   their re-measure recipes; read before changing the `justfile`,

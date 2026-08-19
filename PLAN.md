@@ -507,15 +507,20 @@ that deliver what they validate.
   whose authority lives elsewhere. Whatever is ruled for the rest of
   `.claude/refs/`, **`behavior-corpus.md` stays until parity is
   declared**: later steps consume it as §8.1's yardstick.
-  **What changed the question:** the repository's initial commit was
-  pushed to a public `origin` before this plan existed, and it carries
-  both directories. So this is no longer a decision made *before* the
-  push it becomes irreversible at — it is a decision about whether to
-  accept what is already published or to rewrite published history. Both
-  branches are the operator's; the second is a force-push to a public
-  repository and is named here so nobody reaches for it casually. The
-  ruling is wanted early rather than at `005`, since every close from
-  `001` onward attempts a push.
+  **What changed the question, and what did not.** The repository's
+  initial commit was pushed to a public `origin` before this plan
+  existed, and it carries both directories — so this is not a decision
+  made *before* the push it becomes irreversible at, but one about
+  accepting what is already published or rewriting published history.
+  It still belongs at `005` (the operator's ruling, 2026-08-19): pushing
+  the intervening steps publishes nothing further about either
+  directory, so nothing is lost by deciding at the step that finishes
+  the bootstrap. **The strip branch is a history rewrite and a
+  force-push to a public repository**, which is named here for two
+  reasons: nobody should reach for it casually, and step `001`'s guard
+  ground rules deny forced pushes however spelled — so taking that
+  branch is a deliberate, operator-driven override of the boundary this
+  project builds, not something a session can do in passing.
 
 **How the operator tests it.** Authorise the first push and watch the run.
 **Crosses the boundary**: a push publishes to what will be the plugin's
@@ -1686,7 +1691,8 @@ it.
 | `just` installed on this machine | `000` |
 | A working `python3` and `pip` (any version) for the pinned toolchain | `000` |
 | A private backup remote for rule 1's backup ref | `001` |
-| Authorisation to push. The forge and remote already exist — `origin` is the public `github.com/yannlugrin/cc-frisk`, whose `main` is still the initial commit — so what is owed is the operator's go-ahead for the first push of this work, and their ruling on the publish-or-strip question above | `001`'s close (rule 6 attempts a push at every close) |
+| Authorisation to push. The forge and remote already exist — `origin` is the public `github.com/yannlugrin/cc-frisk`, whose `main` is still the initial commit — so what is owed is the operator's go-ahead for the first push of this work | `001`'s close (rule 6 attempts a push at every close) |
+| The publish-or-strip ruling on `.claude/spec-work/` and `.claude/refs/`, both already public via the initial commit | `005` |
 | A second strong model for the milestone passes — the state review and the memory compaction must not run on the model that wrote the work | the foundation-milestone close, after `005` |
 | An interpreter at the committed floor (rule 2's floor-pinned checks need it), and either authorisation for the distribution-data lookups item 12 needs or the operator's own table | `006` |
 | The verification-pass trio: consent to drive sessions in the permissive modes, a scratch area outside the working directory, and the platform version recorded with every measurement | `015`, with the permissive modes first needed at `016` |
