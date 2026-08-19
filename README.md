@@ -68,7 +68,9 @@ If you are reviewing this repository, human or AI, this is the frame:
   flagging it.** Most of the specification is deliberately not built
   yet; §13 stages the work and the plan places each item.
 - **Each plan step lists the specification sections it implements. That
-  list is the review checklist for that step.**
+  list is the review checklist for that step.** The exception is the
+  final milestone, whose entries are deliberately coarse until the work
+  before them lands (`DECISIONS.md`, `D-008`).
 - **A problem in the specification itself is a question for the project
   owner, never a change to propose.** The same holds for anything in
   `.claude/refs/`, which is supplied material, not this repository's
