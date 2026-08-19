@@ -27,5 +27,9 @@ dist/
 .coverage.*
 htmlcov/
 
-# Machine-local instructions, outside git by design
+# Machine-local, outside git by design. settings.local.json can carry
+# local permission grants and is ignored here rather than relying on a
+# machine's global gitignore, where a fresh clone would surface it as an
+# untracked file and break the rituals' clean-tree preconditions.
 CLAUDE.local.md
+.claude/settings.local.json

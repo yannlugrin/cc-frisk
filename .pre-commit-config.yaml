@@ -34,7 +34,10 @@ repos:
       # Hygiene
       - id: check-merge-conflict
       - id: check-added-large-files
-        args: [--maxkb=512]
+        # --enforce-all, because without it the hook intersects its file
+        # list with what is *staged*, so it checks nothing at all when
+        # run from `just check` or CI.
+        args: [--maxkb=512, --enforce-all]
       - id: check-case-conflict
       - id: check-symlinks
       - id: destroyed-symlinks
@@ -46,11 +49,11 @@ repos:
       - id: detect-aws-credentials
         args: [--allow-missing-credentials]
 
-      # Parse checks. .claude/settings.json is the permission
-      # enforcement mechanism itself, so a malformed edit to it fails
-      # exactly as quietly as a skill that never loads.
+      # JSON parse. .claude/settings.json is the permission enforcement
+      # mechanism itself, so a malformed edit to it fails exactly as
+      # quietly as a skill that never loads. YAML needs no hook here:
+      # yamllint --strict below already fails on a parse error.
       - id: check-json
-      - id: check-yaml
 
   # YAML lint. The hook runner's own configuration is the first artifact
   # of this class.
@@ -70,7 +73,7 @@ repos:
   # Markdown and prose lint over the governance documents. In this
   # repository documents are load-bearing.
   - repo: https://github.com/jackdewinter/pymarkdown
-    rev: v0.9.34
+    rev: v0.9.39
     hooks:
       - id: pymarkdown
         args: [--config, .pymarkdown.json, scan]

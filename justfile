@@ -10,12 +10,13 @@
 #                         for a fast pass while working
 #   just test             is the implementation right? The behaviour this
 #                         repository itself ships, the cases that must
-#                         fail included
+#                         fail included. It takes no arguments yet; it
+#                         gains them with the first suite that needs one
 #   just verify           both — what CI runs, and what a step passes
 #                         before it is handed over
 #
-# setup, check and test pass their arguments to their script unchanged,
-# so the two surfaces cannot drift: what `just check` accepts is what
+# setup and check pass their arguments to their script unchanged, so the
+# two surfaces cannot drift: what `just check` accepts is what
 # scripts/check.sh documents. Running those scripts directly is
 # equivalent; verify has no script of its own, it runs check then test.
 #
@@ -38,8 +39,8 @@ check scope="all":
     bash scripts/check.sh {{ scope }}
 
 # is the implementation right?
-test *flags:
-    bash scripts/test.sh {{ flags }}
+test:
+    bash scripts/test.sh
 
 # both — what CI runs, and what a step passes before it is handed over
 verify: check test

@@ -12,7 +12,9 @@ if [ ! -x "$VENV/bin/python" ]; then
     python3 -m venv "$VENV"
 fi
 
-"$VENV/bin/python" -m pip install --quiet --upgrade pip
+# No `pip install --upgrade pip` here: it fetches an unpinned tool from
+# the network on every run, which is exactly what the pinned-toolchain
+# claim is meant to exclude. The pip that venv ships is sufficient.
 "$VENV/bin/python" -m pip install --quiet -r requirements.txt
 
 # The commit hooks run the same checks as `just check`, so the local
