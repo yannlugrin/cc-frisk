@@ -705,6 +705,14 @@ quantifiers), §9 (the effective registry must be inspectable).
 - The API-generation declaration the scaffold will write, and the
   fail-closed check when a config declares a generation outside the
   accepted range.
+- **The configuration's location convention**, fixed here rather than at
+  the scaffold: §5.1 puts the config in a dedicated directory inside the
+  project's `.claude/`, whose name should carry the plugin's name. This
+  plan assumes `.claude/frisk/` and logs it at this step, because every
+  later step's test instructions say "write a config by hand in a scratch
+  project", `018`'s hook must resolve it, and `021`'s same-configuration
+  requirement presupposes it. The scaffold at `024` *creates* that
+  directory; it does not get to invent where it goes.
 - **The effective-registry inspection surface** (§3.4 requires it: "the
   effective registry must be inspectable (§9) so composition never hides
   a rule") — `frisk` prints the composed registry, each declaration's
@@ -1214,6 +1222,14 @@ same-configuration), §8.2 (the CI pin), §13 (what first exposure owes).
   from different configs.
 - The engine version the project pins for CI, recorded beside the
   configuration.
+- **This is the step at which an existing prototype-guarded project can
+  switch.** Nothing after it is a precondition for that: `022` measures
+  plugin-system facts whose unfavourable branches cost durability of
+  validation state, a failure-policy dial and the sentinel's rationale —
+  §2.2 calls item 6's bad outcome "a performance-and-reach cost, never a
+  correctness or safety one" — while `023` and `024` supply starter
+  content and a scaffold that a project bringing its own registry does
+  not use.
 - **The trust statement, brought forward from `028`.** This is the commit
   that makes the repository installable by anyone who finds it, and §13
   says the first public exposure of a permission-path tool must not lack
@@ -1328,8 +1344,7 @@ project).
 **Deliverables.**
 
 - The scaffold creating the configuration directory inside the target
-  project's `.claude/` — the name carries the plugin's name; this plan
-  assumes `.claude/frisk/` and logs it here — pre-filled with the starter
+  project's `.claude/`, at the location `007` fixed — pre-filled with the starter
   registry, the API-generation declaration, and the starter cases.
 - **§9's stable scaffold-created entry point inside the project**, written
   into that same directory: the first of §9's three doors, and what
@@ -1358,16 +1373,19 @@ project).
   is a 1.0 item (§13) and arrives at `035`. The scaffold gains the offer
   there.
 
-**Adoption is complete at this step, and that includes replacement.** A
-project moving off a prototype-generation hook needs nothing later: the
-engine's behaviour is corpus-complete after `017`, the hook, both gates
-and the validation triggers are in place, and the proof that *this
-project's* verdicts did not move is its own cases re-running under
-`019`'s selftest — which is exactly the mechanism §3.5's third layer and
-§8.2 exist for. What arrives after this step is the *project's* release
-paperwork, not the operator's capability. Transcribing an existing
-prototype registry into frisk's declaration form remains hand work; see
-§14 Q11.
+**This step completes adoption for a project that has no boundary yet.**
+A project *replacing* a prototype-generation hook does not need it, and
+does not need `022` or `023` either: it brings its own registry and its
+own cases, so the starter content, the scaffold that writes it and the
+pairing guidance for settings it has already paired are all conveniences
+rather than preconditions. **Replacement is possible from `021`** — the
+engine is corpus-complete after `017`, the hook, both gates and the
+validation triggers are in place by `020`, and `021` supplies the
+supported install path, the resolution rule and both CLI doors. The proof
+that *this project's* verdicts did not move is its own cases re-running
+under `019`'s selftest, which is exactly the mechanism §3.5's third layer
+and §8.2 exist for. Transcribing an existing prototype registry into
+frisk's declaration form remains hand work; see §14 Q11.
 
 **How the operator tests it.** Scaffold a throwaway project, read the
 generated config in one pass (the legibility requirement is this test),
@@ -1402,8 +1420,8 @@ with the plugin installed. Cleanup: delete the throwaway project.
 
 **Objective.** Declare parity against the yardstick, or name exactly what
 is missing. **This is the project's release claim, not a gate on anyone's
-adoption**: an operator can adopt frisk, or replace a prototype hook with
-it, from `024` onward. What this step decides is whether the maintainer
+adoption**: an operator can replace a prototype hook from `021` onward,
+and adopt frisk in a project with no boundary from `024`. What this step decides is whether the maintainer
 may say *parity* in public and tag a release on it.
 
 **Spec sections.** §8.1 (the corpus as the parity yardstick), §13 (the
@@ -1778,7 +1796,12 @@ silent assumptions.
    closes. If the operator wants them sized now, say so.
 6. **The config directory's name.** §5.1 leaves it to the implementation
    and says it "should carry the plugin's name". This plan assumes
-   `.claude/frisk/` in a target project and will log it at `024`.
+   `.claude/frisk/` in a target project and logs it at `007` — moved
+   there from the scaffold step, because `018`'s hook must resolve the
+   config, `021`'s same-configuration requirement presupposes a
+   convention, and every engine step's test instructions already assume
+   one. The scaffold creates the directory; it does not decide where it
+   goes.
 7. **The interim honesty obligations.** §4.3 and §4.4 require interim
    gaps to be *named in the honesty documentation* — a 1.0 deliverable
    (`039`) — while the gaps exist from parity. This plan names them in
