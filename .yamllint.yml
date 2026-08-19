@@ -1,0 +1,17 @@
+# yamllint configuration for the whole repository.
+---
+extends: default
+
+rules:
+  line-length:
+    max: 100
+  truthy:
+    allowed-values: ["true", "false"]
+  comments:
+    min-spaces-from-content: 1
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: false
+
+ignore: |
+  .venv/

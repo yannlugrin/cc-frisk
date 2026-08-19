@@ -1,0 +1,9 @@
+# The pinned toolchain, installed by `just setup` into ./.venv.
+#
+# Only pre-commit lives here. Every linter is a pre-commit hook pinned by
+# `rev` in .pre-commit-config.yaml, in its own isolated environment — one
+# pin per tool, in one place, and no linter needs to share this
+# interpreter. `just` itself is a system tool, installed per workstation
+# like python3 and git, so `just setup` is the entry point with nothing
+# before it.
+pre-commit==4.4.0

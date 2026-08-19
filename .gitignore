@@ -1,4 +1,31 @@
+# Isolated worktrees materialize inside the repository; a commit made
+# while one exists swallows the checkout, which has happened.
 .claude/worktrees/
-__pycache__/
+
+# The quarantined development guard (CLAUDE.md rule 1). Never tracked:
+# this repository is the plugin's public install channel, and no later
+# strip removes what an initial commit carries.
 .claude/hooks/bash_guard.py
 .claude/spec-work/handoff/assets/bash_guard.py
+
+# Reviewer reports. Untracked and ignored, so a report never blocks the
+# clean-tree preconditions the handover and approve rituals read.
+.claude/reviews/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+*.egg-info/
+
+# Test, type and lint caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Machine-local instructions, outside git by design
+CLAUDE.local.md

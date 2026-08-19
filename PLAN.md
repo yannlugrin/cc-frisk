@@ -100,7 +100,7 @@ machine" means shared, public state — the forge; rule 6's close-riding
 backup-ref push to the operator's private backup remote is earlier and
 does not count against this ordering.)
 
-### 000 — The harness, local only — `in progress`
+### 000 — The harness, local only — `awaiting test`
 
 **Objective.** A repository that can say, in one documented command,
 whether what it contains is well-formed — and can prove it from a fresh
@@ -145,7 +145,8 @@ later.
   knows about, and **a lint error in a file that exists but was never
   added to the index must still fail `check`**. Never
   `git add --intent-to-add`: it writes to the index as a side effect of
-  a check, turns `?? file` into ` A file` in `git status --porcelain` —
+  a check, turning an untracked `??` line into an added `A` one in
+  `git status --porcelain` —
   the output the handover and approve rituals read for their clean-tree
   preconditions — and lets the next `git commit -a` sweep the file into
   an unrelated commit.

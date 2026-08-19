@@ -30,13 +30,17 @@ operator.
 | `DECISIONS.md` | The decision log — every choice made during implementation, with its context, alternatives and who approved it. |
 | `PLAN.md` | The implementation plan: milestones and steps, each with its objective, the specification sections it implements, its deliverables and how they are tested. Also the §13 re-inventory, the open-fact ledger, the specification coverage map, the external prerequisites and the open questions. |
 | `CLAUDE.md` | Standing instructions for the implementing AI. Directive, and addressed to it alone — not a description of the project. |
+| `justfile`, `scripts/` | The documented entry points: `just setup`, `just check [all\|changed]`, `just test`, `just verify`. The scripts are thin glue; the checks themselves are configured, not written. |
+| `.pre-commit-config.yaml`, `requirements.txt`, `.yamllint.yml`, `.pymarkdown.json` | The pinned toolchain and its configuration. The same checks run from the commit hook and from `just check`, so the two cannot disagree. |
 | `.claude/refs/` | Material supplied by the project owner as input: the adjudicated behavior corpus (the parity yardstick of §8.1) and house harness conventions. Read-only; its authority lives at its source. |
 | `.claude/spec-work/` | The specification phase's own working history. Not part of the product. |
 
 Directories that appear as the implementation proceeds — `src/frisk/`,
-`tests/`, `hooks/`, `skills/frisk/`, `.claude-plugin/`, `docs/`,
-`scripts/`, `.github/workflows/` — are described in `PLAN.md` at the
-step that creates them.
+`tests/`, `hooks/`, `skills/frisk/`, `.claude-plugin/`, `collections/`,
+`docs/`, `.github/workflows/` — are described in `PLAN.md` at the step
+that creates them.
+
+To build and check the repository: `just setup`, then `just verify`.
 
 ## Authority order
 

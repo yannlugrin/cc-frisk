@@ -1,0 +1,76 @@
+# The check families for this repository, pinned.
+#
+# `just check` and the commit hook both run this file, so the local
+# runners cannot diverge: the commit hook judges what is about to be
+# committed, `just check` what is on disk.
+#
+# Families arrive with the first artifact of their class, never ahead of
+# it, so a green gate never says anything about files that are not there.
+# Present at step 000: YAML, JSON, POSIX shell, Markdown, repository
+# hygiene and security, and whitespace discipline. Python and TOML join
+# at step 006 with the engine; governance frontmatter at step 003 with
+# the first skill; the guard's own liveness gate at step 001.
+---
+exclude: |
+  (?x)^(
+      \.claude/spec-work/.*
+    | \.claude/refs/.*
+  )$
+
+repos:
+  # Repository hygiene and security, and whitespace discipline. The
+  # stock collection of the runner, pinned, no code written.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      # Whitespace and newline discipline. These are fixers: the commit
+      # hook is where they write, and `just check` reverts and reports
+      # instead (scripts/check.sh says why).
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+      # Hygiene
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: check-case-conflict
+      - id: check-symlinks
+      - id: destroyed-symlinks
+
+      # Security — CLAUDE.md rule 5. A committed secret is a rotated
+      # secret, so this is the one family whose breach cannot be undone
+      # by noticing it afterwards.
+      - id: detect-private-key
+      - id: detect-aws-credentials
+        args: [--allow-missing-credentials]
+
+      # Parse checks. .claude/settings.json is the permission
+      # enforcement mechanism itself, so a malformed edit to it fails
+      # exactly as quietly as a skill that never loads.
+      - id: check-json
+      - id: check-yaml
+
+  # YAML lint. The hook runner's own configuration is the first artifact
+  # of this class.
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.37.1
+    hooks:
+      - id: yamllint
+        args: [--strict]
+
+  # POSIX shell lint. shellcheck ships as a pinned binary inside this
+  # hook's environment, so it is not a system prerequisite.
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+
+  # Markdown and prose lint over the governance documents. In this
+  # repository documents are load-bearing.
+  - repo: https://github.com/jackdewinter/pymarkdown
+    rev: v0.9.34
+    hooks:
+      - id: pymarkdown
+        args: [--config, .pymarkdown.json, scan]

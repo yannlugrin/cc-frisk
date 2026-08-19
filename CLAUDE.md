@@ -344,8 +344,8 @@ Rule 1's quarantine survives that deletion, attached to
 
 ## Current state
 
-- **Current step:** `000` — the harness, local only (approved plan,
-  2026-08-19).
+- **Current step:** `000` — the harness, local only; awaiting the
+  operator's test.
 - **Next step:** `001` — the permission and hook baseline.
 - **World state:** the plan is approved and `D-001`–`D-009` are settled.
   No harness yet, no tooling, no permission baseline, no code.
@@ -356,8 +356,10 @@ Rule 1's quarantine survives that deletion, attached to
   `023`, Q11 (a prototype-to-frisk migration aid) at `024`. The sentinel
   may be re-staged before parity if `D-007`'s residue proves
   uncomfortable.
-- **`.claude/docs/` pointers:** none yet; `guard-record.md` arrives at
-  step `001`.
+- **`.claude/docs/` pointers:** `harness.md` — the measured behaviour of
+  `just check`/`test`/`verify` and the commit hooks; read before changing
+  the `justfile`, `scripts/`, `.pre-commit-config.yaml` or any linter
+  config. `guard-record.md` arrives at step `001`.
 
 *A closed list of item kinds — current and next step, live world-state,
 open obligations, `.claude/docs/` pointers — and nothing else. What a
