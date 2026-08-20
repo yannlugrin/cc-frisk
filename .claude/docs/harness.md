@@ -3,9 +3,6 @@
 **Read before changing `justfile`, `scripts/`, `.pre-commit-config.yaml`
 or any linter config.**
 
-**Budget: 150 lines.** Instructions and measured values only — reasons
-live in `DECISIONS.md`, history in git.
-
 Measured 2026-08-19 on `just` 1.45.0, `pre-commit` 4.4.0, Python 3.14.4
 (system), git 2.53.0, Linux 6.18 (WSL2).
 

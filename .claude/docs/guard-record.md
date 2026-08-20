@@ -6,9 +6,6 @@ designing any probe of a permission mechanism (see [Method](#method)).
 It holds what a later session needs and cannot get by reading the guard,
 because reading it is forbidden.
 
-**Budget: 250 lines.** It is loaded whole at its trigger. A record nobody
-reads is worse than none; measurements and commands stay, prose goes.
-
 ## The quarantine
 
 `.claude/hooks/bash_guard.py` is prototype tooling for *this repository's
