@@ -344,9 +344,9 @@ Rule 1's quarantine survives that deletion, attached to
 
 ## Current state
 
-- **Current step:** none — `000` closed 2026-08-19.
-- **Next step:** `001` — the permission and hook baseline (the first step
-  that touches the operator's live Claude Code settings).
+- **Current step:** `001` — the permission and hook baseline (the first
+  step that touches the operator's live Claude Code settings).
+- **Next step:** `002` — the probe campaign and the guard record.
 - **World state:** the harness is live and green — `just setup`,
   `just check [all|changed]`, `just test`, `just verify`, with the same
   checks in the commit hook. No permission baseline, no tooling, no
