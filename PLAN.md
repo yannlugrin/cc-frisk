@@ -162,7 +162,7 @@ does not count against this ordering.)
   indistinguishable from an ungated one and the transcript records no
   decisions. Detail in git history between tags step-001 and step-002.
 
-### 003 — Workflow tooling, part one: the probes and the skills — `pending`
+### 003 — Workflow tooling, part one: the probes and the skills — `in progress`
 
 **Objective.** Measure what a subagent can actually see, then instantiate
 the four session rituals under the answer.
@@ -285,6 +285,22 @@ the templates directory.
   scope both exclude `.claude/hooks/bash_guard.py` **unconditionally** —
   they read files, not diffs; these are the quarantine's tooling-step
   mechanisms, symmetric across every file-reading agent.
+- **`003`'s three probe fixtures are deleted here**, their answers
+  having been recorded in `.claude/docs/subagents.md` by then:
+  `.claude/agents/probe-tools-restricted.md`,
+  `.claude/agents/probe-tools-open.md` and
+  `.claude/skills/probe-frontmatter/SKILL.md`. They are tracked and
+  appear in every session's agent and skill lists until they go, which
+  is the price of measuring rather than assuming — paid for one step,
+  not two.
+- **The agent-name arm of the governance citation check joins here**,
+  deferred from `003` for the only honest reason: at `003`
+  `handover-step` and `approve-step` name agents that do not yet exist,
+  so the check could not have been green, and a suppression list built
+  for one step is worse than a check that arrives when it can pass. The
+  shape is `` `<name>` agent ``, resolved against `.claude/agents/`;
+  `scripts/check_frontmatter.py` already carries the path-and-heading
+  arm and the prohibition on scanning prose.
 - **In the same commit**: `.claude/spec-work/handoff/assets/` is deleted
   and every pointer and exception referring to it — `CLAUDE.md`'s
   temporary tooling-templates block among them — goes with it. All nine

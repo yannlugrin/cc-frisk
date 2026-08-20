@@ -357,16 +357,16 @@ Rule 1's quarantine survives that deletion, attached to
 
 ## Current state
 
-- **Current step:** none — `002` closed 2026-08-20.
-- **Next step:** `003` — workflow tooling, part one.
+- **Current step:** `003` — workflow tooling, part one.
+- **Next step:** `004` — workflow tooling, part two: the agents.
 - **World state:** the harness is live and green (`just setup`
   bootstraps it), with the same checks in the commit hook, which now
-  also gate the boundary. The permission baseline is in
-  `.claude/settings.json`, measured and unchanged; the guard is live and
-  untracked, versioned on `refs/backups/bash-guard`. `origin` is
-  `github.com/yannlugrin/cc-frisk`, **public**; no private backup remote
-  exists, so the backup ref is local-only. **Every write under
-  `.claude/` prompts** — no setting removes it.
+  also gate the boundary and the governance frontmatter. The permission
+  baseline is in `.claude/settings.json`, measured and unchanged; the
+  guard is live and untracked. `origin` is
+  `github.com/yannlugrin/cc-frisk`, **public**, and no backup remote
+  exists. **Every write under `.claude/` prompts** — no setting removes
+  it.
 - **Open obligations:** `PLAN.md` §14 carries eleven open questions,
   each answered at the step that needs it. The sentinel may be re-staged
   before parity if `D-007`'s residue proves uncomfortable. `D-010` was
@@ -384,7 +384,12 @@ Rule 1's quarantine survives that deletion, attached to
   the quarantined guard's restore recipe, commands, reach, blind spots
   and platform probes with the liveness triple; read before touching
   `.claude/settings.json` or anything under `.claude/hooks/`, **and
-  before designing any probe of a permission mechanism**.
+  before designing any probe of a permission mechanism**. `subagents.md`
+  — what a subagent's context carries, what skill and agent frontmatter
+  binds, when a definition loads, and the citation shape the harness
+  resolves; read before writing or changing anything under
+  `.claude/skills/` or `.claude/agents/`, or relying on a subagent to
+  know a rule.
 
 *A closed list of item kinds — current and next step, live world-state,
 open obligations, `.claude/docs/` pointers — and nothing else. A closed
