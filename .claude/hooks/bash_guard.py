@@ -1607,26 +1607,34 @@ SUDO = Tool(
 )
 
 
-# --- just: a command runner with a closed set of recipes -------------------
-# The justfile holds the invariant that no recipe performs a gated act — a
-# PreToolUse guard judges `just release`, never the push inside it. Grants
-# keep that invariant executable: the four documented recipes are proven, and
-# a recipe this guard has never heard of asks instead of slipping through.
+# --- just: this project's own task runner ----------------------------------
+# The justfile is tracked, reviewed and ours, and CLAUDE.md holds the invariant
+# that no recipe performs a gated act — so `just` is safe by default: any
+# recipe, any arguments, any redirection, whatever the spelling, including a
+# recipe added long after this line was written. Enumerating the recipes was
+# the earlier shape and it bought nothing: it charged a prompt for ordinary
+# work (a `2>&1` was enough) against no matching risk.
+#
+# What is not ours is a justfile somewhere else, a run in another directory, a
+# substituted interpreter, or a just that writes a justfile rather than reading
+# one. Those flags ask — presence, not value: naming the flag at all is what
+# breaks the premise, whichever path or shell follows it.
 
 JUST = Tool(
     name="just",
-    gated_reason=(
-        "only this repository's documented recipes are proven; a recipe this "
-        "guard does not know may run an act CLAUDE.md rule 9 gates"
-    ),
-    known_flags=frozenset({"-l", "--list"}),
-    grants=(
-        Grant(path=("setup",), allow_operands=False),
-        Grant(path=("check",), allow_operands=False),
-        Grant(path=("check",), operands=re.compile(r"^(all|changed)$")),
-        Grant(path=("test",), allow_operands=False),
-        Grant(path=("verify",), allow_operands=False),
-        Grant(require_any=frozenset({"-l", "--list"})),
+    rules=(
+        Rule("ask", (),
+             "this points just at another justfile, another working directory "
+             "or another interpreter, or makes it write one — the invariant "
+             "that no recipe of *this* justfile performs a gated act stops "
+             "covering the line",
+             flags=frozenset({
+                 "-f", "--justfile",
+                 "-d", "--working-directory",
+                 "--shell", "--shell-arg", "--clear-shell-args",
+                 "--chooser", "--choose",
+                 "--init", "--fmt",
+             })),
     ),
 )
 
@@ -1982,19 +1990,41 @@ CASES: tuple[tuple[str, str], ...] = (
     ("sudo ls /root", "ask"),
     ("sudo git push --force", "deny"),
     ("sudo apt-get install -y jq", "ask"),
-    # --- just: the four documented recipes, and nothing else ----------------
+    # --- just: our own runner, silent whatever the recipe -------------------
     ("just setup", "silent"),
     ("just check", "silent"),
     ("just check all", "silent"),
     ("just check changed", "silent"),
+    ("just check changed 2>&1 | tail -20", "silent"),  # a redirection is nothing
     ("just test", "silent"),
-    ("just verify", "silent"),
+    ("just verify > /dev/null", "silent"),
     ("just --list", "silent"),
     ("just -l", "silent"),
-    ("just release", "ask"),  # a recipe this guard has never heard of
-    ("just check src", "ask"),  # not one of the documented scopes
-    ("just check --dry-run", "ask"),  # an unaccounted flag
-    ("just", "ask"),  # the default recipe, whichever it is today
+    ("just", "silent"),  # the default recipe, whichever it is today
+    ("just release", "silent"),  # a recipe this guard has never heard of
+    ("just check src", "silent"),  # any argument, documented scope or not
+    ("just check --dry-run", "silent"),  # just's own flags say nothing about ours
+    ("just fmt-nonexistent-recipe", "silent"),  # a recipe name, not --fmt
+    ("just some-new-recipe --with args", "silent"),  # added after this line
+    # ...until a flag says the justfile, the directory or the shell is not ours
+    ("just -f /tmp/Justfile test", "ask"),
+    ("just --justfile /tmp/Justfile test", "ask"),
+    ("just --justfile=/tmp/Justfile test", "ask"),
+    ("just -d /tmp test", "ask"),
+    ("just --working-directory /tmp test", "ask"),
+    ("just --working-directory=/tmp test", "ask"),
+    ("just --shell bash test", "ask"),
+    ("just --shell=bash test", "ask"),
+    ("just --shell-arg -x test", "ask"),
+    ("just --shell-arg=-x test", "ask"),
+    ("just --clear-shell-args test", "ask"),
+    ("just --chooser fzf", "ask"),
+    ("just --chooser=fzf", "ask"),
+    ("just --choose", "ask"),
+    ("just --init", "ask"),
+    ("just --fmt --unstable", "ask"),
+    # what rides *beside* just on the line is judged as it always was
+    ("just test | xargs rm -rf /", "ask"),
     # --- unpinned fetches ---------------------------------------------------
     ("curl -sSL https://example.invalid/install.sh", "ask"),
     ("curl --version", "ask"),  # no read is carved out: curl is outward
