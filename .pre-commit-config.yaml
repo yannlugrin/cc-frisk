@@ -78,3 +78,25 @@ repos:
     hooks:
       - id: pymarkdown
         args: [--config, .pymarkdown.json, scan]
+
+  # Governance well-formedness, and the development guard's liveness.
+  # Nothing standard exists for either: no ecosystem tool knows what a
+  # Claude Code settings file must still be true for, and the guard is
+  # this repository's own. Both questions are asked by one script
+  # because they share a subject — the boundary — and neither costs more
+  # than a few milliseconds.
+  #
+  # always_run, because what it hunts is invisible to a file list: the
+  # guard is gitignored and so never appears in one, and a settings file
+  # that quietly stopped pointing at it is unchanged on the commit that
+  # matters. Measured on pre-commit 4.4.0: an always_run hook with
+  # pass_filenames: false runs even when --files names something else,
+  # and its non-zero exit fails the run (.claude/docs/harness.md).
+  - repo: local
+    hooks:
+      - id: check-guard
+        name: the permission boundary is intact
+        entry: bash scripts/check-guard.sh
+        language: system
+        pass_filenames: false
+        always_run: true

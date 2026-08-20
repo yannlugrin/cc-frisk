@@ -404,3 +404,142 @@ Two conventions the format depends on:
   replacement and found none — but the rule asks for the question, not
   for the answer to be right, and the question was skipped. Reversible on
   request.
+
+### D-011 — The permission baseline: broad allows, a guard, a short deny backstop
+
+- **Date:** 2026-08-20
+- **Step:** `001` (the permission and hook baseline)
+- **Context:** rule 9 draws a boundary around this repository's own
+  development — local and read-only is free, outward or usage-spending
+  is gated — and rule 4 says that boundary is never the implementer's to
+  set. Claude Code's native permission rules match on command prefixes,
+  which cannot express "a force push however it is spelled":
+  `Bash(git push:*)` misses `git -C dir push`, and no prefix reaches a
+  push hidden in a substitution. A parsing `PreToolUse` guard can, which
+  is why one is instantiated here — and why the settings must be shaped
+  around it rather than duplicating it.
+- **Decision:** `.claude/settings.json` carries, as one piece:
+  `defaultMode: acceptEdits`; `disableBypassPermissionsMode: "disable"`
+  and **no** `disableAutoMode`, leaving `auto` reachable so `002` can
+  A/B a classifier against the guard; one **broad allow per
+  registry-bearing tool** (`git`, `gh`, `pip`, the delete family, the
+  boundary-file writers) so the guard is what judges them, plus a short
+  list of plainly read-only utilities that the guard leaves silent and
+  which would otherwise prompt on every `ls`; **exact-match allows for
+  the six documented `just` recipe spellings** rather than
+  `Bash(just:*)`, because a broad allow on a command-runner is a broad
+  allow on everything it runs the moment the guard is dead; **no broad
+  allow for any runner** — `python3`, `sudo`, `env`, `xargs` and their
+  kin included, which is a real cost, since rule 9's free list names
+  `python3` and it will now prompt, as will the documented direct
+  equivalents `bash scripts/check.sh` and `.venv/bin/pre-commit run`,
+  a friction accepted rather than papered over with `Bash(bash:*)`;
+  **no `ask` rule for anything the guard gates**, since a matching `ask`
+  prompts even where the guard says allow and would cancel every
+  carve-out; **no prefix rule restating a guard decision**, `git push`
+  included; an `ask` tier on the **native file tools** for
+  `.claude/settings.json` and `.claude/hooks/**`, ask rather than deny
+  so the guard's own maintenance keeps an unlock path; and an
+  **eleven-line `deny` backstop** confined to acts that cannot be undone
+  — force, mirror, delete and prune pushes, `filter-branch`,
+  `filter-repo`, `reflog expire`, `update-ref -d` and
+  `update-ref --stdin` — which binds when the hook is dead. Auto memory
+  stays off. A third allow category is named honestly beside the other
+  two: `mkdir`, `touch`, `mktemp` are neither registry-bearing nor
+  read-only, but they are trivially local writes the loop needs. `chmod`
+  was in that group and was **removed**: `chmod -x` on the guard is the
+  disarm, so it is gated in the guard and prompts here. Said plainly,
+  and recorded in `.claude/docs/guard-record.md`: a broad allow plus a
+  dead hook is a **wider** surface than a narrow allow list ever was;
+  the backstop covers **canonical spellings only** (prefix rules match
+  from the start of the line, so `git push origin main --force` matches
+  nothing though the guard denies it — that gap is this project's
+  thesis); and it deliberately does not cover destructive deletes, whose
+  spellings are an open set a prefix rule cannot enumerate.
+- **Alternatives considered:** *A blanket `Bash` allow with the guard as
+  the only gate* — maximal convenience, and the maximal version of the
+  dead-guard hole; rejected for the same reason wrappers get no broad
+  allow. *Keeping the narrow allow list and no guard* — rejected: it is
+  what cannot express the spellings that matter, and this repository's
+  whole subject is that gap. *`default` (manual) mode* — rejected by the
+  operator as a prompt per governance-document edit, on a workflow that
+  edits several per step. *`auto` mode as the baseline* — rejected: it
+  puts a second, non-deterministic decider beside the guard, and for a
+  project whose product *is* a deterministic guard the two disagreeing
+  is worse than either alone. *Locking `auto` out as well* — rejected by
+  the operator, who wants it available for the `002` comparison.
+  *Restating the push gate as a prefix `ask`* — rejected: strictly
+  weaker than the guard's rule and a second source of truth. *A `deny`
+  on the ordinary push* — rejected outright: rule 6 attempts a push at
+  every step close, and a denied pattern cannot be approved in the very
+  exchange rule 9 relies on.
+- **Approved by:** *pending* — put to the operator at step `001`'s
+  handover, as the plan requires the whole to be reviewed as one piece.
+  Three components are already the operator's own rulings of 2026-08-20:
+  the permission mode, the bypass lock without the auto lock, and the
+  absence of a backup remote. **Two spellings in this entry are
+  unverified against the running version and are `002`'s first probes:**
+  whether `Bash(git push --force:*)` actually matches (if not, the
+  backstop is decoration), and whether an explicit `ask` rule beats
+  `acceptEdits` for `Edit`/`Write` (if not, the boundary's own files
+  need the `deny` tier and a named unlock path instead).
+
+### D-012 — The boundary is inert exactly where the guard is absent
+
+- **Date:** 2026-08-20
+- **Step:** `001` (the permission and hook baseline)
+- **Context:** the guard is machine-local and never tracked — this
+  repository is the plugin's public install channel, and no later strip
+  removes what an initial commit carries. But the settings file that
+  registers it *is* committed, and the gates that keep it honest run in
+  the same `just check` that CI runs. Nothing committed may reference the
+  guard in a way that fails where it is absent: CI and fresh clones never
+  have it, this machine always should. The two failures pull in opposite
+  directions — a gate that is loud everywhere breaks every clone, and a
+  gate that is quiet everywhere misses the silent death it exists to
+  catch.
+- **Decision:** two mechanisms, both keyed on the same fact. **(1) The
+  hook registration is self-guarding**:
+  `g="${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/bash_guard.py"; [ -x "$g" ]
+  && exec "$g" || exit 0`. `exec` hands the process over, so a present
+  guard's stdout and exit code arrive untouched; an absent one exits 0
+  in silence, and a clone of the public repository carries a hook that
+  costs nothing. Verified in all four combinations (present/absent ×
+  variable set/unset). **(2) Both gates key on
+  `refs/backups/bash-guard`** — the backup ref the instantiation creates
+  — as the marker for "the guard is expected here". It exists on
+  machines that instantiated the guard, lives outside `refs/heads/`, and
+  is carried by no clone or default refspec. `scripts/check-guard.sh`
+  always asserts governance well-formedness — both settings files parse,
+  neither disables all hooks nor re-enables auto memory, the effective
+  mode is not a permissive one, the bypass lock and a non-empty `deny`
+  backstop survive, and a `PreToolUse` hook matching Bash still names the
+  guard — and, where the marker is, **executes the registered command
+  line** with a force-push payload and requires a `deny` back, which a
+  substring test cannot do. `just test` runs `--selftest` under the same
+  condition. **Linked worktrees are named explicitly**: the marker lives
+  in the shared git directory while the gitignored guard does not, so a
+  worktree would otherwise run the tracked allow list with no guard
+  behind it — both gates fail there and print the symlink that fixes it.
+  Twelve states plus the worktree case were probed rather than assumed
+  (`.claude/docs/harness.md`, probe 6).
+- **Alternatives considered:** *Keying the gates on the guard file
+  itself* — rejected as self-defeating: a deleted guard would make its
+  own gate inert, which is precisely the silent death being hunted.
+  *A separate machine-local sentinel file* — rejected under rule 11: the
+  backup ref already exists exactly where the guard is expected, and a
+  second marker is a second thing to keep true. *Putting the hook
+  registration in the gitignored `.claude/settings.local.json`* —
+  genuinely tempting, since a machine-local fact belongs in a
+  machine-local file, and rejected on review: the registration would then
+  be unversioned and unreviewable, the operator would review two files
+  instead of one diff, and the governance check would have no pointer to
+  assert. *Registering the plain path and accepting hook errors in
+  clones* — rejected: this repository is a public install channel, and
+  shipping a settings file whose hook fails on every Bash call is a
+  defect delivered to strangers.
+- **Approved by:** implementer (within latitude: a workflow choice the
+  bootstrap instructions left open — the harness's shape and names).
+  The custom check itself needs no separate sanction: `CLAUDE.md`'s
+  harness note already provides for a few-line governance check, no
+  ecosystem tool answering either question.
