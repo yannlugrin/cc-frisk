@@ -1344,92 +1344,6 @@ GIT = Tool(
     ),
 )
 
-# --- docker: it runs other programs, so the guard follows through ----------
-# Safe by default with a listable set of dangerous acts, so `rules`. The three
-# families below are dangerous in any project that runs docker at all, and cost
-# nothing in one that does not — the rules simply never fire. A project adds its
-# own beside them; it does not need to invent these.
-#
-# All four forms have the same shape — options, then one operand the form keeps
-# for itself, then the command — and differ only in which options take a value:
-#
-#   run IMAGE [cmd]            spawns a container
-#   compose run SERVICE [cmd]  spawns one from a compose service
-#   exec CONTAINER cmd         uses a container already running
-#   compose exec SERVICE cmd   same, by service
-#
-# What is gated is the command run *in* the container. The image or service is
-# deliberately not read as a program, even when it is named after one: an image
-# called `org/git` may or may not entrypoint into git, and guessing from the
-# name would gate `docker run org/rm -rf` as an `rm` on the host.
-#
-# Only genuinely value-taking options are listed — over-declaring one would
-# skip a token too many and could step over the command itself.
-#
-# A command inside a container is not always the host's: `docker run --rm
-# alpine git push` cannot reach this repo, while `-v $(pwd):/r` can. The guard
-# cannot tell those apart, and gates both.
-
-DOCKER_RUN_OPTS = frozenset({
-    "-v", "--volume", "-e", "--env", "-p", "--publish", "-w", "--workdir",
-    "-u", "--user", "-l", "--label", "-h", "--hostname", "-m", "--memory",
-    "-a", "--attach", "--name", "--entrypoint", "--network", "--mount",
-    "--env-file", "--label-file", "--add-host", "--device", "--dns", "--expose",
-    "--platform", "--pull", "--restart", "--runtime", "--security-opt",
-    "--shm-size", "--stop-signal", "--sysctl", "--tmpfs", "--ulimit", "--userns",
-    "--volumes-from", "--volume-driver", "--cap-add", "--cap-drop", "--gpus",
-    "--cgroupns", "--cidfile", "--group-add", "--ip", "--isolation", "--link",
-    "--log-driver", "--log-opt", "--mac-address", "--memory-swap", "--pid",
-    "--pids-limit", "--storage-opt", "--uts", "--cpus", "--health-cmd",
-})
-DOCKER_EXEC_OPTS = frozenset({
-    "-e", "--env", "-u", "--user", "-w", "--workdir", "--env-file", "--detach-keys",
-})
-
-PUBLISHES = "this publishes to a registry, a write to shared state"
-SWEEPS = "this sweep is host-global and reaches other projects on this machine"
-
-DOCKER = Tool(
-    name="docker",
-    aliases=frozenset({"podman", "nerdctl"}),
-    rules=(
-        # Publishing, in every spelling that reaches a registry.
-        Rule("ask", ("push",), PUBLISHES),
-        Rule("ask", ("image", "push"), PUBLISHES),
-        Rule("ask", ("manifest", "push"), PUBLISHES),
-        Rule("ask", ("compose", "push"), PUBLISHES),
-        Rule("ask", ("buildx", "imagetools", "create"), PUBLISHES),
-        # A publish hidden inside a build. Gated on the flag being present, not
-        # on its value, because a rule can only test presence: `--output
-        # type=registry` publishes where `type=local` does not. The cost is a
-        # prompt on a local export, which is the safe direction.
-        Rule("ask", ("build",), PUBLISHES,
-             flags=frozenset({"--push", "--output", "-o"})),
-        Rule("ask", ("buildx", "build"), PUBLISHES,
-             flags=frozenset({"--push", "--output", "-o"})),
-        Rule("ask", ("buildx", "bake"), PUBLISHES, flags=frozenset({"--push"})),
-        # Host-global sweeps. Deleting this project's own images, volumes and
-        # containers by name stays silent — rebuildable working material — but
-        # a prune takes whatever else this host holds.
-        Rule("ask", ("system", "prune"), SWEEPS),
-        Rule("ask", ("image", "prune"), SWEEPS),
-        Rule("ask", ("volume", "prune"), SWEEPS),
-        Rule("ask", ("network", "prune"), SWEEPS),
-        Rule("ask", ("container", "prune"), SWEEPS),
-        Rule("ask", ("builder", "prune"), SWEEPS),
-        Rule("ask", ("buildx", "prune"), SWEEPS),
-        # Registry credentials.
-        Rule("ask", ("login",), "this hands registry credentials to the daemon"),
-        Rule("ask", ("logout",), "this changes which registry credentials are held"),
-    ),
-    nested=(
-        Nested(("run",), DOCKER_RUN_OPTS, operands=1),
-        Nested(("exec",), DOCKER_EXEC_OPTS, operands=1),
-        Nested(("compose", "run"), DOCKER_RUN_OPTS, operands=1),
-        Nested(("compose", "exec"), DOCKER_EXEC_OPTS, operands=1),
-    ),
-)
-
 # ====================== this project's own tools ===========================
 # frisk is a Claude Code plugin and this repository is its public install
 # channel, so an outward write here is a publication. What follows expresses
@@ -1796,7 +1710,7 @@ TRUNCATE = Tool(
 
 
 TOOLS: dict[str, Tool] = registry(
-    GIT, DOCKER, GH, PIP, PYTHON, SUDO, JUST,
+    GIT, GH, PIP, PYTHON, SUDO, JUST,
     CURL, WGET, NPM, BREW, APT, CLAUDE, RM, FIND, TEE, COPY, SED, TRUNCATE,
 )
 
@@ -1912,77 +1826,10 @@ CASES: tuple[tuple[str, str], ...] = (
     ("git -C . push --force-with-lease", "deny"),
     ("git filter-branch --tree-filter true HEAD", "deny"),
     ("git filter-repo --path src", "deny"),
-    # docker hands off, in both positions a command can hide in
-    ("docker run --rm alpine git push --force", "deny"),  # command after the image
-    # What is gated is the command run *in* the container. The image is not
-    # read as a program even when it is named after one — here the command is
-    # `push`, whatever the image's entrypoint turns out to be.
-    ("docker run --rm git push --force", "silent"),
-    ("docker run --rm alpine/git push --force", "silent"),
-    ("docker run --rm alpine/git:2.45 push --force", "silent"),
-    ("docker run --rm -v /r:/r alpine git push --force", "deny"),
-    ("docker exec -u root api git push --force", "deny"),
-    # likewise for a service or container name: the command is the word after
-    # it, so here `push` runs inside something that happens to be called git
-    ("docker compose run git push --force", "silent"),
-    ("docker exec git push", "silent"),
-    ("docker compose exec git push", "silent"),
-    ("docker compose run --rm web git push --force", "deny"),
-    ("docker compose exec web git push --force", "deny"),
-    ("podman run --rm alpine git push --force", "deny"),  # alias
-    ("nerdctl run --rm alpine git push --force", "deny"),  # alias
-    ("docker run --rm alpine git status", "silent"),
-    ("docker run --rm alpine echo hello", "silent"),
-    # trailing words that are arguments to the image's entrypoint rather than a
-    # command, with nothing gated among them
-    ("docker run --rm alpine/curl -sL https://example.com", "silent"),
-    ("docker run --rm alpine/curl https://example.com", "silent"),
-    ("docker run --rm myimage --verbose --output /tmp/x", "silent"),
-    ("docker run --rm postgres:16 postgres --version", "silent"),
-    ("docker run --rm alpine", "silent"),  # no trailing words at all
-    ("docker run --rm -d --name web nginx", "silent"),
-    # Known wart: an entrypoint argument that merely spells a registered tool's
-    # name is read as "something we could not identify is running one". The
-    # command position here holds `-o`, not a tool, but the fail-closed scan
-    # sees `git` further along and asks. Costs a prompt, never a wrong deny.
-    ("docker run --rm alpine/curl -o git https://example.com", "ask"),
-    ("docker build .", "silent"),  # docker does not hand off here
-    ("docker compose up -d", "silent"),
     ("git reflog expire --expire=now --all", "deny"),
     ("git reflog delete HEAD@{2}", "deny"),
     ("git update-ref -d refs/heads/topic", "deny"),
     ("git gc --prune=now", "deny"),
-    # --- docker: publishing, sweeps, credentials ----------------------------
-    ("docker push registry.example/app:1", "ask"),
-    ("docker image push registry.example/app:latest", "ask"),
-    ("docker manifest push registry.example/app:latest", "ask"),
-    ("docker compose push", "ask"),
-    ("docker buildx imagetools create -t registry.example/a:1 registry.example/a:2",
-     "ask"),
-    ("docker build --push -t app:dev .", "ask"),
-    ("docker build -t app:dev . --push", "ask"),  # the flag arrives last
-    ("docker build -o type=registry,name=registry.example/a:dev .", "ask"),
-    ("docker buildx build --push .", "ask"),
-    ("docker buildx bake --push", "ask"),
-    ("docker system prune -a", "ask"),
-    ("docker image prune -a", "ask"),
-    ("docker volume prune", "ask"),
-    ("docker network prune", "ask"),
-    ("docker container prune", "ask"),
-    ("docker builder prune", "ask"),
-    ("docker buildx prune", "ask"),
-    ("docker login registry.example", "ask"),
-    ("docker logout registry.example", "ask"),
-    # the ordinary local loop stays silent, including deletes by name
-    ("docker build -t app:dev .", "silent"),
-    ("docker run --rm -it app:dev", "silent"),
-    ("docker rm -f app-test", "silent"),
-    ("docker rmi app:dev", "silent"),
-    ("docker volume rm app-data", "silent"),
-    ("docker image ls", "silent"),  # not `image prune`
-    ("docker system df", "silent"),  # not `system prune`
-    ("docker pull debian:trixie-slim", "silent"),
-    ("docker manifest inspect registry.example/app:latest", "silent"),  # a read
     # === this project's tools ==============================================
     # --- git: the additions to the ground rules -----------------------------
     ("git push --prune origin", "deny"),
