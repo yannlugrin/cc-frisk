@@ -6,12 +6,19 @@
 quarantine: everything about the guard that a later session needs and
 cannot get by reading the file, because reading the file is forbidden.
 
-Written at step `001` (2026-08-20). Step `002` adds
+Written at step `001` (2026-08-20). Step `002` added
 [the platform probes](#the-platform-probes) — what the installed Claude
 Code version actually does with the permission rules and the hook
-registered here. Round A of that campaign is measured and recorded;
-[Round B](#still-open--round-b) is still open, and each of its four
-entries names the response already committed to if it comes back wrong.
+registered here — and
+[the liveness triple](#the-liveness-triple--for-the-003-session-rituals)
+the session rituals run. **All six measurements `002` owed are taken**;
+nothing in this file is an assumption carried over from the bootstrap
+instructions or from `CLAUDE.md`.
+
+Before designing a probe of your own, read
+[the method trap](#the-method-trap-it-ran-is-not-a-measurement): a tool
+call that was prompted and approved is indistinguishable from one that
+was never gated, and the mistake reports a live gate as dead.
 
 ## The quarantine, in one paragraph
 
@@ -211,16 +218,28 @@ own).
 
 ## Blind spots — stated as consequences
 
-- **Shell redirection into a file is invisible.** `echo '{}' >
-  .claude/settings.json` is silent. The boundary-file rules only catch
-  spellings that pass the path as an argument. What covers the rest is
-  the `ask` tier on the *native* file tools in `.claude/settings.json`.
-  Nothing **prevents** a shell redirection. What catches one after the
-  fact is `check-guard.sh`, which asserts the invariants a loosening
-  would have to break — an emptied `deny` list, a switched mode, a
-  removed bypass lock, a hook that no longer answers — so the edit
-  survives at most until the next `just check` or commit. Detective,
-  not preventive, and named as such.
+- **Shell redirection into a file is invisible *to the guard*.** `echo
+  '{}' > .claude/settings.json` gets no verdict from it: the
+  boundary-file rules only catch spellings that pass the path as an
+  argument, and a redirection target is not one. **In practice the
+  command still prompts, but not for any reason this repository
+  controls**: `002` measured that file-path rules do not match a `>`
+  target at all — an `ask` rule on the path is silent for a redirection —
+  while Claude Code gates writes under `.claude/` on its own, and every
+  boundary file lives there
+  ([A4](#a4-a-redirection-is-matched-by-no-file-rule--the-platform-gates-claude-anyway),
+  [B6](#b6-writes-under-claude-are-gated-by-the-platform-and-allow-does-not-override)).
+  `001` recorded that nothing *prevents* a shell redirection; that was
+  reasoned, never measured, and the truth is narrower than either the
+  claim or its first correction. **Treat the platform's behaviour as a
+  courtesy, not a control** — it is unconfigured here and can change with
+  an update, and the `ask` tier will not catch redirections if it does.
+  `check-guard.sh` is the only redirection backstop the repository owns,
+  and it also catches an edit that was **approved** or made with no
+  session watching: it asserts the invariants a loosening would have to
+  break — an emptied `deny` list, a switched mode, a removed bypass lock,
+  a hook that no longer answers — so such an edit survives at most until
+  the next `just check` or commit. Detective, and load-bearing.
 - **A delete whose targets come from a substitution or a pipe is
   silent** — `rm -rf $(cat list)`, `ls | xargs rm -rf`. Nothing on the
   line names the paths.
@@ -298,8 +317,50 @@ a session that loaded it cleanly.
 
 **Round A** (below) was measured in a session running **`auto` mode**,
 not the `acceptEdits` baseline. That is stated per probe, because it is a
-confound for anything mode-sensitive; the mode-sensitive probes are
-Round B's and are still open.
+confound for anything mode-sensitive. Round B was measured after
+switching the same session to `acceptEdits`; the mode was **read back
+from the session transcript**, not assumed —
+`grep -ao '"permissionMode":"[a-zA-Z]*"' ~/.claude/projects/<slug>/<id>.jsonl | tail -1`.
+
+### The method trap: "it ran" is not a measurement
+
+**Read this before designing any probe of a permission mechanism, here or
+at `003`.** It invalidated two of this campaign's probes on the first
+attempt and the operator caught it, not the checks.
+
+From inside the session, **a tool call that was prompted and approved and
+a tool call that was never gated at all return the identical result:
+plain success.** The transcript shows the tool output and nothing about
+whether a prompt intervened. So "I ran it and it worked, therefore
+nothing gated it" is not an inference the evidence supports — and it
+fails in the dangerous direction, reporting a live gate as dead.
+
+**The transcript cannot rescue you afterwards.** The session `.jsonl`
+under `~/.claude/projects/<slug>/` records `permissionMode` and nothing
+about permission *decisions* — no allow, no deny, no record that a prompt
+was shown. Measured by grepping it for every plausible key. So a probe
+that was run ambiguously cannot be reinterpreted later; it has to be run
+again.
+
+Two ways out, and a probe must use one of them:
+
+- **The refusal protocol.** The operator agrees in advance to **refuse
+  every prompt** for the duration. Success then means no prompt appeared;
+  `The user doesn't want to proceed…` means one did. Unambiguous in both
+  directions. The cost is that each refusal interrupts the run, so batch
+  the probes into separate calls and expect to be stopped. **Say
+  explicitly that the protocol has ended**, or the next real command gets
+  refused too.
+- **A distinguishable message.** Some outcomes identify their own source
+  and need no protocol: the guard's refusals carry its own sentence and a
+  bracketed rule citation, and a settings `deny` reads `Permission to use
+  Bash with command … has been denied`. Neither can be confused with a
+  user rejection. Probes A1, A2 and B1's first two rows rest on this and
+  were never in doubt.
+
+The corollary for the record: **every "ran without a prompt" claim below
+was taken under the refusal protocol**, and any that could not be is
+marked as the weaker claim it is.
 
 ### A1. The hook is reached, and a refusal names its rule
 
@@ -377,22 +438,77 @@ for c in "pip install -r requirements.txt" "pip list" "git status --short"; do
 done
 ```
 
-### A4. A shell redirection into a boundary file is ungated — observed
+### A4. A redirection is matched by no file rule — the platform gates `.claude/` anyway
 
-**Why it matters.** The blind spot was reasoned at `001`. It is now
-observed live, which is a stronger claim.
+**This overturns a limitation `001` recorded**, in the safe direction.
+`001` reasoned that a `>` redirection into a boundary file was invisible
+to both gates and concluded "nothing **prevents** a shell redirection".
+The first half is true and the conclusion is false.
 
-**Measured.** Writing `.claude/settings.local.json` from a Bash heredoc
-redirection produced **no prompt and no verdict**. Both gates miss it for
-different reasons, and both are working as designed: the settings `ask`
-tier names the *native file tools* (`Edit(…)`), which a Bash call is not,
-and the guard's boundary-file rules only match a path passed **as an
-argument** to a named writer, which a `>` redirection does not do. So a
-well-formed settings edit by redirection is silent, and `check-guard.sh`
-is what catches it afterwards. Detective, not preventive — as stated.
+**The guard is blind to redirection — confirmed.** Fed directly, it
+returns silence for every spelling, including into its own settings:
 
-**Re-measure.** Any `cat > .claude/settings.local.json <<'JSON' … JSON`
-in a session. A prompt would mean the coverage improved; note it.
+| Payload | Guard |
+|---|---|
+| `echo probe > .claude/hooks/redir-probe.txt` | silent |
+| `echo probe > .claude/settings.json` | silent |
+| `cat > .claude/settings.local.json` | silent |
+
+Its boundary-file rules match a path passed **as an argument** to a named
+writer, and a redirection target is not an argument. That is unchanged.
+
+**A redirection is matched against no file rule at all.** Neither `ask`
+nor `allow` reaches one. Measured under the refusal protocol with a
+machine-local `ask` rule on a path **outside `.claude/`**, which is the
+only way to see the tier without the platform gating below masking it:
+
+| Command | Rule in force | Result |
+|---|---|---|
+| `echo probe > probe-ask/y.txt` | `ask: Edit(probe-ask/**)` | **ran**, silent |
+| `echo probe > control-probe.txt` | none | **ran**, silent |
+
+The same `ask` rule **did** fire for a `Write` tool call to the same
+directory ([B5](#b5-the-ask-tier-beats-acceptedits-and-edit-matches-write)),
+so the rule was loaded and live. File-path rules govern the **file
+tools**; a `>` target is not seen by them.
+
+**What does gate a redirection into a boundary file is the platform, not
+this repository.** Writes under `.claude/` prompt regardless of the rules
+— see
+[B6](#b6-writes-under-claude-are-gated-by-the-platform-and-allow-does-not-override).
+Every boundary file lives under `.claude/`, so in practice
+`echo '{}' > .claude/settings.json` **does** prompt:
+
+| Command | Result |
+|---|---|
+| `echo probe > .claude/hooks/redir-probe.txt` | **prompted** |
+| `echo probe > .claude/docs/redir-control.txt` (no `ask` rule) | **prompted** |
+| `echo probe > control-probe.txt` (outside `.claude/`) | **ran**, silent |
+
+**So `001`'s conclusion was wrong, and the correction is narrower than it
+first looked.** A shell redirection into a boundary file is prevented —
+but by a Claude Code behaviour this repository does not configure and
+cannot rely on across updates, **not** by the `ask` tier, which does not
+apply to redirections at all. `check-guard.sh` therefore keeps its full
+weight: it is the only redirection backstop the repository itself owns.
+Re-measure B6 after every Claude Code update; if the platform stops
+gating `.claude/`, redirections into the settings become silent again
+and nothing in `.claude/settings.json` will catch them.
+
+**Still uncovered by anyone:** a redirection used to defeat a **grant**
+(`pip install -r requirements.txt 2>&1` → `ask`), the separate flaw under
+[Blind spots](#blind-spots--stated-as-consequences), ruled not-fixed.
+
+**Re-measure.** Under the refusal protocol, the three `echo` commands in
+the second table: prompt, prompt, silence.
+
+**Method note — this entry was wrong twice.** Its first draft claimed
+redirections were ungated, on a heredoc write that had in fact been
+**prompted and approved** ([the method trap](#the-method-trap-it-ran-is-not-a-measurement)).
+Its second draft claimed the `ask` tier caught them, on a control
+(`control-probe.txt`) that differed from the test in **two** variables at
+once — not a boundary path *and* not under `.claude/`. Only a control
+holding one variable fixed settled it. Change one thing per probe.
 
 ### A5. `autoMemoryEnabled` is a key this version knows
 
@@ -460,7 +576,12 @@ told apart by their text.
 |---|---|
 | `basename --colonstar /a/b/c` | **denied**, generic permission text |
 | `basename --prefixform /a/b/c` | **denied**, generic permission text |
-| `basename /a/b/c --colonstar` | **ran**, no prompt, printed `c` |
+| `basename /a/b --prefixform` | **ran**, no prompt, printed `b` |
+
+The first two rows identify their own source by their text. The third was
+re-measured **under the refusal protocol**, with a spelling that had not
+run earlier in the session, because its first measurement rested on "it
+ran" and was worthless — see [the method trap](#the-method-trap-it-ran-is-not-a-measurement).
 
 **Both spellings bind, so the backstop is real.** The third line is the
 one worth keeping: the same flag, in the same command, moved past the
@@ -558,32 +679,159 @@ indistinguishable from a command it never heard of
 in that slot is strictly more informative anyway — it is the one path
 the close ritual depends on, and the one no local command can test.
 
-### Still open
+### B4. `acceptEdits` prompts for an unmatched command with a side effect
 
-Two probes remain, and both need a session in the **`acceptEdits`**
-baseline mode. This session ran in `auto`, where an unmatched command is
-classified rather than falling to the mode's default — `basename
-/a/b/c --colonstar` ran with no prompt and no allow rule covering it,
-which is an `auto` measurement and says nothing about `acceptEdits`.
-No restart is needed (B3); the mode is switched in-session.
+**Why it matters.** The guard's silence is only as safe as what the mode
+does with a command it never judged. If `acceptEdits` ran everything
+unmatched, the allow list would be decoration and the guard's `ask`
+verdicts would be the only gate left in the loop.
 
-1. **What does `acceptEdits` do with an unmatched Bash command?** The
-   guard's silence is only as safe as that behaviour, and the guard's
-   `ask` verdicts may be the only gate left in a permissive mode.
-2. **Does an explicit `ask` rule beat `acceptEdits` for the file
-   tools?** If not, the boundary's own files are unprotected against a
-   silent, well-formed settings edit, and **the tier must become `deny`
-   with a named unlock path instead** — that response is pre-committed.
-   Half is already answered: **`Write(…)` rules match nothing** — the
-   file tools, `Write` included, are matched by `Edit(…)` rules
-   (operator, 2026-08-20). Both halves are probed at once, and **not**
-   against a live boundary file: the target is a new, disposable
-   `.claude/hooks/probe-target.txt`, which `Edit(.claude/hooks/**)`
-   covers, written with the **`Write`** tool. A prompt confirms the tier
-   and the mapping together; a file appearing in silence falsifies both.
-   The quarantined guard is never the target.
+**Method.** Under the **refusal protocol**, two unmatched commands — no
+allow rule covers `basename`, `dirname` or `python3`, the guard is silent
+on all three, and no `deny` entry matches — with fresh spellings that had
+not run earlier in the session.
 
-**Cleanup owed when they close:** delete
-`.claude/settings.local.json`, `/tmp/frisk-probe-hookenv.txt` and any
-`.claude/hooks/probe-target.txt`, then confirm the baseline alone is in
-force.
+**Measured.**
+
+| Command | Prompt? |
+|---|---|
+| `basename /a/b --prefixform` (pure computation) | **no** — ran |
+| `dirname /x/y/z` (pure computation) | **no** — ran |
+| `python3 -c 'open("…","w").write("…")'` (writes a file) | **yes** — prompted, refused |
+
+**The mode prompts for unmatched commands; it does not wave them
+through.** What ran unprompted was trivially read-only, which points at a
+built-in safe-command carve-out rather than at anything in
+`.claude/settings.json` — this repository's allow list does not name
+`basename` or `dirname`. The moment a side effect is involved, the prompt
+appears.
+
+**`D-011`'s prediction holds and is now verified**: it accepted as a real
+cost that `python3` would prompt, since rule 9's free list names it and
+no broad allow for a runner was granted. It does prompt. The same
+reasoning covers the documented direct equivalents
+(`bash scripts/check.sh`, `.venv/bin/pre-commit run`), which are not
+separately measured.
+
+**This claim was wrong in this record's first draft** and said the
+opposite, on a `python3 -c` call that had in fact been prompted and
+approved. That is the method trap above, and the reason the protocol
+exists.
+
+**Re-measure.** Agree the refusal protocol, then run a `python3 -c` that
+writes to a scratch path, with a spelling not used earlier in the
+session. A success means the mode stopped gating; investigate before
+trusting the loop.
+
+### B5. The `ask` tier beats `acceptEdits`, and `Edit(…)` matches `Write`
+
+**Why it matters.** Two questions in one call. If an explicit `ask` rule
+loses to the mode, the boundary's own files are unprotected against a
+silent, well-formed edit, and **the pre-committed response was to move
+the tier to `deny` with a named unlock path**. And if `Edit(…)` rules do
+not reach `Write` tool calls, the tier has a `Write`-shaped hole in it
+whatever its verdict.
+
+**Method.** A `Write` is the sharper test than an `Edit`, because it
+tests the rule and the tool mapping at once. It must be aimed **outside
+`.claude/`**: a `Write` under `.claude/hooks/` prompts whether or not any
+rule names it ([B6](#b6-writes-under-claude-are-gated-by-the-platform-and-allow-does-not-override)),
+so the baseline's own paths cannot answer this question. A machine-local
+`ask` rule on `probe-ask/**` supplies a path where the tier is the only
+variable. Refusal protocol throughout.
+
+**Measured.** Same tool, same session, same mode, one variable:
+
+| `Write` target | Rule in force | Result |
+|---|---|---|
+| `probe-noask/x.txt` | none | **ran**, silent |
+| `probe-ask/x.txt` | `ask: Edit(probe-ask/**)` | **prompted** |
+
+**Both halves hold.** An explicit `ask` rule beats `acceptEdits`, and an
+`Edit(…)` rule matches a `Write` tool call — confirming the operator's
+ruling of 2026-08-20 that the file tools, `Write` included, are matched
+by `Edit(…)` rules and that `Write(…)` rules match nothing. The control
+also pins `acceptEdits` itself: an unruled `Write` is auto-accepted, so
+the prompt in row two is the rule and nothing else.
+
+**No change to the baseline.** The pre-committed `deny` fallback is not
+triggered; `.claude/settings.json`'s `ask` tier stands as written, and
+the guard's own maintenance keeps its unlock path.
+
+**Re-measure.** Recreate the `probe-ask/**` rule in
+`.claude/settings.local.json` and run the two `Write`s above. Silence on
+the second means the tier has stopped binding — the `deny` fallback
+becomes live again. Never aim a probe at `bash_guard.py`.
+
+**Method note.** This was first measured against
+`.claude/hooks/probe-target2.txt`, which prompted — but B6 means that
+prompt proves nothing about the tier. Re-measured outside `.claude/`.
+
+### B6. Writes under `.claude/` are gated by the platform, and `allow` does not override
+
+**Why it matters.** It explains a prompt this repository does not
+configure, it is the real reason a redirection into a boundary file is
+stopped ([A4](#a4-a-redirection-is-matched-by-no-file-rule--the-platform-gates-claude-anyway)),
+and it invalidates any probe that uses a `.claude/` path to test a rule —
+two of this campaign's did, and both had to be redone.
+
+**Measured.** Under the refusal protocol, with
+`allow: ["Edit(.claude/docs/**)"]` machine-local and **proven loaded**
+(the `ask` rule from the same file fired for B5):
+
+| Action | Target | Result |
+|---|---|---|
+| `Write` tool | `.claude/docs/probe.txt`, explicitly **allowed** | **prompted** |
+| `>` redirection | `.claude/docs/redir-control.txt`, no rule | **prompted** |
+| `>` redirection | `control-probe.txt`, outside `.claude/` | **ran**, silent |
+| `Write` tool | `probe-noask/x.txt`, outside `.claude/` | **ran**, silent |
+
+**Claude Code gates writes under `.claude/` on its own, in `acceptEdits`,
+through both the file tools and shell redirection, and an explicit
+`allow` rule does not suppress it.** There is no setting in this
+repository that removes the prompt.
+
+**Consequences.**
+
+- **Every edit to `.claude/docs/` prompts**, including this file. That is
+  the platform, not the baseline and not a tooling choice; the operator
+  asked whether an allow-list entry would stop it and the measured answer
+  is **no** (2026-08-20). Sessions should expect an approval per
+  working-memory write and not go hunting for a misconfiguration.
+- **It is not ours and may change.** Nothing in `.claude/settings.json`
+  depends on it, and A4 says plainly what is lost if it goes away.
+- **Never probe a permission rule with a `.claude/` path.** The gating
+  masks the rule under test.
+
+**Re-measure.** Put `allow: ["Edit(.claude/docs/**)"]` in
+`.claude/settings.local.json`, then `Write` a disposable file under
+`.claude/docs/` under the refusal protocol. A silent success means the
+platform stopped gating `.claude/` — re-read A4 immediately, because the
+redirection backstop went with it.
+
+### Nothing is open
+
+All six measurements `002` owed are taken, plus three the campaign turned
+up on its own: the guard has no `allow` verdict
+([A3](#a3-the-guard-has-no-allow-verdict-a-grant-is-silence)),
+`.claude/settings.local.json` hot-loads
+([B3](#b3-a-settingslocaljson-change-is-picked-up-without-a-restart)),
+and the platform gates `.claude/` writes
+([B6](#b6-writes-under-claude-are-gated-by-the-platform-and-allow-does-not-override)).
+One limitation `001` recorded was overturned and one was rewritten twice
+before it was right ([A4](#a4-a-redirection-is-matched-by-no-file-rule--the-platform-gates-claude-anyway)).
+**No change to `.claude/settings.json` is needed**: every pre-committed
+unfavourable branch — re-spelling the backstop, moving the `ask` tier to
+`deny` — went unused, because each spelling measured correct.
+
+What remains deliberately unmeasured, and is **not** owed here: the
+`auto`-mode classifier A/B against the guard
+([A6](#a6-auto-mode-leaves-the-allow-rules-standing)), which needs
+`classifyAllShell` on and is not this step's deliverable; and a positive
+behavioural test of `autoMemoryEnabled`
+([A5](#a5-automemoryenabled-is-a-key-this-version-knows)), recorded at
+presence-plus-absence strength instead.
+
+The probe harness is **removed**: no `.claude/settings.local.json`, no
+probe targets under `.claude/hooks/`, no `/tmp/frisk-probe-*`. The
+baseline in `.claude/settings.json` is what is in force.
