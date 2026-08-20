@@ -1464,8 +1464,13 @@ def escapes_project(value: str) -> bool:
     the filesystem root is the unscoped destructive act rule 9 gates.
 
     Resolved before comparing, so `../..` and `~` are what they expand to
-    rather than what they spell.
+    rather than what they spell. A target the shell would expand — `"$HOME"`,
+    `$BUILD_DIR` — is not resolvable from here at all, and `rm -rf "$HOME"` is
+    exactly the spelling that must not go silent, so an unexpanded one counts
+    as reaching outside.
     """
+    if "$" in value or "`" in value:
+        return True
     resolved = os.path.normpath(os.path.expanduser(value))
     if os.path.isabs(resolved):
         if _within(resolved, PROJECT_ROOT):
@@ -1738,7 +1743,9 @@ RM = Tool(
 # find walks a tree and can act on everything it matched, so its blast radius
 # is whatever the expression happened to select — which is why it is gated on
 # the acting flag rather than on where it started.
-DELETERS = re.compile(r"^(?:.*/)?(rm|rmdir|unlink|shred|truncate|mv)$")
+DELETERS = re.compile(
+    r"^(?:.*/)?(rm|rmdir|unlink|shred|truncate|mv|sh|bash|zsh|dash|xargs)$"
+)
 
 FIND = Tool(
     name="find",
@@ -1773,17 +1780,24 @@ COPY = Tool(
     rules=(Rule("ask", (), BOUNDARY_WRITE, operands=any_of(boundary_file)),),
 )
 
+# Deliberately not keyed on `-i`: the in-place flag has an open set of
+# spellings (`-i.bak`, `-i''`), and a flag condition tests an exact name. So
+# any sed naming one of these files asks, which over-gates reading one out
+# through sed — rare, and the safe direction. cat and jq stay free.
 SED = Tool(
     name="sed",
-    rules=(Rule("ask", (), BOUNDARY_WRITE,
-                flags=frozenset({"-i", "--in-place"}),
-                operands=any_of(boundary_file)),),
+    rules=(Rule("ask", (), BOUNDARY_WRITE, operands=any_of(boundary_file)),),
+)
+
+TRUNCATE = Tool(
+    name="truncate",
+    rules=(Rule("ask", (), BOUNDARY_WRITE, operands=any_of(boundary_file)),),
 )
 
 
 TOOLS: dict[str, Tool] = registry(
     GIT, DOCKER, GH, PIP, PYTHON, SUDO, JUST,
-    CURL, WGET, NPM, BREW, APT, CLAUDE, RM, FIND, TEE, COPY, SED,
+    CURL, WGET, NPM, BREW, APT, CLAUDE, RM, FIND, TEE, COPY, SED, TRUNCATE,
 )
 
 
@@ -2112,10 +2126,14 @@ CASES: tuple[tuple[str, str], ...] = (
     ("rm -f /etc/hosts", "ask"),
     ("rm -rf ../../*", "ask"),
     ("rm -rf /tmp/../etc", "ask"),  # resolved before it is compared
+    ('rm -rf "$HOME"', "ask"),  # the shell would expand it; this cannot
+    ("rm -rf $BUILD_DIR", "ask"),
+    ("rm -rf ${TMPDIR}/frisk", "ask"),
     ("find . -name '*.py' -print", "silent"),
     ("find . -name '*.log' -exec grep -l x {} +", "silent"),
     ("find . -name '*.pyc' -delete", "ask"),
     ("find . -type d -name __pycache__ -exec rm -rf {} +", "ask"),
+    ("find . -type f -exec bash -c 'rm -f \"$1\"' _ {} +", "ask"),
     # --- the boundary's own files -------------------------------------------
     ("tee .claude/settings.json", "ask"),
     ("tee -a .claude/hooks/bash_guard.py", "ask"),
@@ -2123,10 +2141,16 @@ CASES: tuple[tuple[str, str], ...] = (
     ("mv new.json .claude/settings.local.json", "ask"),
     ("sed -i s/ask/allow/ .claude/settings.json", "ask"),
     ("sed -i s/x/y/ .claude/hooks/bash_guard.py", "ask"),
+    ("sed -i.bak s/ask/allow/ .claude/settings.json", "ask"),  # any spelling
+    ("truncate -s 0 .claude/settings.json", "ask"),
+    ("truncate -s 0 build.log", "silent"),
     # known over-gate: any operand matches, so reading one of these out to
     # somewhere else prompts too. The safe direction, and rare.
     ("cp .claude/settings.json /tmp/backup.json", "ask"),
-    ("sed -n 1,20p .claude/settings.json", "silent"),  # a read
+    # over-gated on purpose: reading one of these out through sed prompts,
+    # because the in-place flag cannot be recognised in every spelling
+    ("sed -n 1,20p .claude/settings.json", "ask"),
+    ("sed -n 1,20p README.md", "silent"),
     ("tee /tmp/out.log", "silent"),
     ("cp docs/a.md docs/b.md", "silent"),
     ("mv old.py new.py", "silent"),
