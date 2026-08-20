@@ -32,8 +32,11 @@ fi
 git update-ref refs/backups/bash-guard "$commit"
 ```
 
-No backup remote exists, so rule 6's step-close push reports its absence
-and attempts nothing; `origin` is public and this ref never goes there.
+**The backup remote is named `backup`** (`D-017`) — a name, not a
+remote: none exists yet, so rule 6's step-close push resolves it with
+`git remote get-url backup`, reports its absence and attempts nothing.
+`origin` is public and this ref never goes there. `/approve-step`
+carries the exact command pair.
 
 ## The commands
 

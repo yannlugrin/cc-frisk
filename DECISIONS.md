@@ -764,3 +764,105 @@ Two conventions the format depends on:
   `003`'s pointer, and `004` returns ten.
 - **Approved by:** operator, 2026-08-20, ruling to keep the cap at 400
   and take the compaction.
+
+### D-017 — The backup remote is named `backup`
+
+- **Date:** 2026-08-20
+- **Step:** `003`
+- **Context:** rule 6's step-close push carries rule 1's
+  `refs/backups/bash-guard` to the operator's private backup remote, and
+  `PLAN.md` `003` requires `/approve-step` to resolve that remote **by
+  name** and report its absence rather than fail on a machine that lacks
+  it. No such remote exists, so the bootstrap left the name open: a
+  ritual cannot resolve by name without one, and inventing it at the
+  first close that needs it is how two machines end up with two names.
+- **Decision:** the name is **`backup`**. `/approve-step` resolves it
+  with `git remote get-url backup` and, on success only, runs
+  `git push backup refs/backups/bash-guard`; absence prints a line and
+  attempts nothing. The name is recorded in
+  `.claude/docs/guard-record.md`, which `CLAUDE.md` rule 1 already names
+  as the home for this detail.
+- **Alternatives considered:** *`private`* — accurate about the remote's
+  character but says nothing about what it is for, and this repository
+  will never have a second private remote to distinguish it from.
+  *`guard-backup`* — precise, but the ref already says `bash-guard` and
+  the push command names both, so the remote would say it a third time.
+  *Leaving it open and asking at the first close* — rejected: that is
+  the improvisation the plan's "resolve by name" clause exists to
+  prevent, and it would land in the one ritual that runs while the
+  operator is waiting on a push decision.
+- **Approved by:** implementer (within latitude: a workflow choice the
+  bootstrap instructions left open, rule 4)
+
+### D-018 — The governance check imports PyYAML from the project venv
+
+- **Date:** 2026-08-20
+- **Step:** `003`
+- **Context:** `PLAN.md` `003` sanctions a small custom check for
+  governance frontmatter — nothing in the ecosystem asks whether a skill
+  or agent definition loads. What actually parses those files is Claude
+  Code's YAML parser, so approximating it needs a real YAML parser;
+  hand-rolling one over a subset that already includes folded scalars is
+  precisely what rule 11 forbids. Every other linter here is a
+  pre-commit hook pinned by `rev` in its own isolated environment, and
+  `requirements.txt` said so in as many words.
+- **Decision:** `scripts/check_frontmatter.py` imports PyYAML, pinned as
+  `PyYAML==6.0.3` in `requirements.txt`, and runs on the project
+  interpreter (`language: system`, entry `.venv/bin/python …`). `.venv`
+  is guaranteed wherever the checks run, since pre-commit itself lives
+  there and `scripts/check.sh` invokes `.venv/bin/pre-commit`. The
+  script takes an optional root argument so `just test` can point it at
+  fixture trees; committing malformed governance files to exercise the
+  must-fail cases would make this repository's own `just check`
+  permanently red. `requirements.txt`'s "only pre-commit lives here"
+  claim is rewritten in the same commit: third-party linters stay
+  isolated and pinned by `rev`; what shares this interpreter is the hook
+  runner and what our own checks import.
+- **Alternatives considered:** *A `language: python` local hook with
+  `additional_dependencies`* — the most idiomatic pre-commit answer, and
+  rejected only because `just test` must run the same script against
+  fixture roots and cannot reach inside a hook's private environment;
+  two installations of one pin is worse than one. *System `python3` plus
+  system PyYAML*, matching `scripts/check-guard.sh`'s stdlib-only
+  heredoc — rejected: it is an unpinned workstation prerequisite that
+  happens to hold on this machine and does not hold on a bare CI runner,
+  which `005` will discover the hard way. *Embedding the check in
+  `check-guard.sh`'s existing heredoc* — same dependency problem, plus
+  it welds two unrelated subjects together. *Hand-parsing the
+  frontmatter* — rejected by rule 11 outright.
+- **Approved by:** implementer (within latitude: a workflow choice the
+  bootstrap instructions left open, rule 4)
+
+### D-019 — Python well-formedness joins with the first `.py` file, style waits for `006`
+
+- **Date:** 2026-08-20
+- **Step:** `003`
+- **Context:** rule 2 requires a check family to arrive **with the first
+  artifact of its class, never ahead of it**.
+  `scripts/check_frontmatter.py` is this repository's first `.py` file,
+  which brings the Python family forward from `PLAN.md` `006`, where
+  `.pre-commit-config.yaml` had scheduled it. Pinning a style tool now
+  would mean fetching a version that is nowhere in the repository —
+  outside rule 9's local boundary — and pre-empting the configuration
+  `006` will want for the engine.
+- **Decision:** the Python family arrives now as
+  **well-formedness only** — `check-ast` and `debug-statements`, both
+  from `pre-commit/pre-commit-hooks`, already pinned at `v6.0.0` in this
+  file, so no new pin and no fetch. They ask exactly what the rest of
+  `just check` asks: does the artifact load, and does it carry anything
+  that should never have been committed. **Style and TOML still join at
+  `006`** with the engine, where there is a body of code for a style to
+  be about; `.pre-commit-config.yaml`'s family comment is updated to say
+  so rather than left claiming Python arrives at `006` wholesale.
+- **Alternatives considered:** *Adding a full style linter now* —
+  requires an unpinned network fetch to learn a valid `rev`, so it is an
+  operator question, and it would settle the engine's style
+  configuration in a step that ships eighty lines of check script.
+  *Shipping the `.py` file with no Python family at all* — a plain rule
+  2 breach, and the kind that is never noticed later. *Avoiding the
+  `.py` file by embedding the Python in a shell heredoc*, as
+  `check-guard.sh` does — considered seriously, since it would have kept
+  the family question shut; rejected with `D-018`, which needs a pinned
+  import that a heredoc on system `python3` cannot have.
+- **Approved by:** implementer (within latitude: a workflow choice the
+  bootstrap instructions left open, rule 4)

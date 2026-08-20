@@ -1,9 +1,19 @@
 # The pinned toolchain, installed by `just setup` into ./.venv.
 #
-# Only pre-commit lives here. Every linter is a pre-commit hook pinned by
-# `rev` in .pre-commit-config.yaml, in its own isolated environment — one
-# pin per tool, in one place, and no linter needs to share this
-# interpreter. `just` itself is a system tool, installed per workstation
-# like python3 and git, so `just setup` is the entry point with nothing
-# before it.
+# Every *third-party linter* is a pre-commit hook pinned by `rev` in
+# .pre-commit-config.yaml, in its own isolated environment — one pin per
+# tool, in one place, and none of them shares this interpreter. What
+# lives here is the hook runner itself, plus what this repository's own
+# checks import. `just` itself is a system tool, installed per
+# workstation like python3 and git, so `just setup` is the entry point
+# with nothing before it.
 pre-commit==4.4.0
+
+# PyYAML, for scripts/check_frontmatter.py. Our own checks are not
+# third-party linters and cannot be pinned by a `rev`: a skill or agent
+# whose frontmatter does not parse never loads and never complains, and
+# answering that needs a real YAML parser rather than a hand-rolled one
+# (rule 11: the boring standard tool). It shares this interpreter
+# because `.venv` is guaranteed wherever the checks run — pre-commit
+# itself lives there.
+PyYAML==6.0.3

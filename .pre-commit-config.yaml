@@ -7,9 +7,13 @@
 # Families arrive with the first artifact of their class, never ahead of
 # it, so a green gate never says anything about files that are not there.
 # Present at step 000: YAML, JSON, POSIX shell, Markdown, repository
-# hygiene and security, and whitespace discipline. Python and TOML join
-# at step 006 with the engine; governance frontmatter at step 003 with
-# the first skill; the guard's own liveness gate at step 001.
+# hygiene and security, and whitespace discipline. The guard's own
+# liveness gate joined at step 001. Governance frontmatter joined at
+# step 003 with the first skill, and brought with it the first `.py`
+# file this repository ships, so Python *well-formedness* joined in the
+# same breath — it parses, and it carries no debugger left behind.
+# Python style and TOML still join at step 006 with the engine, where
+# there is a body of code for a style to be about.
 ---
 exclude: |
   (?x)^(
@@ -49,6 +53,13 @@ repos:
       # credential), so what this guards against is an accidental paste,
       # and a pasted private key is the shape that would actually appear.
       - id: detect-private-key
+
+      # Python well-formedness. Not style — that arrives at step 006
+      # with the engine. These two ask the same question the rest of
+      # this file asks: does the artifact load, and does it carry
+      # anything that should never have been committed.
+      - id: check-ast
+      - id: debug-statements
 
       # JSON parse. .claude/settings.json is the permission enforcement
       # mechanism itself, so a malformed edit to it fails exactly as
@@ -94,6 +105,29 @@ repos:
   # and its non-zero exit fails the run (.claude/docs/harness.md).
   - repo: local
     hooks:
+      # Governance well-formedness for the rituals themselves: every
+      # skill and agent definition parses and agrees with its own path.
+      # A malformed one does not fail — it silently never loads, and a
+      # ritual nobody can invoke is indistinguishable from one nobody
+      # needed. Nothing in the ecosystem asks that question.
+      #
+      # It runs on the project interpreter rather than an isolated hook
+      # environment because it imports PyYAML, pinned in
+      # requirements.txt; `.venv` is guaranteed wherever pre-commit
+      # runs, since pre-commit itself lives there.
+      #
+      # always_run with pass_filenames: false, because the failures it
+      # hunts are shaped like absences — a skill directory with no
+      # SKILL.md, a citation whose target heading was renamed in a file
+      # this commit does not touch — and neither appears in a changed
+      # file list.
+      - id: governance-frontmatter
+        name: every skill and agent definition loads
+        entry: .venv/bin/python scripts/check_frontmatter.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
       - id: check-guard
         name: the permission boundary is intact
         entry: bash scripts/check-guard.sh
