@@ -225,9 +225,13 @@ own).
   `just check changed | tail -20`, never `… 2>&1 | tail -20`.** Measured
   2026-08-20 against the ref's tip `82336ab`, by feeding each spelling
   to the guard in the payload shape of the third command above and
-  reading back `.hookSpecificOutput.permissionDecision`. `002` decides
-  whether stripping redirection tokens before matching is worth an
-  in-channel fix.
+  reading back `.hookSpecificOutput.permissionDecision`. **It is not
+  being fixed, and `002` does not revisit it** (operator, 2026-08-20):
+  the guard is scaffolding retired at `027`, so parser work on it is
+  effort spent on the very thing frisk replaces — and §4.3 already
+  requires the product to parse redirections off the command line and
+  to treat a pure fd-duplication like `2>&1` as no obstacle to an
+  allow. Avoid the spelling; the guard keeps the flaw until it goes.
 - **The guard cannot tell whether it is reached at all.** Only a live
   session can, which is `002`'s job.
 
