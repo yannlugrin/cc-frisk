@@ -6,7 +6,6 @@
 # this repository is the plugin's public install channel, and no later
 # strip removes what an initial commit carries.
 .claude/hooks/bash_guard.py
-.claude/spec-work/handoff/assets/bash_guard.py
 
 # Reviewer reports. Untracked and ignored, so a report never blocks the
 # clean-tree preconditions the handover and approve rituals read.

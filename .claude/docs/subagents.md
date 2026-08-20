@@ -12,7 +12,7 @@ on the rest, and the probes are what this repository stands on.
 
 **`CLAUDE.md` reaches a subagent — both the built-in kinds and a
 project-defined one.** Measured twice: a built-in `general-purpose`
-agent, and the project-defined `probe-tools-restricted`. Each was
+agent, and a project-defined probe agent. Each was
 forbidden every tool and asked for three things that exist only in
 `CLAUDE.md`; each returned rule 9's opening line verbatim and rule 11 as
 "Proportion".
@@ -48,9 +48,11 @@ prose plus `.claude/settings.json` plus the guard hook. Keep instantiated
 skill frontmatter to `name` and `description`: a key that binds nothing
 reads as a guarantee.
 
-*Re-measure.* Spawn `probe-tools-restricted` against `probe-tools-open`
-with the same prompt and compare; invoke `/probe-frontmatter`. All three
-fixtures are deleted at `PLAN.md` `004`.
+*Re-measure.* The `004` fixtures are gone; recreate them. A controlled
+pair of throwaway agents differing only in the `tools:` line, given the
+same prompt, is the agent arm — one arm alone cannot tell a restriction
+from a refusal. For the skill arm, a throwaway skill declaring
+`allowed-tools: Read` that is then asked to run Bash and Write.
 
 ## When a definition loads
 
