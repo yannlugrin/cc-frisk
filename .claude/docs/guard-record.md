@@ -526,6 +526,38 @@ believed dead the other way round.
 `.claude/settings.local.json` and run the matching command in the same
 session.
 
+## The liveness triple — for the `003` session rituals
+
+Three live tool calls, run **as tool calls in a session**, never piped to
+the guard by hand. The hand-fed payload in
+[The commands](#the-commands) asks whether the file is correct; these ask
+whether Claude Code is calling it. Both questions are real and only the
+second one can catch the silent death.
+
+| # | Command | Must do | Proves |
+|---|---|---|---|
+| 1 | `git status --short` | run, no prompt | the loop is not blocked: guard silent, allow rule carries it |
+| 2 | `git push --dry-run origin main` | **prompt**, `pushing is an outward write [rule git push]` | the hook's `ask` path still reaches the operator — what rule 6's close push rests on |
+| 3 | `git push origin main --force --dry-run` | **refuse**, `history is linear here and published state is never rewritten [rule git push: --force]` | the hook is reached at all |
+
+Answer 2 either way; `--dry-run` makes both harmless.
+
+**Three is the load-bearing one.** It is the only command here that no
+`deny` entry matches ([B1](#b1-both-rule-spellings-bind--and-only-from-the-start-of-the-line)),
+so a refusal can only have come from the hook. If it merely **prompts**,
+the hook is not reaching the tool call, the backstop is all that is
+left — and `--selftest` and `--liveness` would both still pass, because
+they answer whether the file is correct, not whether anything calls it.
+If it **runs**, both are gone.
+
+**The triple is silent / ask / deny, not silent / grant / deny** as
+`PLAN.md`'s `002` entry sketched it. There is no observable "grant": the
+guard emits only `deny` and `ask`, and a proven grant is plain silence,
+indistinguishable from a command it never heard of
+([A3](#a3-the-guard-has-no-allow-verdict-a-grant-is-silence)). An `ask`
+in that slot is strictly more informative anyway — it is the one path
+the close ritual depends on, and the one no local command can test.
+
 ### Still open
 
 Two probes remain, and both need a session in the **`acceptEdits`**
