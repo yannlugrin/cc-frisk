@@ -6,10 +6,12 @@
 quarantine: everything about the guard that a later session needs and
 cannot get by reading the file, because reading the file is forbidden.
 
-Written at step `001` (2026-08-20). Step `002` adds the platform probe
-results — what the installed Claude Code version actually does with the
-permission rules and the hook registered here. Until it does, the
-[open questions](#what-002-must-still-measure) at the end are open.
+Written at step `001` (2026-08-20). Step `002` adds
+[the platform probes](#the-platform-probes) — what the installed Claude
+Code version actually does with the permission rules and the hook
+registered here. Round A of that campaign is measured and recorded;
+[Round B](#still-open--round-b) is still open, and each of its four
+entries names the response already committed to if it comes back wrong.
 
 ## The quarantine, in one paragraph
 
@@ -279,41 +281,197 @@ Two limits on it, both measured, both accepted knowingly:
 The gates above are the answer to both: they are what keep the hook —
 which does not have either limit — alive.
 
-## What `002` must still measure
+## The platform probes
 
-Nothing below is assumed anywhere in this repository; each is a probe
-`002` owes, with the pre-committed response if it comes back wrong.
+Every claim here is a measurement, not an inference. **Taken on Claude
+Code `2.1.237`, Linux (WSL2), 2026-08-20**, unless a line says otherwise.
+Re-run the lot after a Claude Code update: each of these is a property
+that fails silently — the mechanism stops enforcing and announces
+nothing.
+
+**The restart is part of the method.** Settings and hook changes are read
+at session start, so a probe run in the session that made the edit can
+report a false "not enforced". Every recipe below that touches a settings
+file says where its restart falls. The `001` baseline was written in the
+previous session, so the probes below that read it were measured against
+a session that loaded it cleanly.
+
+**Round A** (below) was measured in a session running **`auto` mode**,
+not the `acceptEdits` baseline. That is stated per probe, because it is a
+confound for anything mode-sensitive; the mode-sensitive probes are
+Round B's and are still open.
+
+### A1. The hook is reached, and a refusal names its rule
+
+**Why it matters.** `--selftest` and `--liveness` answer whether the file
+is correct, never whether anything calls it. If a denied command merely
+prompts, the hook is not reaching the tool call and only the `deny`
+backstop is live. No local command can detect this.
+
+**Method.** Fire a command the guard denies and **no settings `deny`
+prefix matches**. `git push origin main --force --dry-run` is that
+command: the backstop entries match from the start of the line, so
+`Bash(git push --force:*)` does not reach this spelling, while the guard
+keys on the flag's presence. `--dry-run` makes the fall-through harmless
+if the hook turns out to be dead.
+
+**Measured.** The call came back refused, carrying the guard's own text
+verbatim: `history is linear here and published state is never rewritten
+[rule git push: --force]`. Feeding the same command to the guard by hand
+returns that identical string. **The hook is reached and its `deny` is
+honoured.** Measured in `auto` mode; the hook path is documented as
+mode-independent, and Round B re-confirms it under `acceptEdits`.
+
+**Re-measure.**
+
+```sh
+# expected verdict, out of band:
+printf '{"tool_name":"Bash","tool_input":{"command":"git push origin main --force --dry-run"}}' \
+    | .claude/hooks/bash_guard.py | jq -r '.hookSpecificOutput.permissionDecision'   # deny
+# then, as a live tool call in a session started after the settings landed:
+git push origin main --force --dry-run
+# must be refused, naming [rule git push: --force]. A prompt, or an
+# actual dry-run, means the hook is not reached.
+```
+
+### A2. A hook `ask` still prompts
+
+**Why it matters.** Rule 6's close ritual attempts a push at every step
+close and relies on being able to approve it in that exchange. A gate
+that has stopped gating says nothing about itself.
+
+**Method.** `git push --dry-run origin main` — the guard returns `ask`
+(`pushing is an outward write [rule git push]`), and `--dry-run` makes it
+harmless whichever way the operator answers.
+
+**Measured.** It prompted. The operator declined, and the tool call was
+rejected. **The `ask` path reaches the operator.** Measured in `auto`
+mode; Round B re-confirms under `acceptEdits`, which is the mode the
+close ritual actually runs in.
+
+**Re-measure.** Run `git push --dry-run origin main` in a fresh session
+and answer the prompt either way. Silence — the push simply running — is
+the failure.
+
+### A3. The guard has no `allow` verdict: a grant is silence
+
+**Why it matters.** `PLAN.md`'s `002` entry asked the liveness triple to
+include "one the guard *grants*". It cannot, as a distinct observable:
+a proven grant and a command the guard never heard of both produce **no
+output at all**, and both then fall to the permission rules. The triple
+is designed around that below.
+
+**Measured.** `pip install -r requirements.txt` (the one proven `pip`
+shape), `pip list`, `just check changed` and `git status --short` all
+return empty output, exit 0. Only `deny` and `ask` produce a verdict:
+`pip install requests` → `ask`, `gh pr create` → `ask`, `sudo ls` →
+`ask`, `git push --force` → `deny`. Mode-independent: the guard is a
+process reading stdin.
+
+**Re-measure.**
+
+```sh
+for c in "pip install -r requirements.txt" "pip list" "git status --short"; do
+    printf '{"tool_name":"Bash","tool_input":{"command":"%s"}}' "$c" \
+        | .claude/hooks/bash_guard.py | wc -c    # must be 0
+done
+```
+
+### A4. A shell redirection into a boundary file is ungated — observed
+
+**Why it matters.** The blind spot was reasoned at `001`. It is now
+observed live, which is a stronger claim.
+
+**Measured.** Writing `.claude/settings.local.json` from a Bash heredoc
+redirection produced **no prompt and no verdict**. Both gates miss it for
+different reasons, and both are working as designed: the settings `ask`
+tier names the *native file tools* (`Edit(…)`), which a Bash call is not,
+and the guard's boundary-file rules only match a path passed **as an
+argument** to a named writer, which a `>` redirection does not do. So a
+well-formed settings edit by redirection is silent, and `check-guard.sh`
+is what catches it afterwards. Detective, not preventive — as stated.
+
+**Re-measure.** Any `cat > .claude/settings.local.json <<'JSON' … JSON`
+in a session. A prompt would mean the coverage improved; note it.
+
+### A5. `autoMemoryEnabled` is a key this version knows
+
+**Why it matters.** An unrecognised setting is ignored in silence, and
+auto memory is machine-local, unversioned state outside rule 3's files.
+
+**Method.** Two halves, because no command prints the effective value.
+First, whether the shipped binary knows the string at all — an unknown
+key would not appear in it. Second, whether any auto-memory artifact
+exists.
+
+**Measured.** All five keys this repository sets or relies on are present
+as strings in the `2.1.237` binary: `CLAUDE_PROJECT_DIR` (26),
+`disableAutoMode` (13), `disableBypassPermissionsMode` (8),
+`autoMemoryEnabled` (6), `classifyAllShell` (4). No auto-memory file or
+directory exists under `~/.claude/` or the project's `.claude/`, and no
+`CLAUDE.local.md` exists. **Recognised, and consistent with being
+honoured.** This is a presence measurement plus an absence one; it is
+not a positive behavioural test, and is recorded at that strength.
+
+**Re-measure.**
+
+```sh
+b=$(readlink -f "$(which claude)")
+grep -aoE 'autoMemoryEnabled|disableAutoMode|disableBypassPermissionsMode|classifyAllShell|CLAUDE_PROJECT_DIR' "$b" \
+    | sort | uniq -c
+find ~/.claude -maxdepth 2 -iname '*memor*'    # must print nothing
+```
+
+### A6. `auto` mode leaves the allow rules standing
+
+**Why it matters.** `auto` stays reachable deliberately (`D-011`) so a
+classifier can be A/B'd against the guard. `autoMode.classifyAllShell`
+suspends every Bash allow rule — the knob that makes the comparison
+meaningful — and it is **not set** here.
+
+**Measured.** `claude auto-mode config` reports the effective
+configuration with keys `allow`, `environment`, `hard_deny`, `soft_deny`;
+`classifyAllShell` reads `null`. So in this session's `auto` mode the
+baseline's allow list still applied, and the guard still ran ahead of it
+— A1 and A2 were both measured in that mode. The A/B comparison the
+decision reserved `auto` for has **not** been run; it needs
+`classifyAllShell` on, and it is not this step's deliverable.
+
+**Re-measure.** `claude auto-mode config | jq '.classifyAllShell'`.
+
+### Still open — Round B
+
+Each needs a session in the **`acceptEdits`** baseline mode, and the two
+settings-dependent ones need a restart after the probe harness lands.
+The harness is `.claude/settings.local.json` (machine-local, gitignored),
+carrying two synthetic `deny` entries on `basename` — a command the guard
+leaves silent, so the two mechanisms cannot confound each other — and a
+second `PreToolUse` hook that appends `$CLAUDE_PROJECT_DIR` and `$PWD` to
+`/tmp/frisk-probe-hookenv.txt` and exits 0.
 
 1. **Does `Bash(git push --force:*)` actually match?** The colon-star
-   form is what the guard's own pairing prescribes; the settings schema
-   documents a `Bash(git *)` prefix form as well. If the backstop's
-   spelling does not bind, the backstop is decoration — re-spell it.
+   form is what the pairing prescribes; the CLI's own `--allowedTools`
+   help documents a `Bash(git *)` prefix form as well, so both spellings
+   are live in the documentation and one of them may bind nothing. Probed
+   through the synthetic pair `Bash(basename --colonstar:*)` and
+   `Bash(basename --prefixform *)`. **If the colon-star form does not
+   bind, the backstop is decoration — re-spell it.**
 2. **What does `acceptEdits` do with an unmatched Bash command?** The
-   guard's silence is only as safe as that behaviour, and its `ask`
-   verdicts may be the only gate left in a permissive mode.
+   guard's silence is only as safe as that behaviour.
 3. **Does an explicit `ask` rule beat `acceptEdits` for the file tools?**
    If not, the boundary's own files are unprotected against a silent,
    well-formed settings edit and the tier must be `deny` with a named
-   unlock path instead. Half of this one is already answered:
-   **`Write(…)` rules match nothing** — the file tools, `Write`
-   included, are matched by `Edit(…)` rules (operator, 2026-08-20).
-   The baseline shipped with a `Write(…)` entry beside each `Edit(…)`
-   one; the three dead entries were removed and the tier is unchanged,
-   because the `Edit(…)` rules already covered what they were meant to
-   cover. Confirm that mapping here too, with a live `Write` at a
-   boundary path.
+   unlock path. Half is already answered: **`Write(…)` rules match
+   nothing** — the file tools, `Write` included, are matched by `Edit(…)`
+   rules (operator, 2026-08-20). Confirm that mapping with a live `Write`
+   at a boundary path.
 4. **Is `$CLAUDE_PROJECT_DIR` exported to `PreToolUse` hooks?** The
    registry's boundary rules resolve against it, falling back to the
-   guard process's working directory — which under a hook is wherever
-   Claude Code launches it. If the variable is absent *and* the working
-   directory is not the project root, those rules resolve against the
-   wrong tree.
-5. **Is the hook reached at all, and does a refusal come back naming a
-   rule?** If a denied command merely prompts, the hook is not reaching
-   the tool call and only the backstop is live. This is the one failure
-   no local command can detect.
-6. **What does `auto` mode do here?** It stays reachable deliberately
-   (`disableAutoMode` was not set) so `002` can A/B a classifier against
-   the guard. `claude auto-mode` inspects its configuration, and
-   `autoMode.classifyAllShell` suspends every Bash allow rule — the
-   knob that makes the comparison meaningful.
+   guard process's working directory — under a hook, wherever Claude Code
+   launches it. Absent variable *and* a working directory that is not the
+   project root means those rules resolve against the wrong tree. The
+   harness hook records both.
+
+**Cleanup owed at the end of Round B:** delete
+`.claude/settings.local.json` and `/tmp/frisk-probe-hookenv.txt`, and
+restart once more so the baseline alone is in force.

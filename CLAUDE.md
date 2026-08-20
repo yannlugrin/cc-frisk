@@ -344,8 +344,9 @@ Rule 1's quarantine survives that deletion, attached to
 
 ## Current state
 
-- **Current step:** none — `001` closed 2026-08-20.
-- **Next step:** `002` — the probe campaign and the guard record.
+- **Current step:** `002` — the probe campaign and the guard record;
+  Round A measured, Round B needs an `acceptEdits` session.
+- **Next step:** `003` — workflow tooling, part one.
 - **World state:** the harness is live and green — `just setup`,
   `just check [all|changed]`, `just test`, `just verify` — with the same
   checks in the commit hook, which now also gate the boundary. The

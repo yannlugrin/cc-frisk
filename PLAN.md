@@ -142,7 +142,7 @@ does not count against this ordering.)
   spellings stay knowingly unverified until `002` probes them. Detail in
   git history between tags `step-000` and `step-001`.
 
-### 002 — The probe campaign and the guard record — `pending`
+### 002 — The probe campaign and the guard record — `in progress`
 
 **Objective.** Prove what each enforcement mechanism introduced at `001`
 actually does in the version being run, and write down what was
