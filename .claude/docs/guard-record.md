@@ -213,8 +213,11 @@ Delete the harness and every probe target afterwards.
 
 ## The liveness triple — for the `003` rituals
 
-Three **live tool calls**, never piped to the guard by hand: the payload
-above asks whether the file is correct, these whether anything calls it.
+Three **live tool calls**, never piped to the guard by hand and **never
+run with `!`** — that executes in the operator's shell, with no hook and
+no permission check, so all three pass and prove nothing. The payload
+above asks whether the file is correct; these ask whether anything calls
+it.
 
 | # | Command | Must do |
 |---|---|---|
