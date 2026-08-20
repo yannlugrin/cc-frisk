@@ -190,7 +190,7 @@ does not count against this ordering.)
   tool and not the harness. Detail in git history between tags
   `step-002` and `step-003`.
 
-### 004 — Workflow tooling, part two: the agents — `in progress`
+### 004 — Workflow tooling, part two: the agents — `awaiting test`
 
 **Objective.** The five reviewer and maintenance agents, written under
 `003`'s measured answer about what a subagent can read — and the end of
