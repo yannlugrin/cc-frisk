@@ -345,17 +345,20 @@ Rule 1's quarantine survives that deletion, attached to
 ## Current state
 
 - **Current step:** `002` — the probe campaign and the guard record;
-  Round A measured, Round B needs an `acceptEdits` session.
+  all measurements taken, `awaiting test`.
 - **Next step:** `003` — workflow tooling, part one.
 - **World state:** the harness is live and green — `just setup`,
   `just check [all|changed]`, `just test`, `just verify` — with the same
   checks in the commit hook, which now also gate the boundary. The
   permission baseline is in `.claude/settings.json` and the guard is
-  live and untracked, versioned on `refs/backups/bash-guard`; two rule
-  spellings stay unverified until `002` probes them (`D-011`). No
-  tooling, no product code. Tags `step-000` and `step-001` exist.
-  `origin` is `github.com/yannlugrin/cc-frisk`, **public**; no private
-  backup remote exists, so the backup ref is local-only.
+  live and untracked, versioned on `refs/backups/bash-guard`; `002`
+  measured every mechanism and the baseline needed **no change** —
+  both `deny` spellings bind, the `ask` tier beats `acceptEdits`, and
+  the hook is reached (`guard-record.md`). No tooling, no product code.
+  Tags `step-000` and `step-001` exist. `origin` is
+  `github.com/yannlugrin/cc-frisk`, **public**; no private backup remote
+  exists, so the backup ref is local-only. **Every write under
+  `.claude/` prompts** — the platform does that, no setting removes it.
 - **Open obligations:** `PLAN.md` §14 carries eleven open questions, each
   answered at the step that needs it — Q10 (amend §5.4 or deviate) at
   `023`, Q11 (a prototype-to-frisk migration aid) at `024`. The sentinel
@@ -367,15 +370,15 @@ Rule 1's quarantine survives that deletion, attached to
   published `.claude/spec-work/` and `.claude/refs/` or rewrite history —
   and, added at `001`, that `.claude/settings.json` publishes an allow
   list which is only as narrow as the guard no clone receives.
-  `002` owes six named measurements, each with its response
-  pre-committed (`guard-record.md`).
 - **`.claude/docs/` pointers:** `harness.md` — the measured behaviour of
   `just check`/`test`/`verify` and the commit hooks, six probes with
   re-measure recipes; read before changing the `justfile`, `scripts/`,
   `.pre-commit-config.yaml` or any linter config. `guard-record.md` —
-  the quarantined guard's restore recipe, commands, reach, blind spots
-  and what `002` must still measure; read before touching
-  `.claude/settings.json` or anything under `.claude/hooks/`.
+  the quarantined guard's restore recipe, commands, reach, blind spots,
+  and `002`'s twelve platform probes with the liveness triple; read
+  before touching `.claude/settings.json` or anything under
+  `.claude/hooks/`, **and before designing any probe of a permission
+  mechanism** — its method section is why two of `002`'s were wrong.
 
 *A closed list of item kinds — current and next step, live world-state,
 open obligations, `.claude/docs/` pointers — and nothing else. What a

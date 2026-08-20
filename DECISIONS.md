@@ -480,19 +480,26 @@ Two conventions the format depends on:
   gates as one piece at step `001`'s handover. Three components were
   their own rulings earlier the same day: the permission mode, the
   bypass lock without the auto lock, and the absence of a backup remote.
-  **Two spellings in this entry are
-  unverified against the running version and are `002`'s first probes:**
-  whether `Bash(git push --force:*)` actually matches (if not, the
-  backstop is decoration), and whether an explicit `ask` rule beats
-  `acceptEdits` for the file tools (if not, the boundary's own files
-  need the `deny` tier and a named unlock path instead). A third
-  spelling was wrong and is already corrected: the baseline listed a
-  `Write(…)` rule beside each `Edit(…)` one, and **`Write(…)` matches
-  nothing** — the file tools are matched by `Edit(…)` rules, `Write`
-  included (operator, 2026-08-20). The three dead entries were removed;
-  the coverage they were meant to add is what the `Edit(…)` rules
-  already gave, so the tier above is unchanged. `002` confirms that
-  mapping alongside the probe.
+  A third spelling was wrong and is already corrected: the baseline
+  listed a `Write(…)` rule beside each `Edit(…)` one, and **`Write(…)`
+  matches nothing** — the file tools are matched by `Edit(…)` rules,
+  `Write` included (operator, 2026-08-20). The three dead entries were
+  removed; the coverage they were meant to add is what the `Edit(…)`
+  rules already gave, so the tier above is unchanged.
+- **Verified at `002` (2026-08-20), no change needed.** The two
+  spellings this entry left unverified both bind on Claude Code
+  `2.1.237`: `Bash(git push --force:*)` matches, so the backstop is not
+  decoration, and an explicit `ask` rule beats `acceptEdits` for the
+  file tools — measured outside `.claude/`, where a platform behaviour
+  would otherwise have masked it. The `Edit(…)`-matches-`Write` mapping
+  is confirmed too. So is this entry's accepted cost: `python3` does
+  prompt. Neither pre-committed fallback — re-spelling the backstop,
+  moving the `ask` tier to `deny` — was needed. Two facts the entry did
+  not anticipate are recorded in `.claude/docs/guard-record.md`: the
+  `deny` list matches only from the **start** of the command line, so
+  `git push origin main --force` matches nothing and only the guard
+  catches it; and Claude Code gates **every write under `.claude/`**
+  regardless of the rules, which no `allow` entry suppresses.
 
 ### D-012 — The boundary is inert exactly where the guard is absent
 
