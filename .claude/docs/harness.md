@@ -131,7 +131,15 @@ broader scanning is a pinned hook away (`gitleaks`, `detect-secrets`).
 ## Check families
 
 `.pre-commit-config.yaml`'s header comment carries the families and the
-step each arrives at; the hooks below it name their tools and pins. Not
-in that file: `scripts/check-guard.sh` is one hook carrying two families
-— guard liveness and governance well-formedness — and gains frontmatter
-parsing at `003`.
+step each arrives at; the hooks below it name their tools and pins.
+
+Two of them are local scripts rather than pinned third-party hooks, both
+`always_run` with `pass_filenames: false`, because what each hunts is
+invisible to a changed-file list. `scripts/check-guard.sh` asks whether
+the permission boundary is intact — the settings files' invariants, and
+one executed verdict from the command line they register.
+`scripts/check_frontmatter.py` asks whether every skill and agent
+definition still loads, and resolves the one citation shape the rituals
+use (`D-018` — it is a separate script and a separate hook, not a third
+family bolted onto `check-guard.sh`; it imports PyYAML from `.venv`,
+pinned in `requirements.txt`, where `check-guard.sh` is stdlib-only).

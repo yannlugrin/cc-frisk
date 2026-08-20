@@ -21,8 +21,7 @@ namespace**, never by the latest tag of any kind (other tags exist):
 before the first step tag, the range is the whole history. Then tell the
 operator where we are **before touching anything**. If the session was
 resumed after an interruption, or the operator says the work was
-interrupted, run `/resume-step` first — never trust the transcript; until
-step `004` instantiates it, apply the routine above directly.
+interrupted, run `/resume-step` first — never trust the transcript.
 
 ## The rules
 

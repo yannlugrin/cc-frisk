@@ -866,3 +866,37 @@ Two conventions the format depends on:
   import that a heredoc on system `python3` cannot have.
 - **Approved by:** implementer (within latitude: a workflow choice the
   bootstrap instructions left open, rule 4)
+
+### D-020 — The agent-name arm of the citation check is deferred to `004`
+
+- **Date:** 2026-08-20
+- **Step:** `003`
+- **Context:** `PLAN.md` `003` rides two *shoulds* beside the governance
+  check's required parse: "an agent name checked against
+  `.claude/agents/` and a path checked against the tree", and a section
+  pointer checked against the target's headings. The path and heading
+  arms shipped. The agent-name arm cannot be green at `003`: rule 2's
+  gates live in `/handover-step` and `/approve-step`, which name
+  `step-reviewer`, `code-reviewer`, `test-reviewer`, `state-reviewer`
+  and `optimize-memory` — five agents `PLAN.md` `004` creates. The plan
+  anticipates the forward reference ("resolved there") but the check
+  would still go red for a step in between.
+- **Decision:** the arm is deferred to `004`, recorded as a deliverable
+  in that step's entry rather than as a suppression list here. Both
+  rituals carry an explicit until-`004` fallback naming what to do while
+  the agents do not exist, so the forward reference cannot read as a
+  gate that silently skips — which is the failure the *should* exists to
+  catch, addressed in prose in the interim.
+- **Alternatives considered:** *An exemption list in
+  `scripts/check_frontmatter.py`* naming the five not-yet-adopted
+  agents — rejected: a suppression built for one step outlives it, and
+  the list would have to be deleted at `004` by the same session that
+  would rather leave it. *Adopting the five agents at `003`* — that is
+  `004`, and merging them would batch two steps because they look
+  related, which rule 2 forbids. *Dropping the arm permanently* —
+  rejected: a dangling agent name is exactly the silent-skip the plan
+  names, and `004` is where the check can pass on its first run.
+- **Approved by:** *pending* — put to the operator at `003`'s handover.
+  A *should* moving out of the step that owns it is a scope change, not
+  an implementer's latitude; if the ruling is that `003` must carry the
+  check with a temporary exemption, this entry is superseded.

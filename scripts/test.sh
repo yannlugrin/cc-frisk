@@ -54,6 +54,15 @@ fi
 echo "test: the governance frontmatter check"
 
 CHECK="scripts/check_frontmatter.py"
+PYTHON=.venv/bin/python
+
+# Without this, every case below reports "wanted exit 0, got 127" and the
+# real cause — no venv — is buried under nine failures. scripts/check.sh
+# says the same thing in the same words.
+if [ ! -x "$PYTHON" ]; then
+    echo "test: toolchain missing — run 'just setup' first." >&2
+    exit 1
+fi
 fixtures=$(mktemp -d)
 trap 'rm -rf "$fixtures"' EXIT
 
@@ -73,7 +82,7 @@ expect() {
     want_says=${4:-}
     cases_run=$((cases_run + 1))
     set +e
-    out=$(.venv/bin/python "$CHECK" "$root" 2>&1)
+    out=$("$PYTHON" "$CHECK" "$root" 2>&1)
     got=$?
     set -e
     if [ "$got" != "$want" ]; then
