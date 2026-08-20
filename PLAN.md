@@ -162,7 +162,7 @@ does not count against this ordering.)
   indistinguishable from an ungated one and the transcript records no
   decisions. Detail in git history between tags step-001 and step-002.
 
-### 003 — Workflow tooling, part one: the probes and the skills — `in progress`
+### 003 — Workflow tooling, part one: the probes and the skills — `awaiting test`
 
 **Objective.** Measure what a subagent can actually see, then instantiate
 the four session rituals under the answer.
