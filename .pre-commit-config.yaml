@@ -90,12 +90,11 @@ repos:
       - id: pymarkdown
         args: [--config, .pymarkdown.json, scan]
 
-  # Governance well-formedness, and the development guard's liveness.
-  # Nothing standard exists for either: no ecosystem tool knows what a
-  # Claude Code settings file must still be true for, and the guard is
-  # this repository's own. Both questions are asked by one script
-  # because they share a subject — the boundary — and neither costs more
-  # than a few milliseconds.
+  # Two local scripts, two hooks, one subject: the things that break
+  # silently. Nothing standard asks what a Claude Code settings file must
+  # still be true for, and the guard is this repository's own. D-018 kept
+  # them apart — check-guard.sh is stdlib-only and machine-local,
+  # check_frontmatter.py imports a pinned PyYAML and runs everywhere.
   #
   # always_run, because what it hunts is invisible to a file list: the
   # guard is gitignored and so never appears in one, and a settings file
@@ -109,7 +108,14 @@ repos:
       # skill and agent definition parses and agrees with its own path.
       # A malformed one does not fail — it silently never loads, and a
       # ritual nobody can invoke is indistinguishable from one nobody
-      # needed. Nothing in the ecosystem asks that question.
+      # needed.
+      #
+      # The ecosystem asks most of this: `claude plugin validate
+      # --strict` catches missing, unparseable and description-less
+      # frontmatter. It is not wired in here — it is the operator's
+      # unpinned live CLI, and every other tool in this file is pinned
+      # by rev (D-021). What it does not catch at all is a `name` that
+      # disagrees with its path, which is this script's reason to exist.
       #
       # It runs on the project interpreter rather than an isolated hook
       # environment because it imports PyYAML, pinned in

@@ -900,3 +900,50 @@ Two conventions the format depends on:
   A *should* moving out of the step that owns it is a scope change, not
   an implementer's latitude; if the ruling is that `003` must carry the
   check with a temporary exemption, this entry is superseded.
+
+### D-021 — `check_frontmatter.py` beside `claude plugin validate`, not instead of it
+
+- **Date:** 2026-08-20
+- **Step:** `003`
+- **Context:** rule 11 says to ask whether the ecosystem already ships
+  the tool before writing one. That question was not asked before
+  `scripts/check_frontmatter.py` was written, and the cold code review
+  asked it afterwards. It does ship one: `claude plugin validate
+  --strict <dir>`. Measured on 2.1.237 against this step's own fixture
+  classes — no frontmatter, unparseable YAML, a skill directory with no
+  `SKILL.md` all exit 1; **a `name` that disagrees with its directory
+  exits 0**, uncaught. So roughly two thirds of the parse half is
+  ecosystem-shipped, and the check's own comments claimed the opposite
+  in as many words.
+- **Decision:** both exist, and neither is folded into the other. The
+  script stays as the harness's gate; the validator is **not** wired
+  into `.pre-commit-config.yaml` or CI. It is `claude` — the operator's
+  live, unpinned CLI — and every other tool in that file is pinned by
+  `rev` with an isolated environment, which rule 2 requires of a
+  third-party check; wiring it in would make `just check` depend on
+  which Claude Code the workstation happens to have, and would put a
+  Claude Code install in `005`'s CI to lint five markdown files. The
+  false "nothing in the ecosystem asks that question" claim is struck
+  from the script's docstring and from `.pre-commit-config.yaml` in the
+  same commit; both now name the validator and say what it misses. The
+  script's residue that is genuinely its own — name↔path agreement, the
+  two layout checks, and the citation shape — is the part rule 11
+  actually sanctions, and it is the part with the most test cases.
+- **Revisit at `PLAN.md` `021`**, where the plugin tree lands and the
+  validator becomes necessary for the *product's* manifest rather than
+  optional for dev tooling. If it is pinned and wired then, the
+  duplicated parse diagnostics here should go with it.
+- **Alternatives considered:** *Replacing the script with the
+  validator* — loses name↔path agreement, the layout checks and the
+  citations, which is most of the value, and buys an unpinned
+  dependency. *Keeping both and wiring the validator in as a second
+  hook* — the honest maximal answer, rejected on pinning and on CI
+  weight, and revisitable at `021`. *Narrowing the script to only what
+  the validator misses* — tempting, but it would make `just check` green
+  on a skill with no frontmatter at all unless the validator ran too, so
+  it only works bundled with the previous option. *Deleting the check
+  entirely* — `PLAN.md` `003` requires the family, and the validator is
+  not in the harness.
+- **Approved by:** *pending* — put to the operator at `003`'s handover.
+  Rule 11 questions about whether a thing should exist are theirs, and
+  this one was answered by building first.

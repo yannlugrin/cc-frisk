@@ -167,9 +167,75 @@ expect 1 "citation to a heading that was renamed" "$root" "which is not a headin
 # built and regretted, and this case is what keeps it from creeping back.
 root=$(new_root prose-untouched)
 mkdir -p "$root/.claude/skills/ritual"
-printf -- '---\nname: ritual\ndescription: does a thing\n---\n\nThe engine lives in `src/frisk/engine.py`, not built yet.\n' \
+printf -- '---\nname: ritual\ndescription: does a thing\n---\n\nThe plan lives in `PLAN.md`, and `.claude/docs/gone.md` is not real.\n' \
     > "$root/.claude/skills/ritual/SKILL.md"
 expect 0 "backticked prose is not resolved" "$root"
+
+# 10 — frontmatter opened and never closed.
+root=$(new_root unclosed)
+mkdir -p "$root/.claude/skills/ritual"
+printf -- '---\nname: ritual\ndescription: does a thing\n\nbody\n' > "$root/.claude/skills/ritual/SKILL.md"
+expect 1 "frontmatter never closed" "$root" "never closed"
+
+# 11 — frontmatter that parses but is not a mapping.
+root=$(new_root not-a-mapping)
+mkdir -p "$root/.claude/skills/ritual"
+printf -- '---\n- a\n- b\n---\n\nbody\n' > "$root/.claude/skills/ritual/SKILL.md"
+expect 1 "frontmatter is a sequence, not a mapping" "$root" "not a mapping"
+
+# 12 — a skill directory with no SKILL.md. Named in
+# .pre-commit-config.yaml as the concrete absence that justifies
+# always_run: true, so it owes a case more than most.
+root=$(new_root empty-skill-dir)
+mkdir -p "$root/.claude/skills/ritual"
+expect 1 "skill directory with no SKILL.md" "$root" "no SKILL.md"
+
+# 13 — a directory where an agent file belongs.
+root=$(new_root agent-as-dir)
+mkdir -p "$root/.claude/agents/helper"
+expect 1 "agent written as a directory" "$root" "never loads"
+
+# 14 — an agent file with the wrong extension: it never loads and, until
+# this case, was never reported either.
+root=$(new_root agent-wrong-suffix)
+printf -- '---\nname: helper\ndescription: does a thing\n---\n\nbody\n' > "$root/.claude/agents/helper.markdown"
+expect 1 "agent with a non-.md suffix" "$root" 'must be a `.md` file'
+
+# 15 — a citation may not steer the check outside the tree. `ROOT / p`
+# discards ROOT for an absolute p, and `..` climbs; this repository
+# builds a permission guard, so that idiom does not get to live here.
+root=$(new_root citation-escape)
+mkdir -p "$root/.claude/skills/ritual"
+# The target must *exist*, or is_file() rejects it for the wrong reason
+# and the case passes with the containment check deleted. It sits one
+# level above the fixture root, reachable only by climbing out.
+printf -- '# Outside\n\n## Reachable only by climbing out\n' > "$fixtures/outside.md"
+printf -- '---\nname: ritual\ndescription: does a thing\n---\n\nSee `../outside.md` § "Reachable only by climbing out".\n' \
+    > "$root/.claude/skills/ritual/SKILL.md"
+expect 1 "citation climbing out of the tree" "$root" "not a file in this tree"
+
+# 16 — a heading that only exists inside a fenced code block is not a
+# heading. This repository's own harness.md has four such lines, so
+# without the fence pass a citation to a phantom resolves green.
+root=$(new_root fenced-heading)
+mkdir -p "$root/.claude/skills/ritual" "$root/.claude/docs"
+printf -- '---\nname: ritual\ndescription: does a thing\n---\n\nSee `.claude/docs/note.md` § "1 — not a heading".\n' \
+    > "$root/.claude/skills/ritual/SKILL.md"
+printf -- '# Note\n\n```sh\n# 1 — not a heading\n```\n' > "$root/.claude/docs/note.md"
+expect 1 "heading inside a fence is not a heading" "$root" "not a heading there"
+
+# 17 — and the converse: a citation shape *inside* a fence is an example,
+# not a citation. The 004 agents will document this convention.
+root=$(new_root fenced-citation)
+mkdir -p "$root/.claude/skills/ritual"
+printf -- '---\nname: ritual\ndescription: does a thing\n---\n\nThe shape is:\n\n```\n`docs/example.md` § "Some Heading"\n```\n' \
+    > "$root/.claude/skills/ritual/SKILL.md"
+expect 0 "citation shape inside a fence is an example" "$root"
+
+# 18 — a root that does not exist must not pass. Without this the two
+# green cases above would be satisfied by a fixture tree that failed to
+# materialise, which is the same silent-inertness the check exists for.
+expect 1 "nonexistent root" "$fixtures/never-created" "is not a directory"
 
 if [ "$failures" != 0 ]; then
     echo "test: $failures of $cases_run governance cases failed" >&2

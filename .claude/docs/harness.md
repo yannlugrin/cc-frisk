@@ -21,9 +21,10 @@ by `rev`. Pre-commit's transitive dependencies float.
 
 ## Invariants — each breaks silently
 
-They were measured, not assumed. **Re-run 1–4 after touching
-`scripts/check.sh` or the fixer hooks, 5–6 after touching
-`scripts/check-guard.sh` or its hook.** When one breaks, the check keeps
+They were measured, not assumed. **Re-run 1–5 after touching
+`scripts/check.sh` or the fixer hooks, 5–6 after touching either local
+hook (`scripts/check-guard.sh`, `scripts/check_frontmatter.py`) or its
+registration.** When one breaks, the check keeps
 passing and simply stops seeing things.
 
 **1. `check` sees untracked files.** `pre-commit run --all-files`
@@ -54,12 +55,28 @@ non-existent paths, which is right for deleted-but-indexed files and
 wrong for broken symlinks. **Do not test `-f` alone** — that makes the
 hook unreachable from `just check`.
 
-**5. A `local` hook runs even when the file list excludes it.**
-`check-guard` must run on every invocation, `just check changed`
-included: the guard is gitignored so never appears in a file list, and a
-settings file that stopped pointing at it is *unchanged* on the commit
-where that matters. Requires `always_run: true` and
-`pass_filenames: false` (confirmed on pre-commit 4.4.0).
+**5. A `local` hook runs even when the file list excludes it — and
+even when the list is empty.** Both local hooks must run on every
+invocation, `just check changed` on a clean tree included: the guard is
+gitignored so never appears in a file list, a settings file that stopped
+pointing at it is *unchanged* on the commit where that matters, and a
+skill directory with no `SKILL.md` is an absence no list contains.
+Requires `always_run: true` and `pass_filenames: false` (confirmed on
+pre-commit 4.4.0) **and** that `scripts/check.sh` still invokes
+pre-commit when its file list comes out empty.
+
+*Corrected at `003`.* This invariant was recorded as measured at `001`
+and was false at the boundary that mattered. The probe below ran
+`pre-commit` directly with `--files README.md`, so it measured
+pre-commit and never exercised `scripts/check.sh`, which returned early
+with "nothing to check" before pre-commit was reached. `just check
+changed` on a clean tree therefore ran **no hooks at all** and reported
+green, asserting nothing about the permission boundary. `scripts/check.sh`
+now runs `"$PRE_COMMIT" run --files` — an explicitly empty list, which
+skips every file-scoped hook and fires the always_run pair. `--files
+/dev/null` does not work: `destroyed-symlinks` asks git about a path
+outside the repository and crashes. **The lesson generalises: a probe
+that bypasses the entry point measures the tool, not the harness.**
 
 **6. The guard gate fails on each silent death.** A `PreToolUse` hook
 fails open, so each death is exercised rather than assumed. Verified at
@@ -101,10 +118,16 @@ just check                        # must be 1
 rm -f broken-probe.md
 ```
 
-**5.** A `local` hook with `always_run: true`, `pass_filenames: false`,
-`entry: "bash -c 'echo PROBE-RAN args=$*; exit 3' --"`, run through
-`.venv/bin/pre-commit run -c <config> --files README.md`: exit 1,
-`PROBE-RAN` printed, `args=` empty.
+**5.** Two halves, and the second is the one that was missed.
+*Pre-commit's behaviour:* a `local` hook with `always_run: true`,
+`pass_filenames: false`, `entry: "bash -c 'echo PROBE-RAN args=$*; exit
+3' --"`, run through `.venv/bin/pre-commit run -c <config> --files
+README.md`: exit 1, `PROBE-RAN` printed, `args=` empty. *The harness's
+behaviour — through the entry point, never around it:* on a **clean
+tree**, `just check changed` must print the always_run gates as
+`Passed`, not `nothing to check`. Sabotage `.claude/settings.json`
+(empty the `deny` list), commit it, run `just check changed`: it must go
+red. Restore afterwards.
 
 **6.** `git init` a scratch repo outside this one; copy
 `scripts/check-guard.sh` and a minimal `.claude/settings.json` in; stub

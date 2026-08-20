@@ -139,9 +139,24 @@ while IFS= read -r -d '' f; do
     fi
 done <"$list_file"
 
+# An empty file list is not "nothing to check". The two local hooks are
+# always_run/pass_filenames:false precisely because what they hunt is
+# invisible to a file list — a gitignored guard, a settings file that
+# quietly stopped pointing at it, a skill directory with no SKILL.md —
+# and `just check changed` on a clean tree is exactly when a tampered
+# boundary would sail through. Returning early here made those hooks
+# inert at the one invocation they were designed for, and
+# .claude/docs/harness.md recorded the opposite as measured. So run
+# pre-commit with no file list, which fires the always_run hooks and
+# nothing else; there is no file to snapshot, so the fixer machinery
+# below has nothing to do either. `--files` with an empty list is the
+# spelling that works: `--files /dev/null` makes destroyed-symlinks ask
+# git about a path outside the repository and crash.
 if [ "${#files[@]}" -eq 0 ]; then
-    echo "check ($SCOPE): nothing to check"
-    exit 0
+    echo "check ($SCOPE): no changed files — running the always_run gates only"
+    status=0
+    "$PRE_COMMIT" run --files || status=$?
+    exit "$status"
 fi
 
 # Snapshot, so a fixer hook's edits can be reverted below.
