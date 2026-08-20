@@ -407,6 +407,9 @@ Two conventions the format depends on:
 
 ### D-011 — The permission baseline: broad allows, a guard, a short deny backstop
 
+- **Superseded in part by `D-013` (2026-08-20):** the `just` treatment
+  below — a grant in the registry, six exact-match allows in the
+  settings — is overturned. Everything else in this entry stands.
 - **Date:** 2026-08-20
 - **Step:** `001` (the permission and hook baseline)
 - **Context:** rule 9 draws a boundary around this repository's own
@@ -550,3 +553,59 @@ Two conventions the format depends on:
   The custom check itself needs no separate sanction: `CLAUDE.md`'s
   harness note already provides for a few-line governance check, no
   ecosystem tool answering either question.
+
+### D-013 — `just` is safe-by-default: our own task runner is not a dangerous tool
+
+- **Date:** 2026-08-20
+- **Step:** none (`meta` — amends `D-011`, which is `001`'s)
+- **Context:** `D-011` treated `just` as dangerous-by-default on both
+  sides of the boundary: in the guard's registry as a **grant** (a
+  closed world of six proven spellings, anything else asks), and in
+  `.claude/settings.json` as six exact-match allows rather than
+  `Bash(just:*)`. The stated reason was that a broad allow on a
+  command-runner is a broad allow on everything it runs the moment the
+  guard is dead. In use that produced prompts on ordinary work: a
+  redirection is enough to leave the proven world, so
+  `just check changed 2>&1 | tail -20` asked, as did every spelling the
+  list did not literally contain. **An enforcement mechanism that asks
+  about routine work is worse than one that does not exist** — it trains
+  the operator to approve without reading, which is the failure this
+  whole project exists to prevent.
+- **Decision:** `just` becomes **safe-by-default on both sides**. In the
+  registry it is a rule, not a grant: any recipe, any arguments, any
+  redirection is silent, **including a recipe that does not exist yet**,
+  and a short set of named flags asks because each one breaks the
+  premise that this is *our* justfile run in *our* project — `-f` /
+  `--justfile` and `-d` / `--working-directory` (another justfile,
+  another directory), `--shell` / `--shell-arg` /
+  `--clear-shell-args` (another interpreter), `--chooser` / `--choose`
+  (an arbitrary command as chooser), and `--init` / `--fmt` (which
+  write a justfile). In the settings the six exact allows become one
+  `Bash(just:*)`, because a guard that goes silent while the allow list
+  still enumerates spellings simply moves the prompt from the hook to
+  the permission rules. `pip` stays a grant: its closed world is about
+  packages fetched from a network, which is a real risk and not ours to
+  vouch for.
+- **What this rests on, named honestly:** `CLAUDE.md` rule 2's invariant
+  that **no `just` recipe ever performs an act rule 9 gates**. The guard
+  judges the `just` line and can never see inside a recipe, so a recipe
+  that pushed or deleted would pass unseen. That invariant is now
+  load-bearing rather than merely stated. It is a fair thing to rest on:
+  the justfile is tracked, reviewed in the same diffs as everything
+  else, and written by us — which is exactly the argument the closed
+  world was ignoring.
+- **Alternatives considered:** *Teaching the guard's parser to strip
+  redirections*, which was the first fix proposed — rejected by the
+  operator under rule 11: the guard is scaffolding retired at `PLAN.md`
+  `027`, parser work on it is effort spent on the thing frisk replaces,
+  and §4.3 already legislates the correct behaviour for the product
+  (recorded in `.claude/docs/guard-record.md`). It would also have
+  fixed one spelling and left every unlisted recipe asking. *Enumerating
+  the four recipes as a rule instead of a grant* — rejected: a seventh
+  recipe would prompt on its first use, which is the same defect with a
+  longer fuse. *Leaving the settings at six exact allows and changing
+  only the guard* — rejected as half a fix, per the decision above.
+- **Approved by:** operator, 2026-08-20, who identified the grant as the
+  root cause and rejected the premise that a runner whose every task we
+  write ourselves is a dangerous tool. `D-011` stands otherwise; only
+  its `just` treatment is overturned.

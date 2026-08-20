@@ -70,7 +70,9 @@ template is recoverable from the operator.
 At the close of `001` the ref carried five links: clean base → the frisk
 registry → three in-channel gap fixes → docker removed → the cold
 review's three holes closed
-(`82336abee4f32fe2d019f9637d784deeb8dd688b`).
+(`82336abee4f32fe2d019f9637d784deeb8dd688b`). `just` became a rule after
+that close, in the same channel
+(`44be6c4a8a2bf1708b3bdf03bac341a79be5c39d`).
 
 ## The commands
 
@@ -80,8 +82,8 @@ runs the file directly.
 
 | Command | Asks | Green looks like |
 |---|---|---|
-| `.claude/hooks/bash_guard.py --liveness` | is it structurally alive? | one line, `liveness: 18 gated tools, 81 rules and grants, 17 wrappers, ok`, exit 0 |
-| `.claude/hooks/bash_guard.py --selftest` | is it right? | the liveness line, then `228/228 registry cases passed`, `174/174 engine cases passed`, `92/92 rules and grants covered`, exit 0 |
+| `.claude/hooks/bash_guard.py --liveness` | is it structurally alive? | one line, `liveness: 18 gated tools, 76 rules and grants, 17 wrappers, ok`, exit 0 |
+| `.claude/hooks/bash_guard.py --selftest` | is it right? | the liveness line, then `248/248 registry cases passed`, `174/174 engine cases passed`, `87/87 rules and grants covered`, exit 0 |
 | `printf '{"tool_name":"Bash","tool_input":{"command":"git push --force"}}' \| .claude/hooks/bash_guard.py` | does a payload still come back as a verdict? | one line of JSON carrying `permissionDecision: deny` and a reason ending in a bracketed rule citation, exit 0 |
 
 Failure shapes: liveness prints one `DEAD …` line per problem and ends
@@ -144,9 +146,10 @@ channel; the file itself is the authority.
 
 **Rules** (safe-by-default tool, finite set of dangerous acts — any named
 act gates the line, everything else falls through silent): `git`, `gh`,
-`claude`, `rm`/`rmdir`/`shred`, `find`, and the boundary-file writers.
+`claude`, `rm`/`rmdir`/`shred`, `find`, `just`, and the boundary-file
+writers.
 **Grants** (dangerous-by-default tool, small proven-safe set — closed
-world, anything unproven asks): `pip`, `just`. **Handoff-only**:
+world, anything unproven asks): `pip`. **Handoff-only**:
 `python` (so it cannot hide `pip`) and `sudo` (which also asks on its
 own).
 
@@ -172,10 +175,23 @@ own).
   too.
 - **pip.** Only `pip install -r requirements.txt` and the read
   subcommands are silent. **Any upgrade flag asks**, deliberately.
-- **just.** Only this repository's six documented recipe spellings are
-  silent; a new or unknown recipe asks. That is the registry-side
-  expression of the justfile invariant that no recipe performs a gated
-  act — the guard judges `just release`, never the push inside it.
+- **just.** Silent by default — any recipe, any arguments, any
+  redirection, whatever the spelling, including a recipe added after the
+  registry was written. The justfile is ours, tracked and reviewed, and
+  carries the invariant that no recipe performs a gated act; the guard
+  judges `just release`, never the push inside it. **What asks is a flag
+  that breaks the "our justfile, our project" premise**: `-f`/
+  `--justfile`, `-d`/`--working-directory`, `--shell`, `--shell-arg`,
+  `--clear-shell-args`, `--chooser`, `--choose`, `--init`, `--fmt` —
+  another justfile, another directory, another interpreter, or a just
+  that writes one. Keyed on the flag's presence, never its value, in
+  both the `--flag value` and `--flag=value` spellings; it asks, never
+  denies. It was a grant until 2026-08-20 and the operator ruled it out:
+  the closed world charged a prompt for ordinary work — a redirection
+  was enough — against no matching risk. One residue: a clustered short
+  with an attached value (`just -fOther/Justfile`) is a single unknown
+  token to the parser and stays **silent**. Nobody writes it here, and
+  closing it would need parser work on scaffolding retired at `027`.
 - **Deletes** are judged by resolved operands, not by the verb: project
   artifacts by name are free, anything resolving outside the project
   asks, and an operand the guard cannot resolve (`"$HOME"`,
@@ -213,25 +229,24 @@ own).
   a heredoc fed to a non-shell.
 - **Rules test presence, never value.** Only grants constrain a value,
   and they yield ask rather than deny.
-- **A redirection defeats a grant, never a rule.** `just check changed
-  2>&1 | tail -20` comes back **ask**, and so does
-  `pip install -r requirements.txt 2>&1`: the redirection token is
-  counted as an argument, so the closed-world grant sees a shape it
-  cannot prove (`just check 2 >&: no proven-safe shape`). Rules are
-  untouched — `git push --force 2>/dev/null` still denies,
-  `rm -rf ~/x 2>&1` still asks — because they test for a named act's
-  presence, not for a whole shape. It fails closed, so this is friction,
-  not a hole, and the friction is avoidable: **write
-  `just check changed | tail -20`, never `… 2>&1 | tail -20`.** Measured
-  2026-08-20 against the ref's tip `82336ab`, by feeding each spelling
-  to the guard in the payload shape of the third command above and
-  reading back `.hookSpecificOutput.permissionDecision`. **It is not
-  being fixed, and `002` does not revisit it** (operator, 2026-08-20):
-  the guard is scaffolding retired at `027`, so parser work on it is
-  effort spent on the very thing frisk replaces — and §4.3 already
-  requires the product to parse redirections off the command line and
-  to treat a pure fd-duplication like `2>&1` as no obstacle to an
-  allow. Avoid the spelling; the guard keeps the flaw until it goes.
+- **A redirection defeats a grant, never a rule.**
+  `pip install -r requirements.txt 2>&1` comes back **ask**: the
+  redirection token is counted as an argument, so the closed-world grant
+  sees a shape it cannot prove. Rules are untouched — `git push --force
+  2>/dev/null` still denies, `rm -rf ~/x 2>&1` still asks — because they
+  test for a named act's presence, not for a whole shape. It fails
+  closed, so this is friction, not a hole. **`just` used to be the
+  painful case and no longer is**: it became a rule on 2026-08-20, so
+  `just check changed 2>&1 | tail -20` is silent. `pip` keeps the flaw;
+  avoid the spelling there. Measured 2026-08-20 against the ref's tip
+  `44be6c4`, by feeding each spelling to the guard in the payload shape
+  of the third command above and reading back
+  `.hookSpecificOutput.permissionDecision`. **It is not being fixed, and
+  `002` does not revisit it** (operator, 2026-08-20): the guard is
+  scaffolding retired at `027`, so parser work on it is effort spent on
+  the very thing frisk replaces — and §4.3 already requires the product
+  to parse redirections off the command line and to treat a pure
+  fd-duplication like `2>&1` as no obstacle to an allow.
 - **The guard cannot tell whether it is reached at all.** Only a live
   session can, which is `002`'s job.
 

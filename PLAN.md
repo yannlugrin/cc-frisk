@@ -127,7 +127,9 @@ does not count against this ordering.)
   is shaped around it rather than duplicating it (`D-011`): mode
   `acceptEdits` with the bypass lock, `auto` left reachable for `002`'s
   comparison, one broad allow per registry-bearing tool, exact-match
-  allows for the `just` recipes rather than a broad allow on a runner,
+  allows for the `just` recipes rather than a broad allow on a runner
+  (that half overturned the same day by `D-013`, which makes our own
+  task runner safe-by-default on both sides),
   an `ask` tier on the boundary's own files, and a `deny` backstop
   confined to what cannot be undone. Because a hook fails open, two
   gates ask the two different questions, both inert exactly where the
