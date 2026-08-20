@@ -656,6 +656,10 @@ Two conventions the format depends on:
   a fidelity review had to reverse.
 - **Approved by:** operator, 2026-08-20, ruling on the workflow-update
   triage.
+- **Resolved (2026-08-20, `D-016`):** the deferred compaction was taken
+  in the U-065 update pass instead of at `003`. The number is unchanged
+  and `D-014` stands; the file now sits at 394, so the "no headroom"
+  state recorded above no longer holds and `003` arrives with room.
 
 ### D-015 — Doctrine adopted through U-064
 
@@ -710,3 +714,53 @@ Two conventions the format depends on:
   sweep makes it `003`'s, and `003` is next.
 - **Approved by:** operator, 2026-08-20, ruling point by point on the
   audit triage.
+
+### D-016 — Doctrine adopted through U-065, and the budget given headroom
+
+- **Date:** 2026-08-20
+- **Step:** — (workflow maintenance, no step)
+- **Context:** One *running* entry sat above `D-015`'s adoption point.
+  **U-065** attaches rule 3's headroom requirement to the budget itself
+  — the baseline, a number derived at the first task, or one re-derived
+  later — because that requirement had only ever lived in the
+  changelog's *remedy* field, which no project reads. Its detection test
+  has two limbs and this repository tripped both: `CLAUDE.md` stood at
+  exactly 400 lines against the 400 it states, and `D-014` re-derived to
+  a number equal to the file's length. The entry is in fact drawn from
+  this repository, quoting both derivations (389 against 390, then 400
+  against 400). `D-014` had already recorded the consequence — that
+  step `003` arrives owing a compaction pass it did not budget for.
+- **Decision:** this repository is **adopted through U-065**. The cap
+  stays at **400 lines hard, ~375 at handover**; `D-014`'s number is
+  unchanged and the headroom comes from taking the compaction it
+  deferred. `CLAUDE.md` goes 400 → 394, and rule 3 now states that every
+  budget lands above what the file owes, a re-derivation included, so
+  the two shrinks `D-002` schedules (step `004`, −10; `PLAN.md` `027`,
+  −29) re-derive downward under the rule rather than to the file's
+  length. Seven lines came back under the eviction order's own
+  precedence: per-step detail the plan already carries — `002`'s
+  measured findings in the world-state bullet, which its plan entry, the
+  `step-002` tag message and `.claude/docs/guard-record.md` (probes P1,
+  P4, P7) each hold — and the §14 question numbers in the obligations
+  bullet, which `PLAN.md` already routes to their steps. Three more came
+  from the layout section's `.claude/` inventory, which restated rules 1
+  and 3 clause for clause and is now a pointer to them: rule 3's
+  duplication disqualifier, applied to this file itself.
+- **Alternatives considered:** *Invoking U-065's own escape clause* —
+  "a file already at its cap is not re-cut for this alone" — rejected on
+  two grounds: the next change that touches the budget is step `003`,
+  which begins next, so the deferral buys one commit; and the headroom
+  clause cannot reach rule 3 without room, which is the failure U-065
+  names. *Raising the cap above 400* — rejected by the operator: it pays
+  for headroom with budget rather than with compaction, and `D-002`'s
+  reasoning that a budget met by moving it teaches the next session the
+  budget is decorative applies to raising it as much as to breaching it.
+  *Compacting further to reach ~385, the figure first estimated* —
+  rejected: the remaining candidates were the plan-entry shape and the
+  `.claude/refs/` inventory, and neither is reachable by a read-trigger
+  (U-055 has the close ritual cite the first, and the second *is* its
+  own trigger), so the cut would have been a rule trimmed to make room,
+  which `D-002` and `D-014` both refused. Six lines is headroom for
+  `003`'s pointer, and `004` returns ten.
+- **Approved by:** operator, 2026-08-20, ruling to keep the cap at 400
+  and take the compaction.

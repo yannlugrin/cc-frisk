@@ -160,6 +160,9 @@ memory, not a report. Auto memory is disabled in `.claude/settings.json`
 and stays disabled: machine-local, unversioned, outside git and outside
 these rules.
 **This file's budget is 400 lines hard, ~375 at handover (`D-014`).**
+**Every budget lands above what the file owes, never at it**, a
+re-derivation included — one set to the length of what is already
+written has recorded the file rather than budgeted it.
 When it binds, things leave in this order and the order is not yours to
 reshuffle: context-specific content a read-trigger can reach, then the
 tooling-templates block once its directory is gone, then per-step detail
@@ -334,12 +337,10 @@ outcomes.
 `src/frisk/` (engine), `tests/` (its suites), `collections/starter/`
 (shipped policy content the engine suite never imports) and the plugin's
 own tree, whose paths `PLAN.md` `021` confirms against the installed
-platform rather than assuming; `docs/` is documentation
-for humans (§12). Under `.claude/`: `docs/` is your working memory,
-`skills/` and `agents/` your tooling, `settings.json` the permission
-baseline, `hooks/bash_guard.py` the quarantined dev guard (untracked),
-`refs/` the operator's read-only material, and `spec-work/` the
-specification phase's history — not your reading material.
+platform rather than assuming; `docs/` is documentation for humans
+(§12). Under `.claude/`: `settings.json` is the permission baseline, and
+`docs/`, `skills/`, `agents/`, `hooks/`, `refs/` and `spec-work/` are
+what rules 1 and 3 make them.
 
 ## Tooling templates — temporary
 
@@ -358,43 +359,36 @@ Rule 1's quarantine survives that deletion, attached to
 
 - **Current step:** none — `002` closed 2026-08-20.
 - **Next step:** `003` — workflow tooling, part one.
-- **World state:** the harness is live and green — `just setup`,
-  `just check [all|changed]`, `just test`, `just verify` — with the same
-  checks in the commit hook, which now also gate the boundary. The
-  permission baseline is in `.claude/settings.json` and the guard is
-  live and untracked, versioned on `refs/backups/bash-guard`; `002`
-  measured every mechanism and the baseline needed **no change** — both
-  deny spellings bind, the gated tier beats the permissive edit mode,
-  and the hook is reached. `guard-record.md` names the modes, stamped.
-  Tags `step-000`, `step-001` and `step-002` exist. `origin` is
+- **World state:** the harness is live and green (`just setup`
+  bootstraps it), with the same checks in the commit hook, which now
+  also gate the boundary. The permission baseline is in
+  `.claude/settings.json`, measured and unchanged; the guard is live and
+  untracked, versioned on `refs/backups/bash-guard`. `origin` is
   `github.com/yannlugrin/cc-frisk`, **public**; no private backup remote
   exists, so the backup ref is local-only. **Every write under
-  `.claude/` prompts** — the platform does that, no setting removes it.
-- **Open obligations:** `PLAN.md` §14 carries eleven open questions, each
-  answered at the step that needs it — Q10 (amend §5.4 or deviate) at
-  `023`, Q11 (a prototype-to-frisk migration aid) at `024`. The sentinel
-  may be re-staged before parity if `D-007`'s residue proves
-  uncomfortable. `D-010` was logged after the fact rather than put to the
-  operator before it was built, and is reversible on request.
-  `005`'s publish-or-strip question stays at `005` (operator,
-  2026-08-19); what it now decides is whether to accept the already
-  published `.claude/spec-work/` and `.claude/refs/` or rewrite history —
-  and, added at `001`, that `.claude/settings.json` publishes an allow
-  list which is only as narrow as the guard no clone receives.
+  `.claude/` prompts** — no setting removes it.
+- **Open obligations:** `PLAN.md` §14 carries eleven open questions,
+  each answered at the step that needs it. The sentinel may be re-staged
+  before parity if `D-007`'s residue proves uncomfortable. `D-010` was
+  logged after the fact rather than put to the operator before it was
+  built, and is reversible on request. `005`'s publish-or-strip question
+  stays at `005` (operator, 2026-08-19); it now decides whether to accept
+  the already published `.claude/spec-work/` and `.claude/refs/` or
+  rewrite history — and, added at `001`, that `.claude/settings.json`
+  publishes an allow list only as narrow as the guard no clone
+  receives.
 - **`.claude/docs/` pointers:** `harness.md` — the measured behaviour of
-  `just check`/`test`/`verify` and the commit hooks, six probes with
-  re-measure recipes; read before changing the `justfile`, `scripts/`,
+  `just check`/`test`/`verify` and the commit hooks, with re-measure
+  recipes; read before changing the `justfile`, `scripts/`,
   `.pre-commit-config.yaml` or any linter config. `guard-record.md` —
-  the quarantined guard's restore recipe, commands, reach, blind spots,
-  and `002`'s twelve platform probes with the liveness triple; read
-  before touching `.claude/settings.json` or anything under
-  `.claude/hooks/`, **and before designing any probe of a permission
-  mechanism**.
+  the quarantined guard's restore recipe, commands, reach, blind spots
+  and platform probes with the liveness triple; read before touching
+  `.claude/settings.json` or anything under `.claude/hooks/`, **and
+  before designing any probe of a permission mechanism**.
 
 *A closed list of item kinds — current and next step, live world-state,
-open obligations, `.claude/docs/` pointers — and nothing else. What a
-closed step produced is not one of them: its outcome belongs in its plan
-entry and its tag, a durable fact in `.claude/docs/`, an invariant in the
-decision log. The close ritual deletes that paragraph rather than
-demoting it; without the closed list, each close adds one reasonable
-paragraph and this section becomes a changelog.*
+open obligations, `.claude/docs/` pointers — and nothing else. A closed
+step's outcome is not one of them: it belongs to its plan entry and its
+tag, a durable fact to `.claude/docs/`, an invariant to the decision
+log. The close ritual deletes that paragraph rather than demoting it;
+otherwise each close adds a paragraph and this section is a changelog.*
