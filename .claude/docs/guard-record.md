@@ -439,39 +439,119 @@ decision reserved `auto` for has **not** been run; it needs
 
 **Re-measure.** `claude auto-mode config | jq '.classifyAllShell'`.
 
-### Still open — Round B
+### B1. Both rule spellings bind — and only from the start of the line
 
-Each needs a session in the **`acceptEdits`** baseline mode, and the two
-settings-dependent ones need a restart after the probe harness lands.
-The harness is `.claude/settings.local.json` (machine-local, gitignored),
-carrying two synthetic `deny` entries on `basename` — a command the guard
-leaves silent, so the two mechanisms cannot confound each other — and a
-second `PreToolUse` hook that appends `$CLAUDE_PROJECT_DIR` and `$PWD` to
-`/tmp/frisk-probe-hookenv.txt` and exits 0.
+**Why it matters.** `Bash(git push --force:*)` is what the backstop is
+written in. If that spelling binds nothing, the backstop is decoration.
+The CLI's own `--allowedTools` help documents a `Bash(git *)` prefix form
+as well, so both were live in the documentation and untested here.
 
-1. **Does `Bash(git push --force:*)` actually match?** The colon-star
-   form is what the pairing prescribes; the CLI's own `--allowedTools`
-   help documents a `Bash(git *)` prefix form as well, so both spellings
-   are live in the documentation and one of them may bind nothing. Probed
-   through the synthetic pair `Bash(basename --colonstar:*)` and
-   `Bash(basename --prefixform *)`. **If the colon-star form does not
-   bind, the backstop is decoration — re-spell it.**
-2. **What does `acceptEdits` do with an unmatched Bash command?** The
-   guard's silence is only as safe as that behaviour.
-3. **Does an explicit `ask` rule beat `acceptEdits` for the file tools?**
-   If not, the boundary's own files are unprotected against a silent,
-   well-formed settings edit and the tier must be `deny` with a named
-   unlock path. Half is already answered: **`Write(…)` rules match
-   nothing** — the file tools, `Write` included, are matched by `Edit(…)`
-   rules (operator, 2026-08-20). Confirm that mapping with a live `Write`
-   at a boundary path.
-4. **Is `$CLAUDE_PROJECT_DIR` exported to `PreToolUse` hooks?** The
-   registry's boundary rules resolve against it, falling back to the
-   guard process's working directory — under a hook, wherever Claude Code
-   launches it. Absent variable *and* a working directory that is not the
-   project root means those rules resolve against the wrong tree. The
-   harness hook records both.
+**Method.** Synthetic `deny` entries in the machine-local harness, on
+`basename` — a command the guard leaves silent, so the hook cannot be
+mistaken for the permission rules. A settings refusal reads
+`Permission to use Bash with command … has been denied`; the guard's
+reads as its own sentence with a bracketed rule citation. The two are
+told apart by their text.
 
-**Cleanup owed at the end of Round B:** delete
-`.claude/settings.local.json` and `/tmp/frisk-probe-hookenv.txt`, and
-restart once more so the baseline alone is in force.
+**Measured.** With `Bash(basename --colonstar:*)` and
+`Bash(basename --prefixform *)` in force:
+
+| Command | Result |
+|---|---|
+| `basename --colonstar /a/b/c` | **denied**, generic permission text |
+| `basename --prefixform /a/b/c` | **denied**, generic permission text |
+| `basename /a/b/c --colonstar` | **ran**, no prompt, printed `c` |
+
+**Both spellings bind, so the backstop is real.** The third line is the
+one worth keeping: the same flag, in the same command, moved past the
+first argument, matches nothing. Prefix rules match from the **start of
+the command line** and there is no fix for that inside them.
+
+This closes the attribution of [A1](#a1-the-hook-is-reached-and-a-refusal-names-its-rule)
+as well: `git push origin main --force --dry-run` matches no `deny`
+entry, so the refusal there came from the hook and from nothing else.
+It is also this project's thesis, now measured rather than asserted —
+`Bash(git push --force:*)` denies `git push --force …` and says nothing
+about `git push origin main --force`, the commoner spelling from muscle
+memory. The guard catches the second; the permission rules cannot.
+
+**Re-measure.** Restore the two synthetic entries in
+`.claude/settings.local.json` and run the three commands above.
+
+### B2. `$CLAUDE_PROJECT_DIR` is exported to `PreToolUse` hooks
+
+**Why it matters.** The registry's boundary-file rules resolve against
+it, falling back to the guard process's working directory — under a
+hook, wherever Claude Code chooses to launch it. An absent variable
+*and* a working directory that is not the project root would resolve
+those rules against the wrong tree, silently.
+
+**Method.** A second `PreToolUse` hook in the machine-local harness,
+appending both values to a file and exiting 0.
+
+**Measured.** Every invocation recorded
+`CLAUDE_PROJECT_DIR=[/home/yann/projects/claude/frisk]` and
+`PWD=[/home/yann/projects/claude/frisk]`. **The variable is exported and
+correct, and the fallback would have been correct too** — both roads
+lead to the project root here. The rules resolve against the right tree.
+
+**Re-measure.**
+
+```sh
+cat /tmp/frisk-probe-hookenv.txt    # while the harness hook is registered
+```
+
+### B3. A `settings.local.json` change is picked up **without** a restart
+
+**Why it matters.** `PLAN.md`'s `002` entry states the restart as
+method — a probe run in the session that made the edit can report a
+false "not enforced". On `2.1.237` that is **stricter than necessary for
+this file**, and knowing which way the error runs matters: the recorded
+recipes are safe either way, but a session that assumes a restart is
+needed will misread a rule that is already live.
+
+**Measured.** `.claude/settings.local.json` was created mid-session, and
+both its synthetic `deny` entries and its extra `PreToolUse` hook took
+effect in that same session, with no restart — the hook's first line is
+timestamped seconds after the file was written.
+
+**The conservative reading stands as the method.** This was measured for
+one file, on one version, for `deny` rules and `PreToolUse` hooks; it is
+not a licence to assume hot reload for `defaultMode`, for
+`.claude/settings.json`, or for anything else. **Restart before
+concluding that a mechanism does not enforce**; a live one may simply be
+believed dead the other way round.
+
+**Re-measure.** Write a synthetic `deny` into
+`.claude/settings.local.json` and run the matching command in the same
+session.
+
+### Still open
+
+Two probes remain, and both need a session in the **`acceptEdits`**
+baseline mode. This session ran in `auto`, where an unmatched command is
+classified rather than falling to the mode's default — `basename
+/a/b/c --colonstar` ran with no prompt and no allow rule covering it,
+which is an `auto` measurement and says nothing about `acceptEdits`.
+No restart is needed (B3); the mode is switched in-session.
+
+1. **What does `acceptEdits` do with an unmatched Bash command?** The
+   guard's silence is only as safe as that behaviour, and the guard's
+   `ask` verdicts may be the only gate left in a permissive mode.
+2. **Does an explicit `ask` rule beat `acceptEdits` for the file
+   tools?** If not, the boundary's own files are unprotected against a
+   silent, well-formed settings edit, and **the tier must become `deny`
+   with a named unlock path instead** — that response is pre-committed.
+   Half is already answered: **`Write(…)` rules match nothing** — the
+   file tools, `Write` included, are matched by `Edit(…)` rules
+   (operator, 2026-08-20). Both halves are probed at once, and **not**
+   against a live boundary file: the target is a new, disposable
+   `.claude/hooks/probe-target.txt`, which `Edit(.claude/hooks/**)`
+   covers, written with the **`Write`** tool. A prompt confirms the tier
+   and the mapping together; a file appearing in silence falsifies both.
+   The quarantined guard is never the target.
+
+**Cleanup owed when they close:** delete
+`.claude/settings.local.json`, `/tmp/frisk-probe-hookenv.txt` and any
+`.claude/hooks/probe-target.txt`, then confirm the baseline alone is in
+force.
