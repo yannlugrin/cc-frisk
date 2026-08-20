@@ -257,10 +257,17 @@ Nothing below is assumed anywhere in this repository; each is a probe
 2. **What does `acceptEdits` do with an unmatched Bash command?** The
    guard's silence is only as safe as that behaviour, and its `ask`
    verdicts may be the only gate left in a permissive mode.
-3. **Does an explicit `ask` rule beat `acceptEdits` for `Edit`/`Write`?**
+3. **Does an explicit `ask` rule beat `acceptEdits` for the file tools?**
    If not, the boundary's own files are unprotected against a silent,
    well-formed settings edit and the tier must be `deny` with a named
-   unlock path instead.
+   unlock path instead. Half of this one is already answered:
+   **`Write(…)` rules match nothing** — the file tools, `Write`
+   included, are matched by `Edit(…)` rules (operator, 2026-08-20).
+   The baseline shipped with a `Write(…)` entry beside each `Edit(…)`
+   one; the three dead entries were removed and the tier is unchanged,
+   because the `Edit(…)` rules already covered what they were meant to
+   cover. Confirm that mapping here too, with a live `Write` at a
+   boundary path.
 4. **Is `$CLAUDE_PROJECT_DIR` exported to `PreToolUse` hooks?** The
    registry's boundary rules resolve against it, falling back to the
    guard process's working directory — which under a hook is wherever

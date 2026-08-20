@@ -481,8 +481,15 @@ Two conventions the format depends on:
   unverified against the running version and are `002`'s first probes:**
   whether `Bash(git push --force:*)` actually matches (if not, the
   backstop is decoration), and whether an explicit `ask` rule beats
-  `acceptEdits` for `Edit`/`Write` (if not, the boundary's own files
-  need the `deny` tier and a named unlock path instead).
+  `acceptEdits` for the file tools (if not, the boundary's own files
+  need the `deny` tier and a named unlock path instead). A third
+  spelling was wrong and is already corrected: the baseline listed a
+  `Write(…)` rule beside each `Edit(…)` one, and **`Write(…)` matches
+  nothing** — the file tools are matched by `Edit(…)` rules, `Write`
+  included (operator, 2026-08-20). The three dead entries were removed;
+  the coverage they were meant to add is what the `Edit(…)` rules
+  already gave, so the tier above is unchanged. `002` confirms that
+  mapping alongside the probe.
 
 ### D-012 — The boundary is inert exactly where the guard is absent
 
