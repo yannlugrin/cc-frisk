@@ -17,8 +17,7 @@ Measured 2026-08-19 on `just` 1.45.0, `pre-commit` 4.4.0, Python 3.14.4
 
 `just` is a system tool, unpinned, so `just setup` has nothing before it.
 Only `pre-commit` is pinned in `requirements.txt`; every linter is pinned
-by `rev`. Pre-commit's transitive dependencies float — accepted, since
-the linters that decide verdicts are exact.
+by `rev`. Pre-commit's transitive dependencies float.
 
 ## Invariants — each breaks silently
 
@@ -131,15 +130,8 @@ broader scanning is a pinned hook away (`gitleaks`, `detect-secrets`).
 
 ## Check families
 
-| Family | Since | Tool |
-|---|---|---|
-| Whitespace / newline | `000` | pre-commit-hooks (fixers) |
-| Hygiene, secrets | `000` | `detect-private-key`, large files `--enforce-all`, merge conflicts, symlinks, case conflicts |
-| JSON parse | `000` | `check-json` |
-| YAML | `000` | yamllint `--strict` (fails on parse errors, so `check-yaml` is redundant) |
-| POSIX shell | `000` | shellcheck-py (ships its own pinned binary) |
-| Markdown / prose | `000` | pymarkdown |
-| Guard liveness | `001` | `scripts/check-guard.sh`, machine-local, inert where absent |
-| Governance well-formedness | `001` | same script: settings still register the guard, hooks not globally disabled, auto memory off |
-| Governance frontmatter | `003` | same script gains it — no ecosystem tool parses skill frontmatter |
-| Python, TOML | `006` | pinned to that step's floor interpreter |
+`.pre-commit-config.yaml`'s header comment carries the families and the
+step each arrives at; the hooks below it name their tools and pins. Not
+in that file: `scripts/check-guard.sh` is one hook carrying two families
+— guard liveness and governance well-formedness — and gains frontmatter
+parsing at `003`.

@@ -3,23 +3,10 @@
 **Read before touching `.claude/settings.json`, `scripts/check-guard.sh`,
 its `check-guard` hook, or anything under `.claude/hooks/`** — and before
 designing any probe of a permission mechanism (see [Method](#method)).
-It holds what a later session needs and cannot get by reading the guard,
-because reading it is forbidden.
-
-## The quarantine
-
-`.claude/hooks/bash_guard.py` is prototype tooling for *this repository's
-development*, not the product; §3.1 excludes the prototype's code and API
-shapes as inputs. It never enters a session's context — edits run in an
-**isolated subagent** reporting outcomes only. Executing it is fine
-(output is verdicts). **Never tracked**: both guard paths are gitignored,
-because this repository is the plugin's public install channel.
 
 ## Restore, and the backup ref
 
-Versioning lives on **`refs/backups/bash-guard`**, outside `refs/heads/`
-so no `push --all`, default refspec or clone carries it. Redirect it;
-never render the content into a session.
+Restore by redirection; never render the content into a session.
 
 ```sh
 git show refs/backups/bash-guard:.claude/hooks/bash_guard.py > .claude/hooks/bash_guard.py
@@ -45,11 +32,8 @@ fi
 git update-ref refs/backups/bash-guard "$commit"
 ```
 
-**No backup remote is configured** (operator, 2026-08-20). Only `origin`
-exists and it is **public**; this ref must never go there. Until a
-private remote exists, rule 6's step-close push reports "the remote does
-not exist" and attempts nothing. Tip at `001`'s close `82336ab`; `just`
-became a rule after, `44be6c4`.
+No backup remote exists, so rule 6's step-close push reports its absence
+and attempts nothing; `origin` is public and this ref never goes there.
 
 ## The commands
 
@@ -72,8 +56,7 @@ A dead, missing or non-executable hook is skipped **silently**, falling
 through to the permission rules. So: `just check` / the commit hook →
 `scripts/check-guard.sh` (liveness plus governance well-formedness);
 `just test` → `--selftest`. Both key on **the backup ref, not the guard
-file** — a gate keyed on the file it guards goes inert exactly when that
-file vanishes, which is the death being hunted (`D-012`).
+file** (`D-012`).
 
 `check-guard.sh` **executes the command line the settings register**,
 with a force-push payload, and requires `deny` back; a registration that
@@ -140,18 +123,13 @@ the non-obvious rulings are written down here:
 - **Rules test presence, never value.** Only grants constrain a value.
 - **A redirection defeats a grant, never a rule.** `pip install -r
   requirements.txt 2>&1` → `ask`. Fails closed, so friction not hole;
-  **not being fixed** (operator, 2026-08-20) — the guard is scaffolding
-  retired at `027`, and §4.3 already requires the product to handle it.
+  **not being fixed** (`D-013`).
 
 ## The settings pairing
 
-Shape and rationale are in `D-011`. The honest summary: **a broad allow
-plus a dead hook is a wider surface than a narrow allow list ever was.**
-The `deny` backstop answers exactly there, confined to acts that cannot
-be undone. Two accepted limits: it covers **canonical spellings only**
-(P4), and it does **not** cover destructive deletes, whose spellings a
-prefix rule cannot enumerate. The gates above are what keep the hook —
-which has neither limit — alive.
+Shape, rationale and the backstop's two accepted limits are in `D-011`.
+What belongs here: the gates above are what keep the hook — which has
+neither limit — alive.
 
 ## The platform probes (`002`)
 
