@@ -213,6 +213,21 @@ own).
   a heredoc fed to a non-shell.
 - **Rules test presence, never value.** Only grants constrain a value,
   and they yield ask rather than deny.
+- **A redirection defeats a grant, never a rule.** `just check changed
+  2>&1 | tail -20` comes back **ask**, and so does
+  `pip install -r requirements.txt 2>&1`: the redirection token is
+  counted as an argument, so the closed-world grant sees a shape it
+  cannot prove (`just check 2 >&: no proven-safe shape`). Rules are
+  untouched — `git push --force 2>/dev/null` still denies,
+  `rm -rf ~/x 2>&1` still asks — because they test for a named act's
+  presence, not for a whole shape. It fails closed, so this is friction,
+  not a hole, and the friction is avoidable: **write
+  `just check changed | tail -20`, never `… 2>&1 | tail -20`.** Measured
+  2026-08-20 against the ref's tip `82336ab`, by feeding each spelling
+  to the guard in the payload shape of the third command above and
+  reading back `.hookSpecificOutput.permissionDecision`. `002` decides
+  whether stripping redirection tokens before matching is worth an
+  in-channel fix.
 - **The guard cannot tell whether it is reached at all.** Only a live
   session can, which is `002`'s job.
 
