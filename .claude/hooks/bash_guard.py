@@ -1430,9 +1430,361 @@ DOCKER = Tool(
     ),
 )
 
-# Add this project's own tools here, then extend CASES to cover them.
+# ====================== this project's own tools ===========================
+# frisk is a Claude Code plugin and this repository is its public install
+# channel, so an outward write here is a publication. What follows expresses
+# CLAUDE.md rule 9's boundary where a prefix permission rule cannot reach it:
+# the deciding token sits anywhere on the line, or the act is safe only for
+# one shape. The inventory is small on purpose — git, gh, just, the venv
+# toolchain and ordinary POSIX utilities; no docker, no npm, no cloud CLI.
 
-TOOLS: dict[str, Tool] = registry(GIT, DOCKER)
+from dataclasses import replace  # to extend GIT without editing its block
+
+# Where this project ends. Claude Code exports CLAUDE_PROJECT_DIR to hooks;
+# the cwd fallback is what --selftest runs under.
+PROJECT_ROOT = os.path.normpath(os.environ.get("CLAUDE_PROJECT_DIR") or os.getcwd())
+
+# Scratch space outside the repository. Rule 9 makes scaffolding and deleting
+# throwaway projects there free, so a delete under one of these is rebuildable
+# working material exactly like a build artifact inside the tree.
+SCRATCH_ROOTS = ("/tmp", "/var/tmp")
+
+
+def _within(path: str, root: str) -> bool:
+    root = os.path.normpath(root).rstrip("/")
+    return path == root or path.startswith(root + "/")
+
+
+def escapes_project(value: str) -> bool:
+    """True when a path being deleted reaches outside this project.
+
+    Removing this project's own artifacts by name — .venv, __pycache__, a
+    cache directory, a scratch file — is rebuildable working material and
+    stays free. A sweep that reaches a sibling checkout, the home directory or
+    the filesystem root is the unscoped destructive act rule 9 gates.
+
+    Resolved before comparing, so `../..` and `~` are what they expand to
+    rather than what they spell.
+    """
+    resolved = os.path.normpath(os.path.expanduser(value))
+    if os.path.isabs(resolved):
+        if _within(resolved, PROJECT_ROOT):
+            return False
+        return not any(_within(resolved, root) for root in SCRATCH_ROOTS)
+    return resolved == ".." or resolved.startswith("../")
+
+
+def boundary_file(value: str) -> bool:
+    """True for the files that carry the boundary itself.
+
+    `.claude/settings.json` is the permission baseline and `.claude/hooks/`
+    holds this guard: a shell write to either edits the gate rather than
+    passing through it. Ask, never deny — a denial would leave the guard's own
+    maintenance with no unlock path.
+    """
+    resolved = os.path.normpath(os.path.expanduser(value))
+    if os.path.isabs(resolved):
+        if not _within(resolved, PROJECT_ROOT):
+            return False
+        resolved = os.path.relpath(resolved, PROJECT_ROOT)
+    return (
+        resolved.startswith(".claude/settings")
+        or resolved == ".claude/hooks"
+        or resolved.startswith(".claude/hooks/")
+    )
+
+
+# A URL, or the scp-like `user@host:path` git accepts. Fetching one is
+# fetching material this repository has not pinned; a remote already named
+# here is not.
+NETWORK_URL = re.compile(r"^(?:[A-Za-z][\w+.-]*://|[\w.-]+@[\w.-]+:)")
+
+# --- git: this project's additions to the ground rules ---------------------
+# The GIT block above is ground rules and stays byte-identical to the
+# template, so "added to, never weakened" can be checked by diffing it. These
+# additions have the project-specific reason CHANGING THE RULES asks for: this
+# repository is a public install channel, its history and step tags are what
+# the workflow rests on, and its backup ref must never leave the machine.
+
+GIT_PROJECT_RULES = (
+    # Push spellings the ground rules do not name, all unrecoverable from
+    # here. `--prune` deletes every remote ref with no local counterpart. A
+    # refspec starting with `:` deletes the ref it names; one starting with
+    # `+` overwrites it non-fast-forward — a force push wearing another hat.
+    Rule(
+        "deny", ("push",),
+        "this deletes remote refs, which cannot be recovered from here",
+        flags=frozenset({"--prune"}),
+    ),
+    Rule(
+        "deny", ("push",),
+        "this refspec deletes or force-updates a remote ref",
+        operands=any_of(re.compile(r"^[:+]")),
+    ),
+    # `--intent-to-add` writes to the index as a side effect of what reads
+    # like a check, and every ritual here has a clean-tree precondition.
+    # CLAUDE.md rule 2 prohibits it outright, so this is a deny, not an ask.
+    Rule(
+        "deny", ("add",),
+        "intent-to-add writes to the index and breaks the clean-tree checks",
+        flags=frozenset({"-N", "--intent-to-add"}),
+    ),
+    # Where a remote points decides whether a push is a private backup or a
+    # publication: the backup ref rides a push to the operator's private
+    # remote and must never reach origin.
+    Rule("ask", ("remote", "add"), "this changes where a push can land"),
+    Rule("ask", ("remote", "set-url"), "this changes where a push can land"),
+    Rule("ask", ("remote", "remove"), "this changes where a push can land"),
+    Rule("ask", ("remote", "rm"), "this changes where a push can land"),
+    # A named remote is already in this repository; a URL is not.
+    Rule(
+        "ask", ("fetch",), "this fetches unpinned material from the network",
+        operands=any_of(NETWORK_URL),
+    ),
+    Rule(
+        "ask", ("clone",), "this fetches unpinned material from the network",
+        operands=any_of(NETWORK_URL),
+    ),
+)
+
+GIT = replace(GIT, rules=(*GIT.rules, *GIT_PROJECT_RULES))
+
+
+# --- gh: safe by default, forge writes enumerated --------------------------
+# Reads are the whole daily use — `gh repo view`, `gh pr list`, `gh run view`,
+# `gh api` with no method — and rule 9 makes them free. The writes are a
+# finite list, so this is a rules tool like git.
+
+FORGE_WRITE = "this writes to the forge, an outward act"
+
+GH = Tool(
+    name="gh",
+    rules=(
+        Rule("ask", ("release", "create"), FORGE_WRITE),
+        Rule("ask", ("release", "edit"), FORGE_WRITE),
+        Rule("ask", ("release", "delete"), FORGE_WRITE),
+        Rule("ask", ("release", "upload"), FORGE_WRITE),
+        Rule("ask", ("repo", "create"), FORGE_WRITE),
+        Rule("ask", ("repo", "edit"), FORGE_WRITE),
+        Rule("ask", ("repo", "delete"), FORGE_WRITE),
+        Rule("ask", ("pr", "create"), FORGE_WRITE),
+        Rule("ask", ("pr", "merge"), FORGE_WRITE),
+        Rule("ask", ("pr", "close"), FORGE_WRITE),
+        Rule("ask", ("pr", "edit"), FORGE_WRITE),
+        Rule("ask", ("issue", "create"), FORGE_WRITE),
+        Rule("ask", ("issue", "close"), FORGE_WRITE),
+        Rule("ask", ("issue", "edit"), FORGE_WRITE),
+        Rule("ask", ("workflow", "run"), "this spends CI on the operator's account"),
+        Rule("ask", ("secret", "set"), "this writes a repository secret"),
+        # A rule tests presence, never value, so any explicit method asks —
+        # `-X GET` included, which nobody writes because omitting it makes the
+        # same request. Presence is also the only thing that catches
+        # `--method=POST`, where the value never becomes its own token.
+        Rule(
+            "ask", ("api",), "this may be a non-GET API call, an outward write",
+            flags=frozenset({"-X", "--method"}),
+        ),
+        Rule(
+            "ask", ("api", "graphql"), "a graphql mutation is an outward write",
+            operands=any_of(re.compile(r"(?s).*\bmutation\b")),
+        ),
+    ),
+)
+
+
+# --- pip: dangerous by default, one proven install shape -------------------
+# Grants, not rules: the safe set is small and closed — the documented setup
+# command installing this repository's pinned dependencies, plus pip's own
+# read subcommands. Rules could not express "unless -r requirements.txt",
+# since a rule only fires and never exempts. `--upgrade` is deliberately
+# absent from known_flags, so it costs a prompt rather than a carve-out.
+
+REQUIREMENTS = re.compile(r"^(?:\./)?requirements\.txt$")
+
+PIP = Tool(
+    name="pip",
+    aliases=frozenset({"pip3"}),
+    gated_reason=(
+        "only `pip install -r requirements.txt` and pip's read subcommands are "
+        "proven here; anything else fetches material this repository has not pinned"
+    ),
+    known_flags=frozenset({
+        "-r", "--requirement", "-q", "--quiet", "--no-input",
+        "--disable-pip-version-check", "--outdated", "--format",
+    }),
+    value_flags=frozenset({"-r", "--requirement", "--format"}),
+    grants=(
+        # allow_operands=False so a package name smuggled beside the
+        # requirements file cannot ride along.
+        Grant(path=("install",), flag_values=(("-r", REQUIREMENTS),),
+              allow_operands=False),
+        Grant(path=("install",), flag_values=(("--requirement", REQUIREMENTS),),
+              allow_operands=False),
+        Grant(path=("list",)),
+        Grant(path=("show",)),
+        Grant(path=("freeze",)),
+        Grant(path=("check",)),
+    ),
+)
+
+
+# --- python: it only hands off ---------------------------------------------
+# `python3 -m pip install …` is a pip install and must reach the pip entry
+# above, so `-m` is deliberately not a value option: the walk steps over the
+# flag and lands on the module name. `-c` is one, so program text in another
+# language is stepped over rather than read as a command line.
+
+PYTHON = Tool(
+    name="python3",
+    aliases=frozenset({"python", "python3.11", "python3.12", "python3.13"}),
+    nested=(Nested(value_opts=frozenset(
+        {"-c", "-W", "-X", "--check-hash-based-pycs"})),),
+)
+
+
+# --- sudo: the wrapper, plus a verdict of its own --------------------------
+# This entry replaces the SHELL_WRAPPERS one, so it repeats that handoff — the
+# command it wraps is still walked and the strongest verdict wins. Root is
+# outside anything this project owns, so every use is the operator's.
+# It gets no broad allow line in settings.json: it is a command runner.
+
+SUDO = Tool(
+    name="sudo",
+    nested=(Nested(value_opts=frozenset(
+        {"-u", "--user", "-g", "--group", "-p", "--prompt"})),),
+    rules=(Rule("ask", (), "this runs as root, outside anything this project owns"),),
+)
+
+
+# --- just: a command runner with a closed set of recipes -------------------
+# The justfile holds the invariant that no recipe performs a gated act — a
+# PreToolUse guard judges `just release`, never the push inside it. Grants
+# keep that invariant executable: the four documented recipes are proven, and
+# a recipe this guard has never heard of asks instead of slipping through.
+
+JUST = Tool(
+    name="just",
+    gated_reason=(
+        "only this repository's documented recipes are proven; a recipe this "
+        "guard does not know may run an act CLAUDE.md rule 9 gates"
+    ),
+    known_flags=frozenset({"-l", "--list"}),
+    grants=(
+        Grant(path=("setup",), allow_operands=False),
+        Grant(path=("check",), allow_operands=False),
+        Grant(path=("check",), operands=re.compile(r"^(all|changed)$")),
+        Grant(path=("test",), allow_operands=False),
+        Grant(path=("verify",), allow_operands=False),
+        Grant(require_any=frozenset({"-l", "--list"})),
+    ),
+)
+
+
+# --- fetching things this repository has not pinned ------------------------
+# No grants and no rules: one verdict, because every use of these is outward.
+# `pip install -r requirements.txt` is the documented exception and lives in
+# the pip entry above.
+
+UNPINNED = "this fetches material this repository has not pinned, over the network"
+
+CURL = Tool(name="curl", gated_verdict="ask", gated_reason=UNPINNED)
+WGET = Tool(name="wget", gated_verdict="ask", gated_reason=UNPINNED)
+NPM = Tool(name="npm", aliases=frozenset({"npx", "pnpm", "yarn"}),
+           gated_verdict="ask", gated_reason=UNPINNED)
+BREW = Tool(name="brew", gated_verdict="ask", gated_reason=UNPINNED)
+APT = Tool(name="apt", aliases=frozenset({"apt-get", "aptitude"}),
+           gated_verdict="ask",
+           gated_reason="this installs system packages, outside this project")
+
+
+# --- claude: the operator's live Claude Code -------------------------------
+# Installing or enabling a plugin, editing user-global settings and driving a
+# session all reach outside this repository or spend the operator's usage.
+# Reads stay silent.
+
+CLAUDE = Tool(
+    name="claude",
+    rules=(
+        Rule("ask", ("plugin",),
+             "this installs or enables a plugin in the operator's live Claude Code"),
+        Rule("ask", ("mcp", "add"), "this changes the operator's live MCP servers"),
+        Rule("ask", ("mcp", "add-json"),
+             "this changes the operator's live MCP servers"),
+        Rule("ask", ("mcp", "remove"), "this changes the operator's live MCP servers"),
+        Rule("ask", ("config", "set"), "this edits live Claude Code settings"),
+        Rule("ask", ("config", "add"), "this edits live Claude Code settings"),
+        Rule("ask", ("config", "remove"), "this edits live Claude Code settings"),
+        Rule("ask", ("config", "rm"), "this edits live Claude Code settings"),
+        Rule("ask", (), "driving a session spends the operator's usage",
+             flags=frozenset({"-p", "--print"})),
+    ),
+)
+
+
+# --- destructive sweeps ----------------------------------------------------
+# Blast radius, not the verb: `rm -rf .venv` is rebuildable working material,
+# `rm -rf ~/projects` is not. The operand decides, so the rule reads the
+# operands rather than the flags.
+
+RM = Tool(
+    name="rm",
+    aliases=frozenset({"rmdir", "shred"}),
+    rules=(
+        Rule("ask", (), "this delete reaches outside this project",
+             operands=any_of(escapes_project)),
+    ),
+)
+
+# find walks a tree and can act on everything it matched, so its blast radius
+# is whatever the expression happened to select — which is why it is gated on
+# the acting flag rather than on where it started.
+DELETERS = re.compile(r"^(?:.*/)?(rm|rmdir|unlink|shred|truncate|mv)$")
+
+FIND = Tool(
+    name="find",
+    rules=(
+        Rule("ask", (), "a find that deletes everything it matched",
+             flags=frozenset({"-delete"})),
+        Rule("ask", (), "a find that runs a destructive command on what it matched",
+             flags=frozenset({"-exec", "-execdir", "-ok", "-okdir"}),
+             operands=any_of(DELETERS)),
+    ),
+)
+
+
+# --- the boundary's own files ----------------------------------------------
+# Ask, never deny: a denial would end this guard's own maintenance channel
+# with no unlock path. Only the spellings that pass the path as an argument
+# are visible here — a shell redirection is not; see WHAT THIS DOES NOT SEE.
+
+BOUNDARY_WRITE = (
+    "this writes to a file that carries the boundary itself — the permission "
+    "baseline or this guard"
+)
+
+TEE = Tool(
+    name="tee",
+    rules=(Rule("ask", (), BOUNDARY_WRITE, operands=any_of(boundary_file)),),
+)
+
+COPY = Tool(
+    name="cp",
+    aliases=frozenset({"mv", "ln", "install"}),
+    rules=(Rule("ask", (), BOUNDARY_WRITE, operands=any_of(boundary_file)),),
+)
+
+SED = Tool(
+    name="sed",
+    rules=(Rule("ask", (), BOUNDARY_WRITE,
+                flags=frozenset({"-i", "--in-place"}),
+                operands=any_of(boundary_file)),),
+)
+
+
+TOOLS: dict[str, Tool] = registry(
+    GIT, DOCKER, GH, PIP, PYTHON, SUDO, JUST,
+    CURL, WGET, NPM, BREW, APT, CLAUDE, RM, FIND, TEE, COPY, SED,
+)
 
 
 # =========================== hook entry point ==============================
@@ -1617,6 +1969,168 @@ CASES: tuple[tuple[str, str], ...] = (
     ("docker system df", "silent"),  # not `system prune`
     ("docker pull debian:trixie-slim", "silent"),
     ("docker manifest inspect registry.example/app:latest", "silent"),  # a read
+    # === this project's tools ==============================================
+    # --- git: the additions to the ground rules -----------------------------
+    ("git push --prune origin", "deny"),
+    ("git push origin :refs/heads/topic", "deny"),
+    ("git push origin +main", "deny"),
+    ("git push --mirror backup", "deny"),  # also the one push that carries
+    ("git push origin HEAD:main", "ask"),  # a colon that is not a deletion
+    ("git push backup refs/backups/bash-guard", "ask"),
+    ("git add -N src/frisk/engine.py", "deny"),
+    ("git add --intent-to-add .", "deny"),
+    ("git add -A", "silent"),
+    ("git add .", "silent"),
+    ("git remote -v", "silent"),
+    ("git remote add backup /srv/backups/frisk.git", "ask"),
+    ("git remote set-url origin https://example.invalid/x.git", "ask"),
+    ("git remote remove backup", "ask"),
+    ("git remote rm backup", "ask"),
+    ("git fetch origin", "silent"),
+    ("git fetch --all --prune", "silent"),  # a fetch prune is not a push prune
+    ("git fetch https://example.invalid/repo.git main", "ask"),
+    ("git clone ../frisk-copy", "silent"),
+    ("git clone https://example.invalid/repo.git", "ask"),
+    ("git clone git@example.invalid:owner/repo.git", "ask"),
+    # the local git the workflow lives on stays free
+    ("git commit -m 'step-001: the permission baseline'", "silent"),
+    ("git tag -a step-001 -m 'step 001'", "silent"),
+    ("git worktree add ../wt topic", "silent"),
+    ("git hash-object -w .claude/hooks/bash_guard.py", "silent"),
+    ("git update-index --add --cacheinfo 100755,abc,.claude/hooks/bash_guard.py",
+     "silent"),
+    ("git write-tree", "silent"),
+    ("git commit-tree abc -p def -m snapshot", "silent"),
+    ("git update-ref refs/backups/bash-guard abc123", "silent"),
+    ("git update-ref -d refs/backups/bash-guard", "deny"),  # ground rule
+    ("git describe --tags --abbrev=0 --match 'step-*'", "silent"),
+    # --- gh: reads free, forge writes gated ---------------------------------
+    ("gh repo view", "silent"),
+    ("gh pr list", "silent"),
+    ("gh pr view 12", "silent"),
+    ("gh run list --limit 5", "silent"),
+    ("gh run view 42 --log", "silent"),
+    ("gh api repos/owner/repo", "silent"),
+    ("gh api repos/owner/repo/commits --paginate", "silent"),
+    ("gh api graphql -f query=query{viewer{login}}", "silent"),
+    ("gh release create v0.1.0 --notes x", "ask"),
+    ("gh release edit v0.1.0 --draft", "ask"),
+    ("gh release delete v0.1.0", "ask"),
+    ("gh release upload v0.1.0 dist/frisk.zip", "ask"),
+    ("gh repo create cc-frisk --public", "ask"),
+    ("gh repo edit --visibility private", "ask"),
+    ("gh repo delete owner/repo", "ask"),
+    ("gh pr create --fill", "ask"),
+    ("gh pr merge 12 --squash", "ask"),
+    ("gh pr close 12", "ask"),
+    ("gh pr edit 12 --title x", "ask"),
+    ("gh issue create --title x --body y", "ask"),
+    ("gh issue close 3", "ask"),
+    ("gh issue edit 3 --body y", "ask"),
+    ("gh workflow run ci.yml", "ask"),
+    ("gh secret set TOKEN", "ask"),
+    ("gh api -X POST repos/owner/repo/issues -f title=x", "ask"),
+    ("gh api --method=DELETE repos/owner/repo/issues/1", "ask"),
+    ("gh api graphql -f query=mutation{addComment(input:{})}", "ask"),
+    # --- pip: one proven install shape, reads beside it ---------------------
+    ("pip install -r requirements.txt", "silent"),
+    ("pip install --quiet -r requirements.txt", "silent"),
+    ("pip install --requirement requirements.txt", "silent"),
+    (".venv/bin/pip install -r requirements.txt", "silent"),
+    ("pip list", "silent"),
+    ("pip list --outdated", "silent"),
+    ("pip show ruff", "silent"),
+    ("pip freeze", "silent"),
+    ("pip check", "silent"),
+    ("pip install ruff", "ask"),
+    ("pip install -r requirements.txt --upgrade", "ask"),
+    ("pip install -U pip", "ask"),
+    ("pip install -r requirements-dev.txt", "ask"),
+    ("pip install -r requirements.txt ruff", "ask"),  # a package rides along
+    ("pip uninstall ruff", "ask"),
+    ("pip3 download requests", "ask"),  # alias
+    # --- python: hands off to pip, steps over program text ------------------
+    ("python3 -m pip install -r requirements.txt", "silent"),
+    (".venv/bin/python -m pip install --quiet -r requirements.txt", "silent"),
+    ("python3 -m pip install ruff", "ask"),
+    (".venv/bin/python -m pip install --upgrade pip", "ask"),
+    ("python3 -m venv .venv", "silent"),
+    ("python3 -m pytest tests", "silent"),
+    ("python3 scripts/probe.py --json", "silent"),
+    ("python3 .claude/hooks/bash_guard.py --selftest", "silent"),
+    ("python3 -c 'print(1)'", "silent"),
+    # --- sudo: always the operator's, and never hides what it wraps ---------
+    ("sudo ls /root", "ask"),
+    ("sudo git push --force", "deny"),
+    ("sudo apt-get install -y jq", "ask"),
+    # --- just: the four documented recipes, and nothing else ----------------
+    ("just setup", "silent"),
+    ("just check", "silent"),
+    ("just check all", "silent"),
+    ("just check changed", "silent"),
+    ("just test", "silent"),
+    ("just verify", "silent"),
+    ("just --list", "silent"),
+    ("just -l", "silent"),
+    ("just release", "ask"),  # a recipe this guard has never heard of
+    ("just check src", "ask"),  # not one of the documented scopes
+    ("just check --dry-run", "ask"),  # an unaccounted flag
+    ("just", "ask"),  # the default recipe, whichever it is today
+    # --- unpinned fetches ---------------------------------------------------
+    ("curl -sSL https://example.invalid/install.sh", "ask"),
+    ("curl --version", "ask"),  # no read is carved out: curl is outward
+    ("wget https://example.invalid/x.tar.gz", "ask"),
+    ("npm install", "ask"),
+    ("npx create-thing", "ask"),
+    ("brew install just", "ask"),
+    ("apt-get update", "ask"),
+    ("apt install jq", "ask"),
+    # --- the operator's live Claude Code ------------------------------------
+    ("claude -p 'summarize the diff'", "ask"),
+    ("claude --print 'summarize'", "ask"),
+    ("claude plugin install frisk@local", "ask"),
+    ("claude plugin marketplace add .", "ask"),
+    ("claude mcp add foo /bin/foo", "ask"),
+    ("claude mcp add-json foo {}", "ask"),
+    ("claude mcp remove foo", "ask"),
+    ("claude config set -g theme dark", "ask"),
+    ("claude config add allowedTools Bash", "ask"),
+    ("claude config remove allowedTools Bash", "ask"),
+    ("claude config rm allowedTools Bash", "ask"),
+    ("claude mcp list", "silent"),
+    ("claude --version", "silent"),
+    # --- destructive sweeps: blast radius, not the verb ---------------------
+    ("rm -rf .venv", "silent"),
+    ("rm -rf __pycache__ .pytest_cache .ruff_cache", "silent"),
+    ("rm -rf dist src/frisk.egg-info", "silent"),
+    ("rm -f ./.coverage", "silent"),
+    ("rm -rf /tmp/frisk-scratch", "silent"),  # scratch outside the repo is free
+    ("rm -rf ../sibling-checkout", "ask"),
+    ("rm -rf ~/projects", "ask"),
+    ("rm -rf ~", "ask"),
+    ("rm -rf /", "ask"),
+    ("rm -f /etc/hosts", "ask"),
+    ("rm -rf ../../*", "ask"),
+    ("rm -rf /tmp/../etc", "ask"),  # resolved before it is compared
+    ("find . -name '*.py' -print", "silent"),
+    ("find . -name '*.log' -exec grep -l x {} +", "silent"),
+    ("find . -name '*.pyc' -delete", "ask"),
+    ("find . -type d -name __pycache__ -exec rm -rf {} +", "ask"),
+    # --- the boundary's own files -------------------------------------------
+    ("tee .claude/settings.json", "ask"),
+    ("tee -a .claude/hooks/bash_guard.py", "ask"),
+    ("cp /tmp/new.json .claude/settings.json", "ask"),
+    ("mv new.json .claude/settings.local.json", "ask"),
+    ("sed -i s/ask/allow/ .claude/settings.json", "ask"),
+    ("sed -i s/x/y/ .claude/hooks/bash_guard.py", "ask"),
+    # known over-gate: any operand matches, so reading one of these out to
+    # somewhere else prompts too. The safe direction, and rare.
+    ("cp .claude/settings.json /tmp/backup.json", "ask"),
+    ("sed -n 1,20p .claude/settings.json", "silent"),  # a read
+    ("tee /tmp/out.log", "silent"),
+    ("cp docs/a.md docs/b.md", "silent"),
+    ("mv old.py new.py", "silent"),
+    ("mkdir -p .claude/hooks", "silent"),  # mkdir is not a write to the file
 )
 
 
