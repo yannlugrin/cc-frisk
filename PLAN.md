@@ -116,163 +116,29 @@ does not count against this ordering.)
   unmodified, so rule 2's bend for it stays unused. Detail in git history
   from the initial commit to tag `step-000`.
 
-### 001 — The permission and hook baseline — `awaiting test`
+### 001 — The permission and hook baseline — `done`
 
-**Objective.** A boundary around this repository's own development: the
-Bash guard live, the settings paired to it, and both gated so that a
-guard which stops working fails a gate instead of failing quietly. The
-whole is proposed for the operator's review as one piece.
-
-**Spec sections.** None (workflow foundation). The guard instantiated
-here is **prototype-generation tooling for this repository's own
-development**; the product is specified solely by `SPECIFICATIONS.md`,
-and nothing about this instantiation — its shapes, names or behaviour —
-is an input to that implementation.
-
-**Deliverables.**
-
-*The guard first — the settings take their shape from it, not the
-reverse.*
-
-- `.claude/hooks/bash_guard.py`, instantiated from
-  `.claude/spec-work/handoff/assets/bash_guard.py` **through the
-  isolated-subagent channel of rule 1**: the file never enters the
-  implementing session's context, in this session or any later one. The
-  subagent reads the module docstring in full, edits only the `REGISTRY`
-  and `CASES` blocks, and reports **outcomes** — how to choose between
-  *rules* and *grants* per tool, what must land in
-  `.claude/settings.json`, what the guard cannot see, and the rule that
-  its `GIT` ground rules are the same in every project and are **added
-  to, never weakened** — never the file's text, parsing approach or API
-  shapes. The file is executable and **untracked**: `.gitignore` already
-  carries both guard paths.
-- A tool inventory driving that registry: what this project actually
-  runs — the harness, `just`, `pre-commit`, `git`, the language
-  runtimes, everything the `justfile` shells out to — with each registry
-  tool given the acts rule 9 gates **for this project**. Every rule added
-  gets a `CASES` entry: `--selftest` fails on a rule no case reaches,
-  which is what keeps the intent executable rather than remembered.
-- `refs/backups/bash-guard` — the backup ref of rule 1, created here,
-  outside `refs/heads/` so no `push --all`, default refspec or clone
-  carries it. The in-channel subagent chains a snapshot onto it at
-  instantiation (a clean base, before any edit) and after every
-  `--selftest`-green edit, using `git hash-object -w`, `mktree` and
-  `commit-tree -p` — commands that print hashes, never content. The ref
-  uniquely carries this project's `REGISTRY` and `CASES` work; the
-  pristine template is recoverable from the operator on request, so no
-  local-only window is load-bearing.
-- **The step's review shape, which rule 1's quarantine reshapes.** The
-  vendored guard code above its `REGISTRY` banner is **exempt** from the
-  standing code review: it arrives proven by its own shipped selftest,
-  and it is what the quarantine protects. The step's *authored* work —
-  the `REGISTRY` and `CASES` edits — is reviewed **inside the
-  isolated-subagent channel**, with an outcomes-only report: what is
-  gated, what a rule misses, never the file's text. Such a report cannot
-  see what reading code would — a mis-spelled rule pattern, the
-  `Bash(git push:*)`-misses-`git -C dir push` class. The substitute is
-  the mandatory `CASES` entry per rule plus `--selftest`'s coverage
-  gate, **and the report states that scope**, so nobody later mistakes it
-  for a code review.
-
-*Then the settings*, per the docstring's pairing as the subagent reports
-it, landing in `.claude/settings.json`:
-
-- One broad allow per rule- or grant-bearing tool. **Never a wrapper** —
-  a broad allow on a command-runner is a broad allow on everything it
-  runs the moment the guard is dead — and **never a tool the registry
-  denies wholesale**, whose broad allow buys nothing alive and is pure
-  liability dead.
-- **No `ask` rule for anything the guard gates**: a matching `ask`
-  prompts even where the guard says allow, so it cancels every carve-out.
-- **No prefix rule restating a guard decision**: a prefix is strictly
-  weaker and gives two sources of truth. `git push` is **not** an
-  exception — it is gated in the guard's ground rules, and a prefix
-  restatement misses `git -C dir push`.
-- **One deliberate exception**: a short `deny` backstop for the acts
-  that cannot be undone — `git push --mirror` among them, which besides
-  deleting remote refs wholesale is the one push that would carry the
-  backup ref to `origin`. A hook fails open, and a prefix rule that
-  binds without it is worth more than the duplication costs. Kept short
-  enough that the exception stays visible as one.
-- The **push tier**: the ordinary push — the one the close ritual
-  attempts — **asks and is never denied**, wherever it is expressed,
-  because a denied pattern cannot be approved in the very exchange
-  rule 9 relies on. The unrecoverable spellings — force, mirror,
-  ref-delete — are the *denied* set, in the guard's ground rules and the
-  backstop alike. `deny` stays reserved for what has no authorised use at
-  all, each named in the proposal.
-- Settings' `ask` tier kept for tools the guard has no registry entry
-  for (`curl`, whatever this project reaches for outside it).
-- **The boundary protects its own files**: native file-tool rules at the
-  **ask** tier gating edits to `.claude/settings.json` and
-  `.claude/hooks/`, inside this same proposal. Ask, not deny — a deny
-  would end the guard's own maintenance channel and the baseline's own
-  evolution with no unlock path. Under a mode that auto-accepts file
-  edits, one silent, well-formed settings edit that drops the push gate
-  turns the close ritual's standing push attempt into an unprompted
-  publish, and the governance family's parse and hook-path checks catch
-  malformation, never a well-formed loosening.
-- Auto memory is already off (`autoMemoryEnabled: false`) — **keep it
-  off**.
-- The **permission mode** the operator is expected to work in, named in
-  the proposal as a committed setting rather than a per-session choice,
-  because it decides how much the rest has to carry. The mode set and
-  what each mode does to an unmatched command are properties of the
-  installed version — modes exist that prompt, that auto-approve, and
-  that judge by classifier and can deny outright, three different answers
-  to what backs the guard's silence — so the list is taken from the
-  running version, not from any document, and the mode proposed is probed
-  at `002`. The key's spelling (`permissions.defaultMode` at last look)
-  is illustrative like the mode list and is verified by the same probe.
-  The mode is *set* rather than worked around — if a mode auto-accepts
-  file edits, that is what removes the need for a blanket edit
-  allowance — and it decides whether the mode-disabling keys belong in
-  the baseline at all.
-- Say plainly, in the proposal, **what a dead guard would leave open**: a
-  broad allow plus a dead hook is a wider surface than a narrow allow
-  list ever was, and the `deny` backstop exists exactly there.
-- A rule of this baseline, recorded with it: **no `just` recipe ever
-  performs an act rule 9 gates.** A `PreToolUse` guard judges the command
-  it is given — `just release`, never the push inside it — so a gated act
-  behind a recipe name bypasses the gate unseen. Gated acts live in CI or
-  in a command the operator invokes directly.
-
-*Then both gates on the guard*, because a hook fails open and the two
-gates ask different questions:
-
-- `bash_guard.py --liveness` in the pre-commit lint: the file is
-  executable, the registry builds, every rule and grant is well-formed,
-  a payload still comes back as a verdict. No behaviour cases, so a lint
-  stays a lint, and the silent deaths — a syntax error from an edit, a
-  lost `+x`, a rename — fail the commit. **One wiring constraint**: the
-  guard is machine-local, so nothing *committed* may reference it in a
-  way that fails where it is absent — CI and fresh clones never have it,
-  this machine always should. The gate is loud locally and inert
-  remotely; the mechanism is named in the proposal.
-- `bash_guard.py --selftest` in the *test* entry point: liveness, then
-  every case, then coverage — a rule or grant no case reaches fails it.
-- The governance check family gains one assertion: **the hook path in the
-  settings resolves.** A path naming a file that is not there leaves
-  valid JSON, a settings file that loads, a green lint, and a guard that
-  never runs.
-- `.claude/docs/guard-record.md` created with what this step fixes: the
-  restore recipe, the backup remote's name, and the tool inventory's
-  outcome. `002` completes it with the probe results and the liveness
-  commands.
-
-**How the operator tests it.** Review the proposal as a whole — the
-registry outcomes, the settings diff, the named `deny` set, the proposed
-permission mode, and the dead-guard statement. Then `just verify` green
-and the guard's `--selftest` green. Then prove the backup ref: run the
-restore recipe
-(`git show refs/backups/bash-guard:.claude/hooks/bash_guard.py`)
-redirected onto a scratch path, confirm the file comes back byte-identical
-and that its content was never rendered into the session.
-**Crosses the boundary**, mildly: the settings edited here are the
-operator's own working project's, and the hook registration takes effect
-in their live Claude Code. Cost: the permission baseline changes under
-them. Cleanup: revert `.claude/settings.json` if the proposal is
-rejected; the guard file is untracked and is deleted by hand.
+- **Outcome (approved 2026-08-20, tag `step-001`):** this repository's own
+  development now has a boundary. The quarantined guard is live and
+  untracked, its registry saying what this project actually runs (18
+  gated tools, 81 rules and grants, every one reached by a case),
+  instantiated and twice repaired entirely inside the isolated-subagent
+  channel, versioned on `refs/backups/bash-guard`. `.claude/settings.json`
+  is shaped around it rather than duplicating it (`D-011`): mode
+  `acceptEdits` with the bypass lock, `auto` left reachable for `002`'s
+  comparison, one broad allow per registry-bearing tool, exact-match
+  allows for the `just` recipes rather than a broad allow on a runner,
+  an `ask` tier on the boundary's own files, and a `deny` backstop
+  confined to what cannot be undone. Because a hook fails open, two
+  gates ask the two different questions, both inert exactly where the
+  guard is absent by design and keyed on the backup ref rather than on
+  the guard file (`D-012`); the check half *executes* the registered
+  command line rather than pattern-matching it. A cold review found
+  seven real holes — `git -c` turning git into a runner behind its own
+  broad allow, `chmod -x` disarming the hook, a linked worktree running
+  the allow list with no guard — and all seven are closed. Two rule
+  spellings stay knowingly unverified until `002` probes them. Detail in
+  git history between tags `step-000` and `step-001`.
 
 ### 002 — The probe campaign and the guard record — `pending`
 

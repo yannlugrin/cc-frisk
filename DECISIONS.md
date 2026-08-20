@@ -473,11 +473,11 @@ Two conventions the format depends on:
   on the ordinary push* — rejected outright: rule 6 attempts a push at
   every step close, and a denied pattern cannot be approved in the very
   exchange rule 9 relies on.
-- **Approved by:** *pending* — put to the operator at step `001`'s
-  handover, as the plan requires the whole to be reviewed as one piece.
-  Three components are already the operator's own rulings of 2026-08-20:
-  the permission mode, the bypass lock without the auto lock, and the
-  absence of a backup remote. **Two spellings in this entry are
+- **Approved by:** operator, 2026-08-20, reviewing the baseline and its
+  gates as one piece at step `001`'s handover. Three components were
+  their own rulings earlier the same day: the permission mode, the
+  bypass lock without the auto lock, and the absence of a backup remote.
+  **Two spellings in this entry are
   unverified against the running version and are `002`'s first probes:**
   whether `Bash(git push --force:*)` actually matches (if not, the
   backstop is decoration), and whether an explicit `ask` rule beats

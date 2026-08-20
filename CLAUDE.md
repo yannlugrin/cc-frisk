@@ -344,19 +344,17 @@ Rule 1's quarantine survives that deletion, attached to
 
 ## Current state
 
-- **Current step:** `001` — the permission and hook baseline (the first
-  step that touches the operator's live Claude Code settings).
+- **Current step:** none — `001` closed 2026-08-20.
 - **Next step:** `002` — the probe campaign and the guard record.
 - **World state:** the harness is live and green — `just setup`,
   `just check [all|changed]`, `just test`, `just verify` — with the same
   checks in the commit hook, which now also gate the boundary. The
-  baseline is in `.claude/settings.json` and the guard is live and
-  untracked, backed by `refs/backups/bash-guard`; **both await the
-  operator's approval**, and two spellings stay unverified until `002`
-  (`D-011`). No tooling, no product code. Tag `step-000` exists.
-  `origin` is `github.com/yannlugrin/cc-frisk`, **public**, its `main`
-  still the initial commit — nothing since has been pushed, and no
-  private backup remote exists.
+  permission baseline is in `.claude/settings.json` and the guard is
+  live and untracked, versioned on `refs/backups/bash-guard`; two rule
+  spellings stay unverified until `002` probes them (`D-011`). No
+  tooling, no product code. Tags `step-000` and `step-001` exist.
+  `origin` is `github.com/yannlugrin/cc-frisk`, **public**; no private
+  backup remote exists, so the backup ref is local-only.
 - **Open obligations:** `PLAN.md` §14 carries eleven open questions, each
   answered at the step that needs it — Q10 (amend §5.4 or deviate) at
   `023`, Q11 (a prototype-to-frisk migration aid) at `024`. The sentinel
@@ -365,7 +363,11 @@ Rule 1's quarantine survives that deletion, attached to
   operator before it was built, and is reversible on request.
   `005`'s publish-or-strip question stays at `005` (operator,
   2026-08-19); what it now decides is whether to accept the already
-  published `.claude/spec-work/` and `.claude/refs/` or rewrite history.
+  published `.claude/spec-work/` and `.claude/refs/` or rewrite history —
+  and, added at `001`, that `.claude/settings.json` publishes an allow
+  list which is only as narrow as the guard no clone receives.
+  `002` owes six named measurements, each with its response
+  pre-committed (`guard-record.md`).
 - **`.claude/docs/` pointers:** `harness.md` — the measured behaviour of
   `just check`/`test`/`verify` and the commit hooks, six probes with
   re-measure recipes; read before changing the `justfile`, `scripts/`,
