@@ -348,27 +348,31 @@ Rule 1's quarantine survives that deletion, attached to
   step that touches the operator's live Claude Code settings).
 - **Next step:** `002` — the probe campaign and the guard record.
 - **World state:** the harness is live and green — `just setup`,
-  `just check [all|changed]`, `just test`, `just verify`, with the same
-  checks in the commit hook. No permission baseline, no tooling, no
-  product code. `.claude/settings.json` still carries only
-  `autoMemoryEnabled: false`. Tag `step-000` exists. `origin` is
-  `github.com/yannlugrin/cc-frisk`, **public**, and its `main` is still
-  the initial commit — nothing this session produced has been pushed.
+  `just check [all|changed]`, `just test`, `just verify` — with the same
+  checks in the commit hook, which now also gate the boundary. The
+  baseline is in `.claude/settings.json` and the guard is live and
+  untracked, backed by `refs/backups/bash-guard`; **both await the
+  operator's approval**, and two spellings stay unverified until `002`
+  (`D-011`). No tooling, no product code. Tag `step-000` exists.
+  `origin` is `github.com/yannlugrin/cc-frisk`, **public**, its `main`
+  still the initial commit — nothing since has been pushed, and no
+  private backup remote exists.
 - **Open obligations:** `PLAN.md` §14 carries eleven open questions, each
   answered at the step that needs it — Q10 (amend §5.4 or deviate) at
   `023`, Q11 (a prototype-to-frisk migration aid) at `024`. The sentinel
   may be re-staged before parity if `D-007`'s residue proves
   uncomfortable. `D-010` was logged after the fact rather than put to the
   operator before it was built, and is reversible on request.
-  `005`'s publish-or-strip question stays at `005` (operator, 2026-08-19)
-  even though the initial commit already published `.claude/spec-work/`
-  and `.claude/refs/`: the intervening pushes add nothing to either, so
-  the ruling is about accepting that or rewriting published history.
+  `005`'s publish-or-strip question stays at `005` (operator,
+  2026-08-19); what it now decides is whether to accept the already
+  published `.claude/spec-work/` and `.claude/refs/` or rewrite history.
 - **`.claude/docs/` pointers:** `harness.md` — the measured behaviour of
-  `just check`/`test`/`verify` and the commit hooks, with four probes and
-  their re-measure recipes; read before changing the `justfile`,
-  `scripts/`, `.pre-commit-config.yaml` or any linter config.
-  `guard-record.md` arrives at step `001`.
+  `just check`/`test`/`verify` and the commit hooks, six probes with
+  re-measure recipes; read before changing the `justfile`, `scripts/`,
+  `.pre-commit-config.yaml` or any linter config. `guard-record.md` —
+  the quarantined guard's restore recipe, commands, reach, blind spots
+  and what `002` must still measure; read before touching
+  `.claude/settings.json` or anything under `.claude/hooks/`.
 
 *A closed list of item kinds — current and next step, live world-state,
 open obligations, `.claude/docs/` pointers — and nothing else. What a

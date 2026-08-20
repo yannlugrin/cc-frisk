@@ -36,13 +36,15 @@ close that and is deliberately not built yet: nothing here depends on it,
 and the pinned surface that matters (the linters, which decide verdicts)
 is exact.
 
-## Four probes that decide the design
+## Six probes that decide the design
 
-All were run at step `000`, and the last three come from that step's cold
-code review, which found the harness failing them. Re-run all four after
-any change to `scripts/check.sh` or to the fixer hooks: each property is
-silent when it breaks — the check keeps passing and simply stops seeing
-things, or stops protecting them.
+One to four were run at step `000` — the last three of those come from
+that step's cold code review, which found the harness failing them —
+and five and six at step `001` with the guard gate. Re-run one to four
+after any change to `scripts/check.sh` or to the fixer hooks, and five
+and six after any change to `scripts/check-guard.sh` or the `check-guard`
+hook: each property is silent when it breaks — the check keeps passing
+and simply stops seeing things, or stops protecting them.
 
 ### 1. `check` sees untracked files
 
@@ -151,6 +153,67 @@ just check; echo "exit: $?"    # must be 1
 rm -f broken-probe.md
 ```
 
+### 5. A `local` hook runs even when the file list excludes it
+
+**Why it matters.** The `check-guard` hook (step `001`) hunts things no
+file list can show it: the guard is gitignored and therefore never
+appears in one, and a settings file that quietly stopped pointing at the
+guard is *unchanged* on the commit where that matters. It must run on
+every invocation, `just check changed` included.
+
+**Measured** on pre-commit 4.4.0: a `local` hook with `always_run: true`
+and `pass_filenames: false` ran under `pre-commit run --files README.md`,
+receiving no filenames; a second one exiting 3 made the run exit 1. Both
+confirmed.
+
+**Re-measure.**
+
+```sh
+cat > /tmp/probe-config.yaml <<'EOF'
+repos:
+  - repo: local
+    hooks:
+      - id: probe
+        name: probe
+        entry: "bash -c 'echo PROBE-RAN args=$*; exit 3' --"
+        language: system
+        pass_filenames: false
+        always_run: true
+EOF
+.venv/bin/pre-commit run -c /tmp/probe-config.yaml --files README.md
+echo "exit: $?"      # must be 1, and PROBE-RAN must appear with args= empty
+```
+
+### 6. The guard gate fails on each silent death
+
+**Why it matters.** A `PreToolUse` hook fails *open*. The gate exists to
+turn each silent death into a failed check, so each one is exercised
+rather than assumed. Run in a throwaway git repository outside this one,
+with `scripts/check-guard.sh` copied in and a stub standing in for the
+guard — the assertions under test are structural, so the stub is honest.
+
+**Measured** at `001`, twelve states plus the worktree case. Exit 0: no
+marker and no guard ("absent by design"); marker with a working guard;
+matcher `*`; matcher `Bash|Read`. Exit 1, each naming its own cause:
+guard present with no marker; a hook that only *mentions* the guard
+(`echo .claude/hooks/bash_guard.py` — caught because the registered line
+is executed, not pattern-matched); an emptied `deny` list; a removed
+bypass lock; `disableAllHooks` set in the **gitignored local** settings;
+a top-level JSON array; `defaultMode: bypassPermissions`; a guard
+stripped of its executable bit. And in a linked worktree with the guard
+unmaterialized: exit 1, printing a `mkdir -p … && ln -s …` recipe that
+was applied verbatim and turned the run green.
+
+**Re-measure.** `git init` a scratch directory outside this repository,
+copy `scripts/check-guard.sh` and a minimal `.claude/settings.json` in,
+stub the guard as a shell script that echoes a liveness line for
+`--liveness` and a `"permissionDecision": "deny"` line when its stdin
+mentions `--force`, create the marker with
+`git update-ref refs/backups/bash-guard HEAD`, then walk the states,
+mutating the settings with a one-line `python3 -c` between runs. For the
+worktree case, `git worktree add` a second checkout of that scratch repo
+and run the script from inside it.
+
 ## Path exclusions
 
 `.claude/spec-work/` and `.claude/refs/` are excluded in
@@ -190,8 +253,9 @@ so a green gate never says anything about files that are not there.
 | YAML | `000` | yamllint `--strict` (which already fails on a parse error, so `check-yaml` would be redundant) |
 | POSIX shell | `000` | shellcheck-py (ships its own pinned binary — not a system prerequisite) |
 | Markdown / prose | `000` | pymarkdown |
-| Guard liveness | `001` | `bash_guard.py --liveness`, machine-local, inert where absent |
-| Governance frontmatter | `003` | a few-line custom check (rule 11 sanctions it; no ecosystem tool parses skill frontmatter) |
+| Guard liveness | `001` | `scripts/check-guard.sh` → `bash_guard.py --liveness`, machine-local, inert where absent |
+| Governance well-formedness | `001` | the same script: the settings file still registers the guard, hooks are not globally disabled, auto memory is still off |
+| Governance frontmatter | `003` | the same script gains it (rule 11 sanctions the few lines; no ecosystem tool parses skill frontmatter) |
 | Python, TOML | `006` | pinned to the interpreter floor that step commits to |
 
 `SPECIFICATIONS.md` passes pymarkdown unmodified, so **no lint bend was

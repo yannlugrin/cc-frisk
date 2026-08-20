@@ -116,7 +116,7 @@ does not count against this ordering.)
   unmodified, so rule 2's bend for it stays unused. Detail in git history
   from the initial commit to tag `step-000`.
 
-### 001 — The permission and hook baseline — `in progress`
+### 001 — The permission and hook baseline — `awaiting test`
 
 **Objective.** A boundary around this repository's own development: the
 Bash guard live, the settings paired to it, and both gated so that a
