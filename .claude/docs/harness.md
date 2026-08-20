@@ -162,7 +162,8 @@ invisible to a changed-file list. `scripts/check-guard.sh` asks whether
 the permission boundary is intact — the settings files' invariants, and
 one executed verdict from the command line they register.
 `scripts/check_frontmatter.py` asks whether every skill and agent
-definition still loads, and resolves the one citation shape the rituals
-use (`D-018` — it is a separate script and a separate hook, not a third
-family bolted onto `check-guard.sh`; it imports PyYAML from `.venv`,
-pinned in `requirements.txt`, where `check-guard.sh` is stdlib-only).
+definition still loads: frontmatter parses, and `name` agrees with the
+path the loader finds it at (`D-018` — a separate script and hook, not a
+third family bolted onto `check-guard.sh`; it imports PyYAML from
+`.venv`, pinned in `requirements.txt`, where `check-guard.sh` is
+stdlib-only).

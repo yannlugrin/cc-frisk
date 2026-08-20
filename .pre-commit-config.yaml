@@ -122,11 +122,12 @@ repos:
       # requirements.txt; `.venv` is guaranteed wherever pre-commit
       # runs, since pre-commit itself lives there.
       #
-      # always_run with pass_filenames: false, because the failures it
-      # hunts are shaped like absences — a skill directory with no
-      # SKILL.md, a citation whose target heading was renamed in a file
-      # this commit does not touch — and neither appears in a changed
-      # file list.
+      # always_run with pass_filenames: false. It is a whole-tree check
+      # over five small files, so scoping it to changed files would buy
+      # nothing and would miss a definition that broke because something
+      # else moved. D-022 cut the layout checks, so this hook no longer
+      # detects a skill directory with no SKILL.md at all — `claude
+      # plugin validate --strict` does, and is the tool to reach for.
       - id: governance-frontmatter
         name: every skill and agent definition loads
         entry: .venv/bin/python scripts/check_frontmatter.py

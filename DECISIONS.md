@@ -810,19 +810,17 @@ Two conventions the format depends on:
   `PyYAML==6.0.3` in `requirements.txt`, and runs on the project
   interpreter (`language: system`, entry `.venv/bin/python …`). `.venv`
   is guaranteed wherever the checks run, since pre-commit itself lives
-  there and `scripts/check.sh` invokes `.venv/bin/pre-commit`. The
-  script takes an optional root argument so `just test` can point it at
-  fixture trees; committing malformed governance files to exercise the
-  must-fail cases would make this repository's own `just check`
-  permanently red. `requirements.txt`'s "only pre-commit lives here"
+  there and `scripts/check.sh` invokes `.venv/bin/pre-commit`.
+  `requirements.txt`'s "only pre-commit lives here"
   claim is rewritten in the same commit: third-party linters stay
   isolated and pinned by `rev`; what shares this interpreter is the hook
   runner and what our own checks import.
 - **Alternatives considered:** *A `language: python` local hook with
   `additional_dependencies`* — the most idiomatic pre-commit answer, and
-  rejected only because `just test` must run the same script against
-  fixture roots and cannot reach inside a hook's private environment;
-  two installations of one pin is worse than one. *System `python3` plus
+  a live alternative: it was rejected when `just test` still drove the
+  script against fixture roots, and `D-022` removed that suite, so the
+  reason is spent. Left as-is rather than churned; revisit if the pin
+  ever needs isolating. *System `python3` plus
   system PyYAML*, matching `scripts/check-guard.sh`'s stdlib-only
   heredoc — rejected: it is an unpinned workstation prerequisite that
   happens to hold on this machine and does not hold on a bare CI runner,
@@ -896,10 +894,9 @@ Two conventions the format depends on:
   related, which rule 2 forbids. *Dropping the arm permanently* —
   rejected: a dangling agent name is exactly the silent-skip the plan
   names, and `004` is where the check can pass on its first run.
-- **Approved by:** *pending* — put to the operator at `003`'s handover.
-  A *should* moving out of the step that owns it is a scope change, not
-  an implementer's latitude; if the ruling is that `003` must carry the
-  check with a temporary exemption, this entry is superseded.
+- **Approved by:** withdrawn, operator, 2026-08-20 — `D-022` removed the
+  citation check entirely, so there is no arm left to defer. Kept
+  because ids freeze.
 
 ### D-021 — `check_frontmatter.py` beside `claude plugin validate`, not instead of it
 
@@ -927,8 +924,8 @@ Two conventions the format depends on:
   from the script's docstring and from `.pre-commit-config.yaml` in the
   same commit; both now name the validator and say what it misses. The
   script's residue that is genuinely its own — name↔path agreement, the
-  two layout checks, and the citation shape — is the part rule 11
-  actually sanctions, and it is the part with the most test cases.
+  `name`↔path agreement — is the part rule 11 actually sanctions
+  (`D-022` cut the rest).
 - **Revisit at `PLAN.md` `021`**, where the plugin tree lands and the
   validator becomes necessary for the *product's* manifest rather than
   optional for dev tooling. If it is pinned and wired then, the
@@ -947,3 +944,51 @@ Two conventions the format depends on:
 - **Approved by:** *pending* — put to the operator at `003`'s handover.
   Rule 11 questions about whether a thing should exist are theirs, and
   this one was answered by building first.
+
+### D-022 — The governance check is a parse check and nothing more
+
+- **Date:** 2026-08-20
+- **Step:** `003`
+- **Context:** the check shipped at ~170 lines with a citation resolver,
+  fence-aware heading extraction, unicode normalisation, a fixture-root
+  argument and an 18-case suite in `just test`. `PLAN.md` `003` had said
+  plainly that "a few-line custom check is **sanctioned** by rule 11
+  here, **and it is the whole of what the rule requires**", offering the
+  citation resolver only as an optional *should*. The operator called
+  the result over-built and, decisively, pointed out that `just verify`
+  runs `check` **before** `test`: the checker is executed against the
+  real tree on every single invocation, so a fixture suite re-proving it
+  is a regression harness for process scaffolding nobody will touch
+  again.
+- **Decision:** the check is cut to the parse question alone —
+  frontmatter is present, closed, parses, is a mapping, `name` agrees
+  with the path the loader finds it at, `description` is non-empty.
+  ~53 lines. `scripts/test.sh` is restored to its pre-`003` shape: the
+  guard's selftest, then the note that no product behaviour exists yet.
+  Deleted with the suite: the citation resolver and its recognised
+  shape, the fenced-code pass, unicode normalisation, the root argument
+  and its guards. `D-020` is withdrawn — the arm it deferred no longer
+  exists. The rituals keep writing pointers in the `` `path` § "Heading"
+  `` form because it reads well, but **nothing checks them**, and no rule
+  requires that they do.
+- **The reason, so this is not re-litigated:** a check that runs ahead of
+  the tests on every invocation does not also need tests. What earns its
+  place is the one diagnostic no other tool provides — `name` against
+  path, which `claude plugin validate --strict` passes silently
+  (`D-021`).
+- **Alternatives considered:** *Deleting the checker entirely* — put to
+  the operator and declined: `CLAUDE.md` rule 2 mandates the governance
+  family "whatever the stack", so removal would need a rule amendment,
+  which is a bigger change than the problem. *Keeping the script and
+  dropping only the suite* — rejected: the citation resolver was the
+  bulk of the complexity and was never asked for, so cutting the tests
+  while keeping what made them feel necessary is the wrong half.
+- **The process failure, recorded because it is the point:** rule 11
+  says to ask whether the ecosystem ships the tool **before** writing
+  one, and rule 2 requires a runner we build to be put to the operator
+  **before it is built**. Neither happened. `D-021` records the first
+  miss; this entry records that the size was never put up for a ruling
+  either, and that the instruction capping it was in the plan text being
+  read at the time.
+- **Approved by:** operator, 2026-08-20, choosing "parse check only, no
+  suite" from the three options put to them.

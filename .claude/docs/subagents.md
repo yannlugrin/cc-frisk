@@ -78,13 +78,3 @@ completed with no visible prompt, which is **not** evidence that
 `CLAUDE.md`'s "every write under `.claude/` prompts" has stopped
 holding. Anything about prompting is measured the way
 `.claude/docs/guard-record.md` § "Method" prescribes, or not at all.
-
-## The citation shape
-
-`scripts/check_frontmatter.py` resolves one shape in skills and agents:
-
-    `<path>` § "<Heading text>"
-
-path against the tree, heading against the target's headings. Use it for
-every pointer a ritual carries; anything else is prose and is not
-checked. The script's docstring carries the rest.

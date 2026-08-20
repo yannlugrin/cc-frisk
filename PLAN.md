@@ -293,14 +293,6 @@ the templates directory.
   appear in every session's agent and skill lists until they go, which
   is the price of measuring rather than assuming — paid for one step,
   not two.
-- **The agent-name arm of the governance citation check joins here**,
-  deferred from `003` for the only honest reason: at `003`
-  `handover-step` and `approve-step` name agents that do not yet exist,
-  so the check could not have been green, and a suppression list built
-  for one step is worse than a check that arrives when it can pass. The
-  shape is `` `<name>` agent ``, resolved against `.claude/agents/`;
-  `scripts/check_frontmatter.py` already carries the path-and-heading
-  arm and the prohibition on scanning prose.
 - **In the same commit**: `.claude/spec-work/handoff/assets/` is deleted
   and every pointer and exception referring to it — `CLAUDE.md`'s
   temporary tooling-templates block among them — goes with it. All nine
