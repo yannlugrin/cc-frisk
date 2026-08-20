@@ -192,13 +192,6 @@ Two of this campaign's findings were wrong on these two points.
 
 `auto` mode: `classifyAllShell` unset, so the allow list stood. The
 classifier A/B `D-011` reserved `auto` for is **not** run here.
-**Nothing needed changing** — every pre-committed fallback went unused.
-
-**One `001` claim retracted.** It reasoned that a `>` into a boundary
-file was invisible to both gates, so "nothing prevents a shell
-redirection". Measured: the guard is indeed blind, and file-path rules
-never match a `>` target — but P12 gates it anyway. Prevented, by
-something we neither configure nor can rely on.
 
 ### Re-measure
 

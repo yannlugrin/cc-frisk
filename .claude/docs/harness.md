@@ -1,265 +1,148 @@
-# The harness — measured behaviour
+# The harness
 
-**Read this before changing `justfile`, `scripts/`, `.pre-commit-config.yaml`
-or any linter config.** It records what the harness's mechanisms were
-*observed* to do, not what they are assumed to do. Standing instructions
-carry no staleness discipline, which is why these values live here and
-not in `CLAUDE.md`.
+**Read before changing `justfile`, `scripts/`, `.pre-commit-config.yaml`
+or any linter config.**
 
-Measured 2026-08-19 on: `just` 1.45.0, `pre-commit` 4.4.0, Python 3.14.4
-(system interpreter; the engine's floor interpreter arrives at step
-`006`), git 2.53.0, Linux 6.18 (WSL2).
+**Budget: 150 lines.** Instructions and measured values only — reasons
+live in `DECISIONS.md`, history in git.
+
+Measured 2026-08-19 on `just` 1.45.0, `pre-commit` 4.4.0, Python 3.14.4
+(system), git 2.53.0, Linux 6.18 (WSL2).
 
 ## Entry points
 
 | Command | Runs |
 |---|---|
-| `just setup` | `scripts/setup.sh` — creates `./.venv`, installs `requirements.txt`, runs `pre-commit install` |
-| `just check [all\|changed]` | `scripts/check.sh` — one entry point, scope as argument |
+| `just setup` | `scripts/setup.sh` — `./.venv`, `requirements.txt`, `pre-commit install` |
+| `just check [all\|changed]` | `scripts/check.sh`, scope as argument |
 | `just test` | `scripts/test.sh` |
 | `just verify` | `check` then `test`; no script of its own |
 
-`just` is a system tool, not pinned in `requirements.txt`, so `just setup`
-is the entry point with nothing before it. Every linter is a pre-commit
-hook pinned by `rev`; only `pre-commit` itself is pinned in
-`requirements.txt`.
+`just` is a system tool, unpinned, so `just setup` has nothing before it.
+Only `pre-commit` is pinned in `requirements.txt`; every linter is pinned
+by `rev`. Pre-commit's transitive dependencies float — accepted, since
+the linters that decide verdicts are exact.
 
-`scripts/check.sh` is portable to bash 3.2 (stock macOS): no `mapfile`,
-no associative arrays. One shellcheck suppression is scoped to one
-function — `SC2329` on `cleanup`, which shellcheck cannot see is invoked
-through a `trap`.
+## Invariants — each breaks silently
 
-**Known limitation.** `requirements.txt` pins `pre-commit` exactly, and
-every linter is pinned by `rev` in `.pre-commit-config.yaml` — but
-pre-commit's own transitive dependencies float. A hash-pinned lock would
-close that and is deliberately not built yet: nothing here depends on it,
-and the pinned surface that matters (the linters, which decide verdicts)
-is exact.
+They were measured, not assumed. **Re-run 1–4 after touching
+`scripts/check.sh` or the fixer hooks, 5–6 after touching
+`scripts/check-guard.sh` or its hook.** When one breaks, the check keeps
+passing and simply stops seeing things.
 
-## Six probes that decide the design
+**1. `check` sees untracked files.** `pre-commit run --all-files`
+enumerates from git and cannot see them, so `scripts/check.sh` passes the
+list explicitly: `git ls-files --cached --others --exclude-standard`.
+Keep `-z` and `core.quotePath=false` — without them git C-quotes
+non-ASCII paths (`café.md` → `"caf\303\251.md"`), which then fail every
+existence test and are dropped with no message. Enumeration failure is
+caught explicitly by writing to a file and checking its status: a process
+substitution's status is invisible to `set -euo pipefail`, and an unborn
+`HEAD` would report "nothing to check", exit 0.
 
-One to four were run at step `000` — the last three of those come from
-that step's cold code review, which found the harness failing them —
-and five and six at step `001` with the guard gate. Re-run one to four
-after any change to `scripts/check.sh` or to the fixer hooks, and five
-and six after any change to `scripts/check-guard.sh` or the `check-guard`
-hook: each property is silent when it breaks — the check keeps passing
-and simply stops seeing things, or stops protecting them.
+**2. `check` asserts, never repairs.** Fixer hooks
+(`trailing-whitespace`, `end-of-file-fixer`, `mixed-line-ending`) may
+write only in the commit hook. `check.sh` snapshots the file list to a
+temp directory, compares afterwards, restores what was rewritten, names
+it and fails. No git operation is involved.
 
-### 1. `check` sees untracked files
+**3. An interrupt mid-run restores the tree too.** The revert is a
+function called from an `EXIT` trap; `INT`/`TERM`/`HUP` simply `exit`,
+which runs it. Keep it idempotent — the main path calls it to report and
+the trap then finds nothing to do. If a restore fails, the snapshot is
+**kept** and its path printed. Straight-line revert code loses untracked
+files' only copy on Ctrl-C.
 
-**Why it matters.** `pre-commit run --all-files` enumerates from git and
-therefore cannot see a file that exists but was never added to the index.
-A lint error in such a file must still fail. `scripts/check.sh` passes the
-file list explicitly (`git ls-files --cached --others --exclude-standard`)
-for exactly this reason.
+**4. Broken symlinks reach `check-symlinks`.** The file-list filter drops
+non-existent paths, which is right for deleted-but-indexed files and
+wrong for broken symlinks. **Do not test `-f` alone** — that makes the
+hook unreachable from `just check`.
 
-**Measured.** An untracked `scripts/*.sh` with a shellcheck error (no
-shebang, SC2148) failed `just check` with exit code 1. Confirmed.
+**5. A `local` hook runs even when the file list excludes it.**
+`check-guard` must run on every invocation, `just check changed`
+included: the guard is gitignored so never appears in a file list, and a
+settings file that stopped pointing at it is *unchanged* on the commit
+where that matters. Requires `always_run: true` and
+`pass_filenames: false` (confirmed on pre-commit 4.4.0).
 
-**Re-measure.**
+**6. The guard gate fails on each silent death.** A `PreToolUse` hook
+fails open, so each death is exercised rather than assumed. Verified at
+`001` across twelve states plus a linked worktree. Exit 0: no marker and
+no guard; marker with a working guard; matcher `*` or `Bash|Read`.
+Exit 1, each naming its cause: guard with no marker; a hook that only
+*mentions* the guard; emptied `deny`; removed bypass lock;
+`disableAllHooks` in the gitignored local settings; a top-level JSON
+array; `defaultMode: bypassPermissions`; a guard stripped of `+x`.
+
+Portability: `scripts/check.sh` targets bash 3.2 (stock macOS) — no
+`mapfile`, no associative arrays. One scoped suppression: `SC2329` on
+`cleanup`, which shellcheck cannot see is invoked through a `trap`.
+
+## Re-measure
 
 ```sh
-printf 'x=1\necho $x\n' > scripts/untracked_probe.sh
-git status --porcelain scripts/untracked_probe.sh   # must show '??'
-just check; echo "exit: $?"                          # must be 1, naming shellcheck
+# 1 — untracked file is seen
+printf 'x=1\necho $x\n' > scripts/untracked_probe.sh   # SC2148
+just check                        # must be 1, naming shellcheck
 rm -f scripts/untracked_probe.sh
-```
 
-Enumeration uses `-z` with `core.quotePath=false`. Without it, git
-C-quotes any path holding non-ASCII or special bytes, so `café.md`
-arrives as the 12-character string `"caf\303\251.md"`, fails every
-existence test and is **dropped with no message** — the exact silent
-failure this probe exists to catch. A failing enumeration is also caught
-explicitly: written to a file whose exit status is checked, because a
-process substitution's status is invisible to `set -euo pipefail` and an
-unborn `HEAD` would otherwise report "nothing to check", exit 0.
-
-**Never** `git add --intent-to-add` as a way to make git aware of such a
-file: it writes to the index as a side effect of a check, turns the
-untracked `??` line into an added `A` one in `git status --porcelain` —
-the output the handover and approve rituals read for their clean-tree
-preconditions — and lets the next `git commit -a` sweep the file into an
-unrelated commit.
-
-### 2. `check` asserts and never repairs
-
-**Why it matters.** Some hooks are fixers (`trailing-whitespace`,
-`end-of-file-fixer`, `mixed-line-ending`). The commit hook is where they
-are allowed to write. A `check` that rewrites the working tree as a side
-effect is the `--intent-to-add` prohibition one step milder, and the
-rituals that read `git status --porcelain` for a clean tree sit
-downstream of it.
-
-**Mechanism.** `scripts/check.sh` copies the file list to a temporary
-directory before running pre-commit, then compares each file afterwards,
-restores any the hooks rewrote, names them, and fails. No git operation is
-involved — nothing touches the index, the working tree's git state, or
-history.
-
-**Measured.** A file with trailing whitespace made `just check` exit 1
-while leaving the file byte-identical, printing "a fixer hook wanted to
-rewrite these files". Confirmed.
-
-**Re-measure.**
-
-```sh
-printf '# probe   \n' > probe.md
-md5sum probe.md
-just check; echo "exit: $?"    # must be 1, naming probe.md as wanted-rewritten
-md5sum probe.md                # must be unchanged
+# 2 — fixer wants to rewrite, file survives byte-identical
+printf '# probe   \n' > probe.md && md5sum probe.md
+just check                        # must be 1, naming probe.md
+md5sum probe.md                   # unchanged
 rm -f probe.md
-```
 
-### 3. An interrupt mid-run restores the tree too
-
-**Why it matters.** The revert used to be straight-line code after the
-pre-commit run, with the `EXIT` trap only deleting the snapshot. A signal
-during the run — Ctrl-C is the ordinary case — left every fixer edit on
-disk *and* deleted the snapshot in the same breath. For an **untracked**
-file no other copy exists anywhere, so its pre-check content was
-unrecoverable. Found by step `000`'s cold review, with a reproduction.
-
-**Mechanism.** The revert is a function called from an `EXIT` trap;
-`INT`, `TERM` and `HUP` traps simply `exit`, which runs it. It is
-idempotent, so the main path calls it to report and the trap call then
-finds nothing to do. If a restore itself fails, the snapshot is **kept**
-and its location printed rather than deleted.
-
-**Re-measure.**
-
-```sh
-printf '# probe   \n' > int-probe.md
-md5sum int-probe.md
+# 3 — interrupt restores
+printf '# probe   \n' > int-probe.md && md5sum int-probe.md
 setsid bash scripts/check.sh >/dev/null 2>&1 & pid=$!
 sleep 1.2; kill -TERM -"$pid"; sleep 2
-md5sum int-probe.md            # must be unchanged
+md5sum int-probe.md               # unchanged
 rm -f int-probe.md
-```
 
-### 4. Broken symlinks reach `check-symlinks`
-
-**Why it matters.** The file-list filter drops paths that do not exist,
-which is right for deleted-but-still-indexed files and wrong for broken
-symlinks — precisely what `check-symlinks` is for. Testing `-f` alone
-made that hook unreachable from `just check` while the harness note
-claimed the family was present. Found by the same review.
-
-**Re-measure.**
-
-```sh
+# 4 — broken symlink fails
 ln -s ./does-not-exist.md broken-probe.md
-just check; echo "exit: $?"    # must be 1
+just check                        # must be 1
 rm -f broken-probe.md
 ```
 
-### 5. A `local` hook runs even when the file list excludes it
+**5.** A `local` hook with `always_run: true`, `pass_filenames: false`,
+`entry: "bash -c 'echo PROBE-RAN args=$*; exit 3' --"`, run through
+`.venv/bin/pre-commit run -c <config> --files README.md`: exit 1,
+`PROBE-RAN` printed, `args=` empty.
 
-**Why it matters.** The `check-guard` hook (step `001`) hunts things no
-file list can show it: the guard is gitignored and therefore never
-appears in one, and a settings file that quietly stopped pointing at the
-guard is *unchanged* on the commit where that matters. It must run on
-every invocation, `just check changed` included.
-
-**Measured** on pre-commit 4.4.0: a `local` hook with `always_run: true`
-and `pass_filenames: false` ran under `pre-commit run --files README.md`,
-receiving no filenames; a second one exiting 3 made the run exit 1. Both
-confirmed.
-
-**Re-measure.**
-
-```sh
-cat > /tmp/probe-config.yaml <<'EOF'
-repos:
-  - repo: local
-    hooks:
-      - id: probe
-        name: probe
-        entry: "bash -c 'echo PROBE-RAN args=$*; exit 3' --"
-        language: system
-        pass_filenames: false
-        always_run: true
-EOF
-.venv/bin/pre-commit run -c /tmp/probe-config.yaml --files README.md
-echo "exit: $?"      # must be 1, and PROBE-RAN must appear with args= empty
-```
-
-### 6. The guard gate fails on each silent death
-
-**Why it matters.** A `PreToolUse` hook fails *open*. The gate exists to
-turn each silent death into a failed check, so each one is exercised
-rather than assumed. Run in a throwaway git repository outside this one,
-with `scripts/check-guard.sh` copied in and a stub standing in for the
-guard — the assertions under test are structural, so the stub is honest.
-
-**Measured** at `001`, twelve states plus the worktree case. Exit 0: no
-marker and no guard ("absent by design"); marker with a working guard;
-matcher `*`; matcher `Bash|Read`. Exit 1, each naming its own cause:
-guard present with no marker; a hook that only *mentions* the guard
-(`echo .claude/hooks/bash_guard.py` — caught because the registered line
-is executed, not pattern-matched); an emptied `deny` list; a removed
-bypass lock; `disableAllHooks` set in the **gitignored local** settings;
-a top-level JSON array; `defaultMode: bypassPermissions`; a guard
-stripped of its executable bit. And in a linked worktree with the guard
-unmaterialized: exit 1, printing a `mkdir -p … && ln -s …` recipe that
-was applied verbatim and turned the run green.
-
-**Re-measure.** `git init` a scratch directory outside this repository,
-copy `scripts/check-guard.sh` and a minimal `.claude/settings.json` in,
-stub the guard as a shell script that echoes a liveness line for
-`--liveness` and a `"permissionDecision": "deny"` line when its stdin
-mentions `--force`, create the marker with
-`git update-ref refs/backups/bash-guard HEAD`, then walk the states,
-mutating the settings with a one-line `python3 -c` between runs. For the
-worktree case, `git worktree add` a second checkout of that scratch repo
-and run the script from inside it.
+**6.** `git init` a scratch repo outside this one; copy
+`scripts/check-guard.sh` and a minimal `.claude/settings.json` in; stub
+the guard as a script echoing a liveness line for `--liveness` and
+`"permissionDecision": "deny"` when stdin mentions `--force`; mark it
+with `git update-ref refs/backups/bash-guard HEAD`; walk the states
+above, mutating settings between runs. Worktree case:
+`git worktree add` a second checkout, run from inside it.
 
 ## Path exclusions
 
 `.claude/spec-work/` and `.claude/refs/` are excluded in
-`.pre-commit-config.yaml`, keyed on the path and not on tracked status —
-one place, so `scripts/check.sh` holds no policy. `spec-work/` because
-rule 1 makes it no session's reading material; `refs/` because it is the
-operator's supplied material, read-only under rule 3 and owned elsewhere,
-so a finding inside one would have no legal resolution.
+`.pre-commit-config.yaml`, keyed on path not tracked status — one place,
+so `scripts/check.sh` holds no policy. Gitignored paths are excluded for
+free by `--others --exclude-standard`, which is also what keeps
+`.claude/hooks/bash_guard.py` out of every file list (rule 1).
 
-`detect-aws-credentials` was dropped at the operator's instruction: this
-project uses no AWS, so the hook could not fire on anything the
-repository could contain. Rule 5's mechanism is unchanged in substance —
-`detect-private-key` is the shape an accidental paste would actually
-take here, and §15 means the project holds no credentials of its own to
-leak. If broader credential scanning is ever wanted, it is a pinned hook
-away (`gitleaks`, `detect-secrets`) and needs no code.
+`check-added-large-files` needs `--enforce-all`: without it the hook
+intersects its list with what is *staged*, so outside a commit it checks
+nothing and always passes — inert exactly in `just check` and CI.
+`detect-aws-credentials` was dropped at the operator's instruction;
+broader scanning is a pinned hook away (`gitleaks`, `detect-secrets`).
 
-`check-added-large-files` carries `--enforce-all` deliberately: without
-it the hook intersects its file list with what is *staged*, so outside a
-commit it checks nothing and always passes — inert in `just check` and in
-CI, which is where it is most wanted.
-
-Gitignored paths are excluded for free: `git ls-files --others
---exclude-standard` never lists them, which is also what keeps
-`.claude/hooks/bash_guard.py` out of every check file list (rule 1).
-
-## Check families present, and what is still owed
-
-Families arrive with the first artifact of their class, never ahead of it,
-so a green gate never says anything about files that are not there.
+## Check families
 
 | Family | Since | Tool |
 |---|---|---|
 | Whitespace / newline | `000` | pre-commit-hooks (fixers) |
-| Hygiene, secrets | `000` | pre-commit-hooks (`detect-private-key`, large files with `--enforce-all`, merge conflicts, symlinks, case conflicts) |
+| Hygiene, secrets | `000` | `detect-private-key`, large files `--enforce-all`, merge conflicts, symlinks, case conflicts |
 | JSON parse | `000` | `check-json` |
-| YAML | `000` | yamllint `--strict` (which already fails on a parse error, so `check-yaml` would be redundant) |
-| POSIX shell | `000` | shellcheck-py (ships its own pinned binary — not a system prerequisite) |
+| YAML | `000` | yamllint `--strict` (fails on parse errors, so `check-yaml` is redundant) |
+| POSIX shell | `000` | shellcheck-py (ships its own pinned binary) |
 | Markdown / prose | `000` | pymarkdown |
-| Guard liveness | `001` | `scripts/check-guard.sh` → `bash_guard.py --liveness`, machine-local, inert where absent |
-| Governance well-formedness | `001` | the same script: the settings file still registers the guard, hooks are not globally disabled, auto memory is still off |
-| Governance frontmatter | `003` | the same script gains it (rule 11 sanctions the few lines; no ecosystem tool parses skill frontmatter) |
-| Python, TOML | `006` | pinned to the interpreter floor that step commits to |
-
-`SPECIFICATIONS.md` passes pymarkdown unmodified, so **no lint bend was
-needed for it** — the escape rule 2 reserves for the read-only
-specification stays unused. If a future rule does flag it, the bend is
-scoped to that file alone and is a logged decision, never a quiet config
-line or a global loosening.
+| Guard liveness | `001` | `scripts/check-guard.sh`, machine-local, inert where absent |
+| Governance well-formedness | `001` | same script: settings still register the guard, hooks not globally disabled, auto memory off |
+| Governance frontmatter | `003` | same script gains it — no ecosystem tool parses skill frontmatter |
+| Python, TOML | `006` | pinned to that step's floor interpreter |
