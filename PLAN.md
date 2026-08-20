@@ -162,92 +162,33 @@ does not count against this ordering.)
   indistinguishable from an ungated one and the transcript records no
   decisions. Detail in git history between tags step-001 and step-002.
 
-### 003 — Workflow tooling, part one: the probes and the skills — `awaiting test`
+### 003 — Workflow tooling, part one: the probes and the skills — `done`
 
-**Objective.** Measure what a subagent can actually see, then instantiate
-the four session rituals under the answer.
-
-**Spec sections.** None (workflow foundation).
-
-**Deliverables.**
-
-- The probes for this step's mechanisms: an agent's `tools:` frontmatter
-  (does it restrict anything at all?), and **whether `CLAUDE.md` reaches
-  a subagent's context at all** — one exchange with the first agent this
-  step spawns ("quote rule 9's opening line"). Every reviewer agent's
-  boundary rests on the answer, which is why it is measured before the
-  agents are written. **Pre-committed unfavourable branch**: if
-  `CLAUDE.md` does not reach a subagent's context, each agent's body
-  carries the gated set inlined — a logged decision naming the
-  single-source-of-truth cost — never a citation to a rule the agent
-  cannot read. Results land in `.claude/docs/`, version-stamped, with
-  the re-measure recipe.
-- The four skills at `.claude/skills/<name>/SKILL.md`: `orient`,
-  `resume-step`, `handover-step`, `approve-step` — instantiated from
-  `.claude/spec-work/handoff/assets/`, every placeholder filled with this
-  repository's real commands and paths, including the governance set
-  (`{{PLAN}}`, `{{DECISIONS}}`, `{{SPEC}}`, `{{STEP_ID}}`,
-  `{{VERIFY_COMMAND}}`). A template arrives with those as placeholders on
-  purpose: a leftover one is visible, while a plausible wrong filename is
-  not. A placeholder whose referent does not exist yet is seeded from the
-  specification's own vocabulary and kept current under rule 6 as the
-  system materializes — the standing examples being `resume-step`'s
-  world-state checks and, at `004`, the state reviewer's architecture
-  vocabulary and inspection commands.
-- **Where a template's own enumeration of a routine is narrower than the
-  rule it claims to execute, the rule wins and the enumeration is
-  rewritten to match.** This repository is single-track: where a
-  template's body carries multi-track guidance, that block is dropped
-  rather than reconciled.
-- `handover-step` gains rule 2's code-review step for code-bearing steps
-  and the test-review step for suite-bearing ones — the standing gate's
-  carrier is the ritual that performs handovers, and a mandated gate
-  outside that ritual is a gate that silently skips — and names
-  `step-reviewer` as its plan-and-spec-conformance pass, which is that
-  agent's only trigger.
-- `approve-step`'s push step gains the backup ref's push to the backup
-  remote, on every close — resolving the remote by name and reporting its
-  absence rather than failing on a machine that lacks it — and its
-  step 5 names the milestone pair (`state-reviewer`, `optimize-memory`)
-  directly.
-- The governance well-formedness check family joins the harness here,
-  with its first artifact: **the frontmatter of every file under
-  `.claude/skills/` and `.claude/agents/` must parse.** A malformed skill
-  does not fail, it silently never loads. The parse check has no standard
-  ecosystem tool, so a few-line custom check is **sanctioned** by rule 11
-  here, and it is the whole of what the rule requires. Two *shoulds* ride
-  beside it, worth doing where they are exact: an agent name checked
-  against `.claude/agents/` and a path checked against the tree; and,
-  once `.claude/docs/` holds several files, a `§N` pointer with its
-  section title checked against the target document's headings — in the
-  instantiated skills and agents only, the one class where a pointer is
-  followed by a session that will not re-read the target, with read-only
-  documents outside its scope (a check that can go red inside a file
-  nobody may edit is a check nobody can turn green) and one recognised
-  citation shape, never prose. **Scanning prose for backticked tokens and
-  asserting each one resolves is prohibited**: it has been built and
-  regretted — a false-positive machine that grows worse as the repository
-  does, and once mandated by a rule it cannot be deleted without amending
-  the rule.
-- An instantiated file must never name a skill or agent that was not
-  adopted: trim the reference or adopt it, because a dangling name is a
-  ritual that silently skips a step. The five agents arrive at `004`, so
-  a reference to one of them is forward-looking by one step and is
-  resolved there.
-
-**How the operator tests it.** Invoke each of the four skills and watch
-it do what it claims — real invocations of the session-start, resume and
-handover rituals; the close ritual proves itself at this very step's
-close, its trigger being any step approval and `003`'s the first after it
-exists. Re-run both probes from the recipe the step records, rather than
-reading what they found: spawn an agent and ask it to quote rule 9's
-opening line, and invoke one whose `tools:` frontmatter restricts it.
-A new skill is picked up after a delay rather than at once, so the
-instructions say where to wait and where a restart forces it.
-**Crosses the boundary**: the probe subagents spend usage, at
-implementation and again at the test, and the restart is in the
-operator's live session. Cost: two short subagent exchanges. Cleanup:
-none.
+- **Outcome (approved 2026-08-20, tag `step-003`):** the four session
+  rituals are live as slash commands — `/orient`, `/resume-step`,
+  `/handover-step` (carrying rule 2's three review gates) and
+  `/approve-step` (carrying the close, the tag and the backup ref's
+  push, `D-017`). Four frontmatter facts are measured on `2.1.237` and
+  recorded in `.claude/docs/subagents.md`: `CLAUDE.md` **does** reach a
+  subagent, built-in and project-defined alike, but the copy it carries
+  is the parent session's rather than the file on disk, so nothing
+  volatile may be read off it; an agent's `tools:` **restricts** and is
+  a boundary `004` may rest on, while a skill's `allowed-tools`
+  restricts nothing; and a definition loads after a rescan delay, not
+  only at session start — the step's own first answer, recorded from one
+  observation and corrected within the step. Governance
+  well-formedness joined the harness, and was then cut back to a
+  ~50-line parse check by operator ruling (`D-022`): the citation
+  resolver and its 18-case suite were work no rule asked for, and
+  `just verify` runs `check` before `test` anyway. `D-021` records that
+  `claude plugin validate --strict` already existed and was not looked
+  for first. The step also falsified a fact `001` had recorded as
+  measured: `just check changed` on a clean tree ran **no hooks at
+  all**, leaving both `always_run` gates inert at the one invocation
+  they were built for — fixed, with `harness.md`'s invariant 5 rewritten
+  around the lesson that a probe bypassing the entry point measures the
+  tool and not the harness. Detail in git history between tags
+  `step-002` and `step-003`.
 
 ### 004 — Workflow tooling, part two: the agents — `pending`
 

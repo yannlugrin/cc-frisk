@@ -356,7 +356,7 @@ Rule 1's quarantine survives that deletion, attached to
 
 ## Current state
 
-- **Current step:** `003` — workflow tooling, part one.
+- **Current step:** none — `003` closed 2026-08-20.
 - **Next step:** `004` — workflow tooling, part two: the agents.
 - **World state:** the harness is live and green (`just setup`
   bootstraps it), with the same checks in the commit hook, which now
@@ -384,11 +384,10 @@ Rule 1's quarantine survives that deletion, attached to
   and platform probes with the liveness triple; read before touching
   `.claude/settings.json` or anything under `.claude/hooks/`, **and
   before designing any probe of a permission mechanism**. `subagents.md`
-  — what a subagent's context carries, what skill and agent frontmatter
-  binds, when a definition loads, and the citation shape the harness
-  resolves; read before writing or changing anything under
-  `.claude/skills/` or `.claude/agents/`, or relying on a subagent to
-  know a rule.
+  — what a subagent's context carries and how stale it is, what skill
+  and agent frontmatter binds, and when a definition loads; read before
+  writing or changing anything under `.claude/skills/` or
+  `.claude/agents/`, or relying on a subagent to know a rule.
 
 *A closed list of item kinds — current and next step, live world-state,
 open obligations, `.claude/docs/` pointers — and nothing else. A closed
