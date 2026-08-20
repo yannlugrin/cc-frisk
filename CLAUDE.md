@@ -344,8 +344,7 @@ Rule 1's quarantine survives that deletion, attached to
 
 ## Current state
 
-- **Current step:** `002` — the probe campaign and the guard record;
-  all measurements taken, `awaiting test`.
+- **Current step:** none — `002` closed 2026-08-20.
 - **Next step:** `003` — workflow tooling, part one.
 - **World state:** the harness is live and green — `just setup`,
   `just check [all|changed]`, `just test`, `just verify` — with the same
@@ -355,7 +354,7 @@ Rule 1's quarantine survives that deletion, attached to
   measured every mechanism and the baseline needed **no change** —
   both `deny` spellings bind, the `ask` tier beats `acceptEdits`, and
   the hook is reached (`guard-record.md`). No tooling, no product code.
-  Tags `step-000` and `step-001` exist. `origin` is
+  Tags `step-000`, `step-001` and `step-002` exist. `origin` is
   `github.com/yannlugrin/cc-frisk`, **public**; no private backup remote
   exists, so the backup ref is local-only. **Every write under
   `.claude/` prompts** — the platform does that, no setting removes it.

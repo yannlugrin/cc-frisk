@@ -142,57 +142,25 @@ does not count against this ordering.)
   spellings stay knowingly unverified until `002` probes them. Detail in
   git history between tags `step-000` and `step-001`.
 
-### 002 — The probe campaign and the guard record — `awaiting test`
+### 002 — The probe campaign and the guard record — `done`
 
-**Objective.** Prove what each enforcement mechanism introduced at `001`
-actually does in the version being run, and write down what was
-measured — because a mechanism that turns out to enforce nothing is a
-guard on paper, and the failure announces nothing.
-
-**Spec sections.** None (workflow foundation).
-
-**Deliverables.**
-
-- The probe campaign for this step's mechanisms, assuming nothing —
-  including nothing from the bootstrap instructions or from `CLAUDE.md`.
-  At minimum: whether the settings keys set at `001` are honoured; which
-  spelling of a file-path rule the file tools actually match; whether the
-  hook is reached at all; what an unmatched command does under the
-  proposed permission mode; and **whether a hook `ask` still prompts**
-  under it — the close ritual attempts its push in reliance on that, and
-  a gate that has stopped gating says nothing about it. Confirm too that
-  this version honours `autoMemoryEnabled`, on the same reasoning: an
-  unrecognised setting is ignored in silence.
-- **The restart is part of the method.** Settings and hook changes may be
-  picked up only at session start, so a probe run in the session that
-  made the edit can report a false "not enforced". The recorded
-  re-measure recipe says so.
-- `.claude/docs/guard-record.md` completed: every claim a measurement,
-  each with **the version it was taken on, the method, and a short
-  re-measure recipe** to re-run after a Claude Code update. The values
-  measured live here and **not** in `CLAUDE.md` or any standing
-  instruction — standing instructions have no staleness discipline, and a
-  version-stamped fact restated there outlives its version in silence.
-- A **liveness check the session rituals of `003` can run**: three
-  commands — one that must run silently, one the guard *grants*, and one
-  it must **refuse, naming the rule that read it**. The third is the only
-  one that says the hook is reached at all: if it merely prompts, the
-  hook is not wired and the deny backstop is all that is left, while the
-  guard's own `--selftest` and `--liveness` would still pass — they
-  answer whether the file is correct, not whether anything calls it.
-- The step summary reports what each mechanism actually did, **including
-  the ones that turned out to enforce nothing**.
-
-**How the operator tests it.** Read the record, then run the three
-liveness commands and observe: silence, a grant, and a refusal that names
-its rule. A session restart falls between `001`'s edits and these probes
-and the step's instructions say where.
-**Crosses the boundary**: the probes run in the operator's own live
-Claude Code, against their own working project's settings. Cost: session
-restarts, and — if the proposed mode differs from the one in use — a
-temporarily altered permission mode. Cleanup: restore the mode and any
-probe-time settings change; the record itself is the deliverable and
-stays.
+- **Outcome (approved 2026-08-20, tag step-002):** every mechanism `001`
+  introduced is measured on Claude Code `2.1.237` and recorded in
+  `.claude/docs/guard-record.md` — twelve probes, each with its method
+  and a re-measure recipe, plus the liveness triple the `003` rituals
+  run. **The hook is reached**, its `deny` is honoured and its `ask`
+  reaches the operator, so rule 6's close push is safe. `D-011`'s two
+  unverified spellings both bind, so **`.claude/settings.json` needed no
+  change** and every pre-committed fallback went unused; `D-011` gained
+  a verification bullet rather than an amendment. Two facts govern later
+  work: `deny` prefixes match **only from the start of the command
+  line** — so `git push origin main --force` matches nothing and only
+  the guard catches it, this project's thesis measured — and the
+  platform gates **every write under `.claude/`**, which no `allow`
+  entry suppresses. The step also fixed how probing is done at all:
+  "it ran" is not a measurement, since a prompted-and-approved call is
+  indistinguishable from an ungated one and the transcript records no
+  decisions. Detail in git history between tags step-001 and step-002.
 
 ### 003 — Workflow tooling, part one: the probes and the skills — `pending`
 
