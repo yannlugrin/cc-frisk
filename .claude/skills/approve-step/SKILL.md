@@ -65,10 +65,7 @@ In order:
    start the next one — suggest the whole-state review (`state-reviewer`)
    and then the memory-compaction pass (`optimize-memory`), in that
    order, so the compaction runs after the review has read the
-   uncompacted memory. *Until step `004` adopts those two agents*, brief
-   a fresh subagent inline from a clean context instead — the passes are
-   required whoever performs them, and this step is their only in-ritual
-   trigger. Delete that sentence at `004`.
+   uncompacted memory.
 
    **Spawn both on a model that did not write the milestone's work.**
    Normally that is any model other than yours — but a milestone spans

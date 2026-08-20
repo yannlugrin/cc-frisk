@@ -49,10 +49,6 @@ Hand the current step over for operator testing. In order:
    out of scope for every pass — its vendored code is exempt and its
    `REGISTRY`/`CASES` edits are reviewed inside the isolated-subagent
    channel, outcomes only, in a report that says so.
-
-   *Until step `004` adopts these three agents*, run each applicable pass
-   as a freshly briefed subagent from a clean context and say in the
-   handover that it ran that way. Delete this paragraph at `004`.
 4. **Tree clean:** everything above — the step's work, the sweep, the
    review fixes — is already in small, coherent commits with `step-NNN:`
    subjects (committed as the work happened, not batched here);

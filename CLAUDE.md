@@ -357,8 +357,8 @@ Rule 1's quarantine survives that deletion, attached to
 
 ## Current state
 
-- **Current step:** none — `003` closed 2026-08-20.
-- **Next step:** `004` — workflow tooling, part two: the agents.
+- **Current step:** `004` — workflow tooling, part two: the agents.
+- **Next step:** `005` — the same harness on the forge.
 - **World state:** the harness is live and green (`just setup`
   bootstraps it), with the same checks in the commit hook, which now
   also gate the boundary and the governance frontmatter. The permission
