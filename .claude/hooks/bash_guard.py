@@ -1464,9 +1464,41 @@ GIT_PROJECT_RULES = (
         "ask", ("clone",), "this fetches unpinned material from the network",
         operands=any_of(NETWORK_URL),
     ),
+    # git is a command runner: a configuration override can name a program git
+    # will execute — an alias beginning with `!`, a pager, an editor, an
+    # external diff, a textconv, an ssh command, a credential helper, a
+    # filesystem monitor, a pack-objects hook, a protocol command. The set of
+    # keys that reach a program is open, so the flag is the condition, not the
+    # key. Nothing in this project's loop passes one from a tool call.
+    Rule(
+        "ask", (),
+        "a configuration override can name a program git will run",
+        flags=frozenset({"-c", "--config-env"}),
+    ),
+    # The batch form of a ref update deletes refs from its payload, which the
+    # guard never sees. `refs/backups/bash-guard` is this guard's only version
+    # history and is local until a backup remote exists, so this matches the
+    # tier the ground rules give `update-ref -d`. The two-argument form the
+    # snapshot recipe uses stays free.
+    Rule(
+        "deny", ("update-ref",),
+        "destroying git's recovery data has no authorized use",
+        flags=frozenset({"--stdin"}),
+    ),
 )
 
-GIT = replace(GIT, rules=(*GIT.rules, *GIT_PROJECT_RULES))
+# `-c` moves out of the pre-subcommand globals and into the flags that consume
+# the next token. It has to: a global is stripped and forgotten, so no rule can
+# see one, and the ground rules' own paths must still land where they expect —
+# `git -c x=y push --force` stays a deny, and now also carries a visible `-c`.
+# The remaining globals join it, so their values are consumed rather than read
+# as a subcommand when one follows a `-c`.
+GIT = replace(
+    GIT,
+    rules=(*GIT.rules, *GIT_PROJECT_RULES),
+    global_value_opts=GIT.global_value_opts - {"-c"},
+    value_flags=GIT.value_flags | GIT.global_value_opts,
+)
 
 
 # --- gh: safe by default, forge writes enumerated --------------------------
@@ -1708,10 +1740,24 @@ TRUNCATE = Tool(
     rules=(Rule("ask", (), BOUNDARY_WRITE, operands=any_of(boundary_file)),),
 )
 
+# Disarming the guard needs no write to its content: the hook registration
+# tests the executable bit and a hook it cannot run fails open, silently. So a
+# mode change on one of these files is a boundary write like any other.
+CHMOD = Tool(
+    name="chmod",
+    aliases=frozenset({"chattr", "chown", "chgrp"}),
+    rules=(Rule(
+        "ask", (),
+        "this changes the mode of a file that carries the boundary itself — "
+        "removing the guard's executable bit disarms it silently",
+        operands=any_of(boundary_file),
+    ),),
+)
+
 
 TOOLS: dict[str, Tool] = registry(
     GIT, GH, PIP, PYTHON, SUDO, JUST,
-    CURL, WGET, NPM, BREW, APT, CLAUDE, RM, FIND, TEE, COPY, SED, TRUNCATE,
+    CURL, WGET, NPM, BREW, APT, CLAUDE, RM, FIND, TEE, COPY, SED, TRUNCATE, CHMOD,
 )
 
 
@@ -1864,6 +1910,18 @@ CASES: tuple[tuple[str, str], ...] = (
     ("git commit-tree abc -p def -m snapshot", "silent"),
     ("git update-ref refs/backups/bash-guard abc123", "silent"),
     ("git update-ref -d refs/backups/bash-guard", "deny"),  # ground rule
+    ("git update-ref --stdin", "deny"),  # a delete line hides in the payload
+    ("git update-ref --stdin < updates.txt", "deny"),
+    # a configuration override names a program git runs
+    ("git -c alias.p='!git push --force' p", "ask"),
+    ("git -c core.pager='sh -c id' log", "ask"),
+    ("git -c uploadpack.packObjectsHook=id ls-remote .", "ask"),
+    ("git -c core.sshCommand='ssh -i /tmp/k' fetch origin", "ask"),
+    ("git --config-env=core.pager=EVIL log", "ask"),
+    # …and the ground rules still land through one
+    ("git -c a=b push --force", "deny"),
+    ("git -c a=b push", "ask"),
+    ("git -c a=b -C /srv/repo push --force", "deny"),
     ("git describe --tags --abbrev=0 --match 'step-*'", "silent"),
     # --- gh: reads free, forge writes gated ---------------------------------
     ("gh repo view", "silent"),
@@ -2002,6 +2060,13 @@ CASES: tuple[tuple[str, str], ...] = (
     ("cp docs/a.md docs/b.md", "silent"),
     ("mv old.py new.py", "silent"),
     ("mkdir -p .claude/hooks", "silent"),  # mkdir is not a write to the file
+    # a mode change is how the guard dies without a write
+    ("chmod -x .claude/hooks/bash_guard.py", "ask"),
+    ("chmod +x .claude/hooks/bash_guard.py", "ask"),
+    ("chmod 600 .claude/settings.json", "ask"),
+    ("chattr +i .claude/settings.local.json", "ask"),
+    ("chmod +x scripts/check.sh", "silent"),
+    ("chmod 644 README.md", "silent"),
 )
 
 
