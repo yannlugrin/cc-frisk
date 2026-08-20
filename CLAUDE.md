@@ -110,8 +110,9 @@ well-formed? Syntax, lint and formatting over the whole working tree,
 what-changed form is a scope argument to the same command. `just test` —
 is the implementation right? Fixtures and expectations proving the
 behaviour **this repository itself ships, the cases that must fail
-included**. `just verify` runs both, and the commit that receives a
-`step-NNN` tag runs the full `check`.
+included**. `just verify` runs `check` then `test`: the check half runs
+against the real tree every invocation, so it needs no suite of its own.
+The commit that receives a `step-NNN` tag runs the full `check`.
 Three limits keep those honest: a third-party tool is never retested;
 **a must-warn case is required only where the implementation already
 defines a warning tier, never a reason to invent one**; and where the

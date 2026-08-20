@@ -799,8 +799,10 @@ Two conventions the format depends on:
 - **Date:** 2026-08-20
 - **Step:** `003`
 - **Context:** `PLAN.md` `003` sanctions a small custom check for
-  governance frontmatter — nothing in the ecosystem asks whether a skill
-  or agent definition loads. What actually parses those files is Claude
+  governance frontmatter. (The clause that stood here — "nothing in the
+  ecosystem asks whether a skill or agent definition loads" — was false
+  and is struck; `D-021` records what `claude plugin validate` does and
+  does not cover.) What actually parses those files is Claude
   Code's YAML parser, so approximating it needs a real YAML parser;
   hand-rolling one over a subset that already includes folded scalars is
   precisely what rule 11 forbids. Every other linter here is a
@@ -906,12 +908,19 @@ Two conventions the format depends on:
   the tool before writing one. That question was not asked before
   `scripts/check_frontmatter.py` was written, and the cold code review
   asked it afterwards. It does ship one: `claude plugin validate
-  --strict <dir>`. Measured on 2.1.237 against this step's own fixture
-  classes — no frontmatter, unparseable YAML, a skill directory with no
-  `SKILL.md` all exit 1; **a `name` that disagrees with its directory
-  exits 0**, uncaught. So roughly two thirds of the parse half is
-  ecosystem-shipped, and the check's own comments claimed the opposite
-  in as many words.
+  --strict <dir>` — and the check's own comments had claimed the
+  opposite in as many words. It covers about half the parse question,
+  and **the half it leaves is the half that fails silently**: a `name`
+  disagreeing with its path, a malformation that swallows the closing
+  `---`, and a skill directory with no `SKILL.md` all exit 0 — the last
+  of these uncovered by our script either. The measurement, its version
+  stamp and its re-measure recipe live in `.claude/docs/harness.md`
+  (rule 2), not here. Two claims this entry carried at `003` were wrong
+  and are corrected there: unparseable YAML exits 1 only while the
+  `---` delimiters survive the malformation, and "a skill directory with
+  no `SKILL.md` exits 1" was an artifact of an otherwise-empty fixture
+  tree, which finds no components at all and falls back to *manifest*
+  validation.
 - **Decision:** both exist, and neither is folded into the other. The
   script stays as the harness's gate; the validator is **not** wired
   into `.pre-commit-config.yaml` or CI. It is `claude` — the operator's
@@ -929,7 +938,9 @@ Two conventions the format depends on:
 - **Revisit at `PLAN.md` `021`**, where the plugin tree lands and the
   validator becomes necessary for the *product's* manifest rather than
   optional for dev tooling. If it is pinned and wired then, the
-  duplicated parse diagnostics here should go with it.
+  duplicated parse diagnostics here should go with it. Retiring the
+  script wholesale is not on that table: it would surrender three
+  silent-failure classes, not one. Re-measure before deciding.
 - **Alternatives considered:** *Replacing the script with the
   validator* — loses name↔path agreement, the layout checks and the
   citations, which is most of the value, and buys an unpinned
@@ -941,9 +952,10 @@ Two conventions the format depends on:
   it only works bundled with the previous option. *Deleting the check
   entirely* — `PLAN.md` `003` requires the family, and the validator is
   not in the harness.
-- **Approved by:** *pending* — put to the operator at `003`'s handover.
-  Rule 11 questions about whether a thing should exist are theirs, and
-  this one was answered by building first.
+- **Approved by:** operator, 2026-08-21, ruling during the U-066 update
+  pass; carried `*pending*` from `003`'s handover. Rule 11 questions
+  about whether a thing should exist are theirs, and this one was
+  answered by building first.
 
 ### D-022 — The governance check is a parse check and nothing more
 
@@ -992,3 +1004,52 @@ Two conventions the format depends on:
   read at the time.
 - **Approved by:** operator, 2026-08-20, choosing "parse check only, no
   suite" from the three options put to them.
+
+### D-023 — Doctrine adopted through U-066, less one contradicted fact
+
+- **Date:** 2026-08-21
+- **Step:** — (workflow maintenance, no step)
+- **Context:** one *running* entry sat above `D-016`'s adoption point.
+  **U-066** is drawn from this repository's own step `003` — it quotes
+  the ~170→~53-line cut and the −442 net as its measurement — so its
+  three repairs were mostly already in force here. Its *Detect* limbs
+  were walked: no governance check now carries a suite, fixture tree or
+  root argument (`D-022`); `scripts/check_frontmatter.py` is 53 lines
+  and `D-021` is the entry recording the build-vs-buy question, now
+  ruled; and the "nothing in the ecosystem" claim survived in `D-018`'s
+  Context after `D-021` struck it from the script and the hook config.
+  The remedy's ordered re-measure then contradicted the entry itself.
+- **Decision:** this repository is **adopted through U-066**, with three
+  repairs applied and one clause declined.
+  *Applied:* rule 2 now states that `just verify` runs `check` before
+  `test` and draws the consequence — the check half executes against the
+  real tree every invocation, so it needs no suite of its own. This was
+  the argument that settled `D-022` and no rule stated it (+1 line;
+  `CLAUDE.md` 397 → 398, cap unchanged at 400). `D-018`'s false
+  ecosystem clause is struck. The validator measurement moves out of
+  `D-021` into `.claude/docs/harness.md` with its version, method and
+  re-measure recipe, as rule 2 requires of a measured value — being
+  logged only in a decision entry is why it went stale unseen.
+  *Declined:* U-066's parenthetical that the validator "passes silently
+  … on frontmatter that does not parse, which it skips without a word".
+  Measured on 2.1.238: unparseable YAML with the `---` delimiters intact
+  exits **1** with an explicit error. The claim holds only for the
+  narrower case where the malformation swallows the closing delimiter.
+  Adopted in the corrected form recorded in `harness.md`.
+- **Alternatives considered:** *Taking U-066's parenthetical as written*
+  — rejected on measurement; the update pass applies under this
+  project's rules, and rule 2's "probe every enforcement mechanism"
+  outranks an unmeasured restatement, which is the class `D-021` already
+  exists to correct. *Deferring rule 2's line to `004`'s compaction* —
+  the budget had room for one line and the clause is the load-bearing
+  half of U-066; deferring a rule to buy a line the file already had is
+  the decorative-budget failure `D-002` names. *A new entry superseding
+  `D-021` rather than amending it* — rejected: the decision there is
+  unchanged and comes out better founded, and this log reserves new
+  entries for reversals. Its wrong *facts* were corrected in place.
+- **Upstream:** U-066 needs a dated correction-in-place note, and
+  `D-021`'s own missing-`SKILL.md` claim was an artifact of an
+  otherwise-empty fixture tree falling back to manifest validation —
+  reported to the operator, whose call it is to touch the skill.
+- **Approved by:** operator, 2026-08-21, approving the U-066 triage and
+  the `D-021` amendment.

@@ -167,3 +167,44 @@ path the loader finds it at (`D-018` — a separate script and hook, not a
 third family bolted onto `check-guard.sh`; it imports PyYAML from
 `.venv`, pinned in `requirements.txt`, where `check-guard.sh` is
 stdlib-only).
+
+### What `claude plugin validate` covers, and what it misses
+
+Measured on **Claude Code 2.1.238**, 2026-08-21, exit codes captured
+without a pipe (a pipeline reports the *last* command's status, which is
+how the 2.1.237 reading in `D-021` went partly wrong). One fixture tree
+per class, each `<root>/skills/<name>/SKILL.md`, run as
+`claude plugin validate --strict <root>`:
+
+| Failure class                                | validator | our script |
+| -------------------------------------------- | --------- | ---------- |
+| No frontmatter block                          | 1 (warn)  | caught     |
+| Unparseable YAML, `---` delimiters intact     | 1 (error) | caught     |
+| Malformation swallows the closing `---`       | **0**     | caught     |
+| `name` disagrees with the path it loads from  | **0**     | caught     |
+| Skill directory with no `SKILL.md`            | **0**     | uncovered  |
+| Missing or empty `description`                | 1 (warn)  | caught     |
+
+The three zeros are silent: the validator prints `Validation passed` and,
+for the swallowed-delimiter case, never lists the file at all — the flow
+scalar consumes the delimiter, so nothing recognises the block as
+frontmatter. That is the whole argument for `D-021`'s "both exist":
+what the ecosystem tool misses is exactly the class this family exists
+to catch. Two traps when re-measuring — a tree holding **no** valid
+component falls back to *manifest* validation and fails on a missing
+manifest, which reads as a catch and is not one; and `--strict` is what
+turns the two warning classes into failures.
+
+Re-measure (`$S` any scratch path; add a valid sibling skill so the
+manifest fallback cannot fire):
+
+```sh
+mkdir -p $S/skills/good $S/skills/mismatch
+printf -- '---\nname: good\ndescription: valid\n---\nbody\n' > $S/skills/good/SKILL.md
+printf -- '---\nname: other\ndescription: valid\n---\nbody\n' > $S/skills/mismatch/SKILL.md
+claude plugin validate --strict $S; echo "rc=$?"   # expect: passed, rc=0
+claude --version                                    # stamp the reading
+```
+
+A version that starts failing this retires part of the check — the
+`021` revisit in `D-021` is where that is decided, on a fresh reading.
