@@ -239,11 +239,15 @@ the four session rituals under the answer.
 it do what it claims — real invocations of the session-start, resume and
 handover rituals; the close ritual proves itself at this very step's
 close, its trigger being any step approval and `003`'s the first after it
-exists. Read the probe results. A new skill may only be picked up at
-session start, so the instructions state where the restart falls.
-**Crosses the boundary**: spawning the probe subagent spends usage, and
-the restart is in the operator's live session. Cost: one short subagent
-exchange. Cleanup: none.
+exists. Re-run both probes from the recipe the step records, rather than
+reading what they found: spawn an agent and ask it to quote rule 9's
+opening line, and invoke one whose `tools:` frontmatter restricts it.
+A new skill may only be picked up at session start, so the instructions
+state where the restart falls.
+**Crosses the boundary**: the probe subagents spend usage, at
+implementation and again at the test, and the restart is in the
+operator's live session. Cost: two short subagent exchanges. Cleanup:
+none.
 
 ### 004 — Workflow tooling, part two: the agents — `pending`
 

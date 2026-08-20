@@ -96,7 +96,11 @@ step; never batch steps because they look small. **When the operator
 asks for something to be removed, it is removed** — a smaller, rewritten
 or relocated version is not compliance. If you think the removal is a
 mistake, say so in one sentence and do it anyway, or ask first which was
-meant.
+meant. **The operator tests behaviour, never a document**: a file
+belongs in the test instructions only when it *is* the deliverable — an
+operator document, a contract, something under `docs/` — never when it
+is memory. Where a step's real product is a measurement, the test is
+re-running the measurement.
 
 **Hand nothing over unverified.** Before asking for a test, every check
 that applies to what you changed passes, through the repository's
@@ -143,11 +147,19 @@ mistakes it for a code review.
 
 **3. All memory lives in files.** `PLAN.md` (the plan and each step's
 status), `DECISIONS.md` (the decision log), this file, and
-`.claude/docs/` (context-specific notes, read at their trigger — plain
-path references, never `@` imports, which load eagerly). Auto memory is
-disabled in `.claude/settings.json` and stays disabled: machine-local,
-unversioned, outside git and outside these rules.
-**This file's budget is 390 lines hard, ~365 at handover (`D-002`).**
+`.claude/docs/` — plain path references, never `@` imports, which load
+eagerly. **A `.claude/docs/` file is a conditional segment of this
+one**, loaded at its trigger rather than on every run, held to the same
+test: what a future session needs to act and cannot get faster from a
+rule, a docstring or a command. Two disqualifiers. *Justification* — why
+a decision was taken is `DECISIONS.md`, why a rule exists is the rule.
+*Duplication* — a second copy of what this file, the specification, the
+plan or a docstring says goes stale in silence, nothing checking it
+against its original. It is not written for the operator: it is your
+memory, not a report. Auto memory is disabled in `.claude/settings.json`
+and stays disabled: machine-local, unversioned, outside git and outside
+these rules.
+**This file's budget is 400 lines hard, ~375 at handover (`D-014`).**
 When it binds, things leave in this order and the order is not yours to
 reshuffle: context-specific content a read-trigger can reach, then the
 tooling-templates block once its directory is gone, then per-step detail
@@ -351,9 +363,9 @@ Rule 1's quarantine survives that deletion, attached to
   checks in the commit hook, which now also gate the boundary. The
   permission baseline is in `.claude/settings.json` and the guard is
   live and untracked, versioned on `refs/backups/bash-guard`; `002`
-  measured every mechanism and the baseline needed **no change** —
-  both `deny` spellings bind, the `ask` tier beats `acceptEdits`, and
-  the hook is reached (`guard-record.md`). No tooling, no product code.
+  measured every mechanism and the baseline needed **no change** — both
+  deny spellings bind, the gated tier beats the permissive edit mode,
+  and the hook is reached. `guard-record.md` names the modes, stamped.
   Tags `step-000`, `step-001` and `step-002` exist. `origin` is
   `github.com/yannlugrin/cc-frisk`, **public**; no private backup remote
   exists, so the backup ref is local-only. **Every write under
@@ -377,7 +389,7 @@ Rule 1's quarantine survives that deletion, attached to
   and `002`'s twelve platform probes with the liveness triple; read
   before touching `.claude/settings.json` or anything under
   `.claude/hooks/`, **and before designing any probe of a permission
-  mechanism** — its method section is why two of `002`'s were wrong.
+  mechanism**.
 
 *A closed list of item kinds — current and next step, live world-state,
 open obligations, `.claude/docs/` pointers — and nothing else. What a

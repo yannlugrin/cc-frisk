@@ -616,3 +616,97 @@ Two conventions the format depends on:
   root cause and rejected the premise that a runner whose every task we
   write ourselves is a dangerous tool. `D-011` stands otherwise; only
   its `just` treatment is overturned.
+
+### D-014 — `CLAUDE.md`'s budget re-derived at 400 for a rule that grew
+
+- **Date:** 2026-08-20
+- **Step:** — (workflow maintenance, no step)
+- **Context:** The workflow doctrine gained U-063, which adds text to
+  two of the nine rules `CLAUDE.md` restates: rule 3 must now say what
+  a `.claude/docs/` file *is* and name its two disqualifiers, and rule 2
+  must say that the operator tests behaviour and never a document.
+  `D-002` derived 390 hard / ~365 at handover from an arithmetic whose
+  largest term was "the remaining nine rules restated tightly enough
+  that a fresh session behaves identically are ~200". Two of those nine
+  are now larger, so the floor that arithmetic measured has moved.
+  Written tightly, the two additions cost 12 lines against 2 of
+  headroom.
+- **Decision:** the budget is **400 lines hard, ~375 at handover**,
+  replacing `D-002`'s 390/~365. `D-002` stands otherwise: its eviction
+  order, its never-leaves list and its two scheduled shrinks are
+  unchanged, and both shrinks still apply to the new number — step `004`
+  removes the tooling-templates block (−10) and `PLAN.md` `027` removes
+  the quarantine text (−29), each re-derived downward on arrival rather
+  than kept as slack. The file lands at exactly 400 after a trim pass
+  that gave back 3 of the 12 by wording alone. **It therefore has no
+  headroom**, and step `003` — which must add a `.claude/docs/` pointer
+  for its probe results and update the current-step block — arrives
+  needing a compaction pass or a further re-derivation. That is stated
+  here rather than discovered there.
+- **Alternatives considered:** *Absorbing the 12 lines by compressing
+  the `Current state` section* (44 lines, grown across three closes) —
+  rejected, though it is the subtractive answer rule 11 prefers: it pays
+  for a permanent rule change with live world state, and `003` needs
+  that room immediately afterwards, so the compaction would be spent
+  twice over. *Leaving the budget at 390 and breaching it* — rejected on
+  `D-002`'s own reasoning, that a budget first met by breaching it
+  teaches the next session the budget is decorative. *Trimming the two
+  new clauses until they fit 390* — rejected: they are the doctrine's
+  text, and `D-002` already recorded trimming as the active failure mode
+  a fidelity review had to reverse.
+- **Approved by:** operator, 2026-08-20, ruling on the workflow-update
+  triage.
+
+### D-015 — Doctrine adopted through U-064
+
+- **Date:** 2026-08-20
+- **Step:** — (workflow maintenance, no step)
+- **Context:** The workflow this repository runs is a restatement of the
+  `specify` skill's doctrine, not a copy of it, so nothing propagates
+  when that doctrine moves. `D-001` adopted the workflow without naming
+  the changelog id it adopted, which left the first update pass no
+  choice but to walk every *running* entry from U-022. Of the nineteen
+  audited (multi-track entries excluded — this repository is
+  single-track), seventeen came back already satisfied, most of them
+  because this project *is* the source of the doctrine's 2026-08-19
+  revision: U-057 to U-062 were banked from its own handoff review
+  rounds. No entry was found to conflict with a logged decision; `D-011`
+  and `D-013` both land with the doctrine rather than against it.
+- **Decision:** this repository is **adopted through U-064**, and a
+  future update pass reads only entries above that id. Two entries were
+  behind and are applied in this pass:
+  - **U-063** — rule 3 now states what a `.claude/docs/` file is and
+    disqualifies justification and duplication; rule 2 now states that
+    the operator tests behaviour and never a document; step `003`'s
+    operator test becomes a re-run of its two probes instead of a read
+    of what they found; and the frozen `optimize-memory` and
+    `step-reviewer` templates gain the sweep's fourth question and the
+    excess lens's memory-as-a-report clause, so `004` instantiates the
+    current doctrine.
+  - **U-022** — the `Current state` world-state bullet named two
+    permission modes as a standing fact with no version stamp beside
+    it. Reworded to the behavioural classification; the names, with the
+    version they were measured on, stay in
+    `.claude/docs/guard-record.md`. No baseline change follows: `002`
+    verified on Claude Code `2.1.237` that the committed
+    `permissions.defaultMode` is a name the running version accepts.
+  U-064 applies to bootstrap only and a project past `001` is reached
+  by U-063's remedy instead, so adopting U-063 covers it; the higher id
+  is named so the next pass does not re-open the question.
+- **Alternatives considered:** *Recording adoption at U-063,* the
+  highest *running* entry — rejected as leaving U-064 permanently
+  unresolved in the index for every later pass to re-read. *Carrying
+  U-063's template fixes as new bullets in `PLAN.md` `004` instead of
+  editing the frozen templates* — rejected: the template is what `004`
+  actually copies, a plan bullet is an instruction that can be missed,
+  and editing the copies restores byte-identity with the doctrine's
+  assets, which `diff -r` verifies in a second. *Applying U-062's
+  `description` note as well* — accepted despite the entry being marked
+  bootstrap-only, because rule 2 makes both reviews standing gates while
+  the templates ship a `description` saying "on request only", and the
+  `description` is what decides whether the agent is reached at all.
+  *Fixing `README.md`'s growth list, which omits `.claude/skills/` and
+  `.claude/agents/`* — deferred, not rejected: rule 6's same-commit
+  sweep makes it `003`'s, and `003` is next.
+- **Approved by:** operator, 2026-08-20, ruling point by point on the
+  audit triage.
