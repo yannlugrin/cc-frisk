@@ -242,8 +242,8 @@ close, its trigger being any step approval and `003`'s the first after it
 exists. Re-run both probes from the recipe the step records, rather than
 reading what they found: spawn an agent and ask it to quote rule 9's
 opening line, and invoke one whose `tools:` frontmatter restricts it.
-A new skill may only be picked up at session start, so the instructions
-state where the restart falls.
+A new skill is picked up after a delay rather than at once, so the
+instructions say where to wait and where a restart forces it.
 **Crosses the boundary**: the probe subagents spend usage, at
 implementation and again at the test, and the restart is in the
 operator's live session. Cost: two short subagent exchanges. Cleanup:
@@ -316,8 +316,9 @@ later, a smoke test — spawn, report shape, the model-override plumbing —
 with their real proof deferred to that trigger and the instructions
 saying so, because **a test that waits on a trigger the step cannot fire
 is not a test**. `just check` green over the now-instantiated tooling,
-including the frontmatter parse. A restart is part of the test: a new
-agent may only be picked up at session start.
+including the frontmatter parse. A new agent appears after a rescan
+delay rather than at once (`.claude/docs/subagents.md`), so allow for it
+or restart.
 **Crosses the boundary**: the smoke tests spawn subagents and spend
 usage. Cleanup: none.
 

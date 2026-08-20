@@ -3,101 +3,88 @@
 **Read before writing or changing anything under `.claude/agents/` or
 `.claude/skills/`, and before relying on a subagent to know a rule.**
 
-Measured on **Claude Code 2.1.237** unless a line says otherwise. Every
-claim here is either a live measurement with its recipe, or is labelled
-*unmeasured* and treated at its stricter branch. Documentation is not a
-measurement: where the published docs and a probe disagree, the probe
-wins and the disagreement is recorded.
+Measured on **Claude Code 2.1.237**, 2026-08-20, step `003`. Every claim
+here is a live measurement with its recipe. Documentation is not a
+measurement: the published docs agreed with two of these and were silent
+on the rest, and the probes are what this repository stands on.
 
-## Does CLAUDE.md reach a subagent?
+## What a subagent's context carries
 
-**Yes — measured, 2026-08-20, step `003`.** A subagent's context carries
-this repository's `CLAUDE.md` before its first turn.
+**`CLAUDE.md` reaches a subagent — both the built-in kinds and a
+project-defined one.** Measured twice: a built-in `general-purpose`
+agent, and the project-defined `probe-tools-restricted`. Each was
+forbidden every tool and asked for three things that exist only in
+`CLAUDE.md`; each returned rule 9's opening line verbatim and rule 11 as
+"Proportion".
 
-*Method.* Spawn a `general-purpose` subagent on a different model, with
-a prompt forbidding every tool and asking for three things that exist
-only in `CLAUDE.md`: the opening line of rule 9 verbatim, the number of
-the rule beginning "Proportion", and the three-digit current-step
-pointer. It answered all three correctly and reported using no tools.
-Three answers, not one, because a single plausible guess proves nothing;
-the current-step pointer in particular changes every step, so a correct
-answer cannot come from training data.
+**But the copy it carries is the parent session's, not the file on
+disk.** Both agents reported the current-step pointer as `none` — the
+value when this session started. The project-defined one was spawned two
+commits after that pointer had become `003`, and still said `none`.
 
-*Consequence.* `PLAN.md` `003`'s pre-committed unfavourable branch —
-inlining the gated set into every agent body — **does not apply**. An
-agent may cite a rule by number and rely on it being readable. It may
-not rely on `PLAN.md`, `DECISIONS.md` or `SPECIFICATIONS.md`, which are
-not auto-loaded: an agent that needs those reads them, and its `tools:`
-list must then include `Read`.
+*Consequences.* An agent may cite a rule by number and rely on it being
+readable. It may **not** be trusted on anything volatile — the
+current-step pointer above all — which must be passed in its prompt or
+read from disk with `Read`. And it has no `PLAN.md`, `DECISIONS.md` or
+`SPECIFICATIONS.md`: an agent that needs those reads them, so its
+`tools:` list must include `Read`.
 
-*Re-measure.* Repeat the method above; change the third question to
-whatever the current-step pointer now says.
+*Re-measure.* Repeat with both agent kinds; change the third question to
+whatever the current-step pointer now says, and edit `CLAUDE.md` between
+the edit and the spawn to re-test staleness.
 
 ## Skill and agent frontmatter
 
-Keep instantiated skill frontmatter to `name` and `description`. Agent
-frontmatter adds `tools`. Nothing else is used here, and a key this
-version does not define buys nothing while its handling is unspecified.
-
-| Key | Where | Status |
+| Key | Where | What it does |
 |---|---|---|
-| `name`, `description` | skills and agents | required; `name` must match the directory (`skills/<name>/SKILL.md`) or the filename (`agents/<name>.md`), or the definition is not the one that loads |
-| `tools:` on an agent | agents | **unmeasured here.** Documented as a strict allowlist — only listed tools are available, and omitting the key inherits the parent's full set. The probe is built and restart-gated (below). |
-| `allowed-tools:` on a skill | skills | **unmeasured here.** The handoff phase probed it on 2.1.231 and found it restricted nothing. The probe is built and restart-gated (below). |
-| `disallowed-tools:` on a skill | skills | not used, not probed. Reported to bind the whole invoking turn and never prompt — too blunt for a ritual, and a mechanism that removes a tool from the operator's own turn is worse than prose. |
+| `name`, `description` | both | required. `name` must match the directory (`skills/<name>/SKILL.md`) or the filename (`agents/<name>.md`), or the definition that loads is not the one you edited. |
+| `tools:` on an agent | agents | **restricts — measured.** A controlled pair, identical but for this line: `tools: Read` had no Bash tool at all ("no such tool in my tool list"), `tools: Read, Bash` ran the command. The pair is the measurement; one failing arm cannot tell a restriction from a refusal. Omitting the key inherits the parent's full set. |
+| `allowed-tools:` on a skill | skills | **restricts nothing — measured.** Under `allowed-tools: Read`, both a `Bash` call and a `Write` ran. This reproduces on 2.1.237 what the handoff phase found on 2.1.231. |
+| `disallowed-tools:` on a skill | skills | not used, not probed. Reported to bind the whole invoking turn and never prompt — too blunt for a ritual, and a mechanism that strips a tool from the operator's own turn is worse than prose. |
 
-*Stricter branch, in force until those two probes report.* **No
-frontmatter tool list is treated as an enforcement boundary.** A
-read-only ritual's discipline is prose plus `.claude/settings.json` plus
-the guard hook; a reviewer agent that must not write is one whose body
-says so. If the probes come back restrictive, a tool list becomes a
-second, cheap layer — never the first one.
+So: **an agent's `tools:` is a real boundary and may be relied on; a
+skill's frontmatter is not.** A ritual's read-only discipline stays
+prose plus `.claude/settings.json` plus the guard hook. Keep instantiated
+skill frontmatter to `name` and `description`: a key that binds nothing
+reads as a guarantee.
 
-*Re-measure — both probes, after a restart.* See the fixtures below.
-For the agent arm: spawn `probe-tools-restricted` (frontmatter `tools:
-Read`) and `probe-tools-open` (frontmatter `tools: Read, Bash`) with the
-same prompt, and compare. The pair is the measurement — a single failing
-arm cannot distinguish a restriction from a refusal. For the skill arm:
-invoke `/probe-frontmatter` and read what it reports.
+*Re-measure.* Spawn `probe-tools-restricted` against `probe-tools-open`
+with the same prompt and compare; invoke `/probe-frontmatter`. All three
+fixtures are deleted at `PLAN.md` `004`.
 
 ## When a definition loads
 
-**Session start only — measured, 2026-08-20, step `003`.** A subagent
-definition written to `.claude/agents/` mid-session is not picked up:
-spawning it returns `Agent type '<name>' not found`, and the error
-enumerates only the agents that existed when the session began.
+**Not immediately, but within the session — no restart needed.** A file
+written to `.claude/agents/` was still absent minutes later (spawning it
+returned `Agent type not found`, the error enumerating only what existed
+at session start), then became available later in that same session
+without any restart. The rescan interval was not measured.
 
-*Consequence.* Any step that creates or renames a skill or an agent
-hands over with a restart in its test instructions, and cannot itself
-verify the thing it just wrote. Assume the same for `.claude/skills/`.
+*Consequence.* A step that writes a skill or an agent cannot verify it
+on demand, but need not hand over with a restart in its test
+instructions either: the honest instruction is that a new definition
+appears after a delay, and a restart forces it. Do not build a ritual
+that depends on picking one up promptly.
 
-*Re-measure.* Write a throwaway agent file and spawn it in the same
-session; the error message is the result.
+*Re-measure.* Write a throwaway agent file, spawn it at once, then again
+after other work; the two results are the answer.
 
-## The probe fixtures
+## What cannot be measured from inside a session
 
-Three files exist only to be measured against, and **step `004` deletes
-all three** once their answers are recorded above:
+A permission prompt that the session's mode auto-answers is
+indistinguishable from no prompt at all — `002` established this and it
+binds here too. During the skill probe a `Write` under `.claude/`
+completed with no visible prompt, which is **not** evidence that
+`CLAUDE.md`'s "every write under `.claude/` prompts" has stopped
+holding. Anything about prompting is measured the way
+`.claude/docs/guard-record.md` § "Method" prescribes, or not at all.
 
-- `.claude/agents/probe-tools-restricted.md` — `tools: Read`
-- `.claude/agents/probe-tools-open.md` — `tools: Read, Bash` (the
-  control arm)
-- `.claude/skills/probe-frontmatter/SKILL.md` — `allowed-tools: Read`
+## The citation shape
 
-They are tracked, so they publish with the repository, and they appear
-in every session's agent and skill lists until they go. That is the cost
-of measuring rather than assuming; it is paid for one step.
-
-## The governance check
-
-`scripts/check_frontmatter.py` asserts what this file assumes: every
-definition parses, carries `name` and `description`, and agrees with its
-own path. It also resolves one recognised citation shape —
+`scripts/check_frontmatter.py` resolves one shape in skills and agents:
 
     `<path>` § "<Heading text>"
 
-— against the target file's headings, in instantiated skills and agents
-only. A pointer nobody follows is how four ritual files come to cite a
-section that no longer exists. **Prose is never scanned for backticked
-tokens**: that check has been built and regretted elsewhere, and once a
-rule mandates it, it cannot be deleted without amending the rule.
+path against the tree, heading against the target's headings. Use it for
+every pointer a ritual carries; anything else is prose and is not
+checked. The script's docstring carries the rest.
