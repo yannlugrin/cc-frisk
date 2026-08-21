@@ -21,13 +21,26 @@ is compared. Path matchers resolve `..` and `~` *before* comparing, so a
 boundary cannot be escaped textually, and they carry three further
 rules that the string family does not:
 
-* **Cross-form is unproven.** A relative value matches only a relative
-  boundary and an absolute value only an absolute one; the mismatch
-  invents no base and is unproven.
+* **Cross-form asks what the working directory could make true**
+  (§3.2, `D-037`), not what form the two sides have. A relative value
+  and a relative boundary hang off the same unknown base, so they
+  compare textually like two absolute paths. A relative value against
+  an absolute boundary is always unproven: some working directory
+  would place it inside, and none can be read off the line. An
+  absolute value against a relative boundary is never *satisfied* —
+  the working directory can never be proven right — and splits on
+  whether any could put it inside at all: unsatisfied when the
+  boundary's components appear nowhere in the value (`.scratch` is
+  absent from `/etc/passwd`, so no directory makes it true),
+  unproven when they do (`./etc` against `/etc/passwd`, true when the
+  working directory is `/`).
 * **A `cd` earlier on the line poisons relative paths.** Every later
   relative *path* match is unproven — deliberately lexical, subshells
-  included (§3.2). Pattern and predicate matchers are untouched, which
-  is why `cd /srv && tool run/validates.yaml` still satisfies a pattern
+  included (§3.2). This is the rule above rather than a second one:
+  two relative paths compare textually *because they share one unknown
+  base*, and an in-line `cd` is exactly what stops them sharing it.
+  Pattern and predicate matchers are untouched, which is why
+  `cd /srv && tool run/validates.yaml` still satisfies a pattern
   matcher over its operand.
 * **Nothing touches the filesystem** (§4.5): resolution is textual, and
   the paths being judged may not exist yet. `~` is expanded from the
@@ -144,6 +157,9 @@ def path_under(*boundaries: str) -> Matcher:
     `/home/*/scratch` accepts `/home/me/scratch/build` and rejects
     `/home/a/b/scratch`. Containment is by path component, so `/tmpevil`
     is not under `/tmp`, and the boundary itself is inside itself.
+
+    Several boundaries combine as `any_of`, so a value satisfied by one
+    is satisfied, and an unknown outranks the others' clean misses.
     """
     raise NotImplementedError
 

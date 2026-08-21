@@ -880,10 +880,18 @@ Detail in git history.
   `conditions=` spellings per condition kind* — `operands=every(…)`
   beside `when=flag(…)`; rejected as two ways to say one thing.
 - **Approved by:** operator, at the test gate of `007` (`D-032`): the
-  cases are the API's first draft, so approving them approves this.
+  cases are the API's first draft, so approving them approves this. The
+  secure-mode deferral was put to them separately and explicitly, with
+  §3.2's "could not be retrofitted" sentence beside it — the
+  non-retrofittable half is the engine's decision model, which
+  `008`–`010` carry; the keyword is additive. They confirmed the
+  deferral.
 
 ### D-035 — Three matcher rulings the specification leaves open
 
+- **Superseded in part by `D-037`:** ruling (4)'s consequence — that a
+  mixed-form boundary set can never answer unsatisfied — no longer
+  holds. The combination rule itself stands.
 - **Date:** 2026-08-21
 - **Step:** `007`
 - **Context:** §3.2 fixes the hard parts of matching — resolution before

@@ -380,12 +380,12 @@ class OperandQuantifierTests(unittest.TestCase):
     """Quantifiers over the operand list, three-valued (§3.2)."""
 
     def setUp(self) -> None:
+        # stubtool's `clean` grant, boundary for boundary.
         self.every = every_operand(path_under("/tmp", ".scratch"))
-        # A single-form boundary, where a clean miss is reachable at
-        # all: against the mixed set above, an absolute value is
-        # cross-form to `.scratch` and a relative one to `/tmp`, so it
-        # answers satisfied or unproven and never unsatisfied (D-035).
-        self.every_absolute = every_operand(path_under("/tmp"))
+        # And a boundary against which a value can be *unknown* rather
+        # than ruled out: `./etc` occurs in `/etc/passwd`, so a working
+        # directory of `/` would place it inside (D-037).
+        self.every_maybe = every_operand(path_under("./etc"))
         self.at_least_one = at_least_one_operand(matching(r"^(list|show)$"))
 
     def test_every_operand_needs_all_of_them(self) -> None:
@@ -396,13 +396,14 @@ class OperandQuantifierTests(unittest.TestCase):
 
     def test_one_failing_operand_fails_the_quantifier(self) -> None:
         # Corpus: `stubtool clean /tmp/x /etc/passwd` → ask. The exact
-        # answer is unproven, not merely "not satisfied": `/etc/passwd`
-        # is cross-form to the `.scratch` half of the boundary set
-        # (D-035). A loose assertion here is what let two cases
-        # contradict each other unnoticed.
+        # answer is unsatisfied, not merely "not satisfied":
+        # `/etc/passwd` is outside `/tmp`, and no working directory
+        # could place it inside `.scratch` either (D-037). A loose
+        # assertion here is what let two cases contradict each other
+        # unnoticed.
         self.assertEqual(
             self.every.evaluate(["/tmp/x", "/etc/passwd"]),
-            Outcome.UNPROVEN,
+            Outcome.UNSATISFIED,
         )
 
     def test_every_operand_requires_at_least_one(self) -> None:
@@ -439,18 +440,24 @@ class OperandQuantifierTests(unittest.TestCase):
         # answers with the decision. Nothing is uncertain about whether
         # every operand matched — one of them provably did not.
         self.assertEqual(
-            self.every_absolute.evaluate(
-                ["/etc/passwd", Value("$FOO", dynamic=True)]
-            ),
+            self.every.evaluate(["/etc/passwd", Value("$FOO", dynamic=True)]),
             Outcome.UNSATISFIED,
         )
 
     def test_an_unknown_outranks_a_match(self) -> None:
         self.assertEqual(
-            self.every_absolute.evaluate(
-                ["/tmp/x", Value("$FOO", dynamic=True)]
-            ),
+            self.every.evaluate(["/tmp/x", Value("$FOO", dynamic=True)]),
             Outcome.UNPROVEN,
+        )
+
+    def test_an_operand_no_directory_rules_out_stays_unknown(
+        self,
+    ) -> None:
+        # The quantifier inherits the matcher's third answer: `/etc`
+        # could be inside `<cwd>/etc` and could not, so the grant is
+        # neither released nor refused on it.
+        self.assertEqual(
+            self.every_maybe.evaluate(["/etc/passwd"]), Outcome.UNPROVEN
         )
 
     def test_the_line_s_context_reaches_the_operands(self) -> None:

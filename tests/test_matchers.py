@@ -141,11 +141,20 @@ class DynamicValueTests(unittest.TestCase):
 class PathBoundaryTests(unittest.TestCase):
     """`path_under`: resolve, then compare by component (§3.2)."""
 
+    #: Five boundaries, and no more: one of each kind the rules of
+    #: §3.2 distinguish. Three single boundaries — an absolute one, and
+    #: two relative ones that differ in what a working directory could
+    #: do with an absolute value (`D-037`): none places `/etc/passwd`
+    #: inside `.scratch`, while `/` places it inside `./etc`. Then two
+    #: sets — the corpus's own, whose parts both decide, and one whose
+    #: second part cannot.
     def setUp(self) -> None:
         self.tmp = path_under("/tmp")
         self.scratch = path_under(".scratch")
+        self.etc = path_under("./etc")
         # stubtool's `clean` grant: every operand under /tmp or .scratch.
         self.clean = path_under("/tmp", ".scratch")
+        self.partly_unknown = path_under("/tmp", "./etc")
 
     def test_a_path_inside_the_boundary(self) -> None:
         # Corpus: `stubtool clean /tmp/x` → silent.
@@ -195,49 +204,65 @@ class PathBoundaryTests(unittest.TestCase):
         # rather than a plain miss (§3.2).
         self.assertEqual(self.tmp.evaluate("tmp/x"), Outcome.UNPROVEN)
 
-    def test_absolute_value_against_relative_boundary_is_unproven(
+    def test_an_absolute_value_no_directory_could_place_inside(
         self,
     ) -> None:
+        # `/etc/passwd` would have to carry a `.scratch` component to
+        # sit inside `<cwd>/.scratch`, and it carries none: the answer
+        # is no for every working directory there is, so reporting
+        # "cannot decide" would say something false about the world
+        # (D-037).
         self.assertEqual(
-            self.scratch.evaluate("/etc/passwd"), Outcome.UNPROVEN
+            self.scratch.evaluate("/etc/passwd"), Outcome.UNSATISFIED
         )
 
-    def test_a_miss_and_an_unproven_boundary_combine_to_unproven(
+    def test_an_absolute_value_some_directory_could_place_inside(
         self,
     ) -> None:
-        # Corpus: `stubtool clean /etc/passwd` → ask. Absolute against
-        # /tmp is a clean miss; absolute against .scratch is unproven;
-        # the boundary set answers with the stricter of the two.
-        self.assertEqual(self.clean.evaluate("/etc/passwd"), Outcome.UNPROVEN)
+        # The other half of the same rule, and the case that separates
+        # "impossible" from "merely unknown": `./etc` resolves to
+        # `etc`, which does occur in `/etc/passwd`, and a working
+        # directory of `/` puts the value inside it.
+        self.assertEqual(self.etc.evaluate("/etc/passwd"), Outcome.UNPROVEN)
 
-    def test_a_mixed_form_boundary_set_never_answers_no(self) -> None:
-        # The consequence of the rule above, pinned deliberately rather
-        # than left to be rediscovered (D-035): with one absolute and
-        # one relative boundary, an absolute value is cross-form to the
-        # second and a relative value to the first, so this matcher can
-        # answer satisfied or unproven and nothing else. It costs a
-        # prompt on a deny rule and nothing at all on a grant, which is
-        # the only place the corpus uses such a set.
-        for value in ("/etc/passwd", "elsewhere/x", "/tmp/../etc"):
+    def test_an_absolute_value_is_never_satisfied_by_a_relative_one(
+        self,
+    ) -> None:
+        # Never satisfied, because the working directory can never be
+        # proven to be the right one — only ruled out, or not.
+        for value in ("/etc", "/etc/passwd", "/home/me/.scratch/x"):
             with self.subTest(value=value):
                 self.assertNotEqual(
-                    self.clean.evaluate(value), Outcome.UNSATISFIED
+                    self.scratch.evaluate(value), Outcome.SATISFIED
                 )
 
-    def test_a_single_form_boundary_can_answer_no(self) -> None:
-        # And the same value against a boundary set it shares a form
-        # with is a clean miss, so "unproven" above is the cross-form
-        # rule at work rather than a matcher that cannot say no.
-        self.assertEqual(self.tmp.evaluate("/etc/passwd"), Outcome.UNSATISFIED)
-
-    def test_one_bad_operand_does_not_borrow_a_good_one_s_answer(
+    def test_a_boundary_set_is_satisfied_by_one_of_its_parts(
         self,
     ) -> None:
-        # Corpus: `stubtool clean /tmp/x /etc/passwd` → ask. The
-        # quantifier is what combines them (see the operand tests);
-        # each value is judged alone here.
+        # Corpus: `stubtool clean /tmp/x` → silent. One boundary
+        # holding is the set holding; the other not applying is not a
+        # reason to withhold.
         self.assertEqual(self.clean.evaluate("/tmp/x"), Outcome.SATISFIED)
-        self.assertEqual(self.clean.evaluate("/etc/passwd"), Outcome.UNPROVEN)
+
+    def test_a_boundary_set_is_unsatisfied_when_every_part_rules_out(
+        self,
+    ) -> None:
+        # Corpus: `stubtool clean /etc/passwd` → ask. Both boundaries
+        # decide against it, so the set does too; the grant fails and
+        # the tool's default asks.
+        self.assertEqual(
+            self.clean.evaluate("/etc/passwd"), Outcome.UNSATISFIED
+        )
+
+    def test_a_boundary_that_cannot_decide_outranks_one_that_did(
+        self,
+    ) -> None:
+        # The third answer, from the same shape: `/tmp` rules
+        # `/etc/passwd` out and `./etc` cannot, so the set cannot
+        # either.
+        self.assertEqual(
+            self.partly_unknown.evaluate("/etc/passwd"), Outcome.UNPROVEN
+        )
 
 
 class GlobBoundaryTests(unittest.TestCase):
