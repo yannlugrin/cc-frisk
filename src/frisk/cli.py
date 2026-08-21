@@ -173,6 +173,19 @@ def explain_command(args: argparse.Namespace) -> int:
     return EXIT_NO_VERDICT
 
 
+#: The three lines that open a printed registry, before the entry
+#: blocks of `Registry.describe`. §9 requires every answer to state
+#: which engine gave it and which configuration it came from — a
+#: registry with no provenance is an answer about an unknown project —
+#: and the generation is what says which contract that file was written
+#: against.
+REGISTRY_HEADER = """\
+{program} {version}
+config: {config}
+generation: {generation}\
+"""
+
+
 def registry_command(args: argparse.Namespace) -> int:
     """`frisk registry` — print the composed registry and its sources.
 

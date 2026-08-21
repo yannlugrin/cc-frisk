@@ -148,15 +148,54 @@ class Registry:
     def describe(self, value: str | None = None) -> str:
         """The effective registry as text an operator can read (§9).
 
-        Every entry with its kind, its layer and the line it was
-        written on, and every rule and grant with the label `amend`'s
-        `drop` takes. With `value`, each matcher additionally carries
-        what it answers for that value, rendered as `[satisfied]`,
-        `[unsatisfied]` or `[unproven]` — bracketed because the three
-        words contain one another and a reader scanning a long registry
-        must not have to tell `satisfied` from `unsatisfied` by the
-        letters in front of it. That annotation is how the three-valued
-        model is inspected before any command line exists to judge.
+        The layout is part of the contract, not a rendering detail: it
+        is what the operator reads at every step's manual test, and a
+        format that drifts makes two sessions describe the same
+        boundary differently. It is a suite of blocks, one per entry,
+        separated by blank lines, ordered by name so two runs of the
+        same configuration compare line by line::
+
+            tool git
+              source: collection:starter starter.py:4
+              aliases: git2
+              options: -C=value
+              flags: -m=value
+              assignments: GIT_PAGER=one of 'cat'
+              default: silent
+              deny [forced push] push
+                reason: A forced push rewrites remote history.
+                source: collection:starter starter.py:7
+              ask [git:ask:commit] commit
+                when: flag --tags
+                reason: A commit is work being recorded.
+                source: collection:starter starter.py:12
+
+        The rules that make it readable back:
+
+        * An entry's header is `<kind> <name>`, its fields are indented
+          two spaces, and a rule's own lines four. Fields absent from a
+          declaration are absent from the block — an empty `aliases:`
+          line is noise in a registry an operator scans.
+        * A rule reads `<verdict> [<label>] <subcommand>`, the label in
+          brackets because it is what `amend`'s `drop` takes. Rules keep
+          their declaration order: the ranking, not the order, decides
+          a verdict (§3.2), but an operator comparing the block against
+          the file they wrote needs the two to run in step.
+        * `source:` is `<layer> <file>:<line>` everywhere it appears —
+          on the entry, and again on any rule that came from elsewhere.
+        * Two sections follow the entries, under their own headers:
+          `benign assignments` and `redirections`.
+        * Everything is ASCII and escaped. A reason is text the
+          configuration supplies, and this output is read by a human
+          deciding what their boundary is: a newline inside a reason
+          must not be able to forge a line of frisk's own output.
+
+        With `value`, every matcher line gains what that matcher
+        answers, as a trailing `[satisfied]`, `[unsatisfied]` or
+        `[unproven]`. Bracketed and suffixed because the three words
+        contain one another: an eye scanning the column must not have
+        to tell `satisfied` from `unsatisfied` by the letters in front
+        of it, and neither must an assertion.
         """
         raise NotImplementedError
 

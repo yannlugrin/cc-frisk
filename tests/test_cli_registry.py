@@ -23,6 +23,7 @@ from pathlib import Path
 
 from test_cli import run
 
+from frisk import __version__
 from frisk.cli import EXIT_CONFIG_ERROR, EXIT_NO_CONFIG
 from frisk.config import CURRENT_GENERATION, config_path
 
@@ -77,6 +78,19 @@ class RegistryCommandTests(unittest.TestCase):
         self.write(CONFIG)
         _, out, _ = run("registry", "--project", str(self.root))
         self.assertIn(str(config_path(self.root)), out)
+
+    def test_the_header_is_three_lines_in_a_fixed_order(self) -> None:
+        # Engine, configuration, generation — which engine answered,
+        # from which file, against which contract. §9 asks for the
+        # first in every context; the other two are what make a
+        # registry an answer about a known project.
+        self.write(CONFIG)
+        _, out, _ = run("registry", "--project", str(self.root))
+        lines = out.splitlines()
+        self.assertEqual(lines[0], f"frisk {__version__}")
+        self.assertEqual(lines[1], f"config: {config_path(self.root)}")
+        self.assertEqual(lines[2], f"generation: {CURRENT_GENERATION}")
+        self.assertEqual(lines[3], "")
 
     def test_an_unconfigured_project_is_unmissable(self) -> None:
         # §5.4: an installed guard silently implying coverage is the

@@ -538,6 +538,127 @@ class CollectionOrderTests(CollectionFixture):
             self.compose(lambda: use("../starter"))
 
 
+class RegistryLayoutTests(CollectionFixture):
+    """The printed layout is contract, not rendering (§3.4, §9).
+
+    It is what the operator reads at every later step's manual test, so
+    a format that drifts makes two sessions describe the same boundary
+    differently. These cases fix the shape; `InspectionTests` fixes
+    what has to appear in it.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.write_collection("gated", GATED)
+
+        def declare() -> None:
+            use("starter")
+            tool(
+                "adeploy",
+                default=ask(reason="Deploys reach production."),
+            )
+
+        self.text = self.compose(declare).describe()
+        self.lines = self.text.splitlines()
+
+    def block_for(self, header: str) -> list[str]:
+        """The lines of one entry block, header excluded."""
+        start = self.lines.index(header)
+        collected = []
+        for line in self.lines[start + 1 :]:
+            if not line.strip():
+                break
+            collected.append(line)
+        return collected
+
+    def test_an_entry_opens_with_its_kind_and_name(self) -> None:
+        self.assertIn("tool git", self.lines)
+        self.assertIn("tool adeploy", self.lines)
+
+    def test_entry_blocks_are_separated_by_blank_lines(self) -> None:
+        self.assertIn("", self.lines[self.lines.index("tool git") + 1 :])
+
+    def test_entries_are_ordered_by_name(self) -> None:
+        # Two runs of one configuration must compare line by line.
+        self.assertLess(
+            self.lines.index("tool adeploy"),
+            self.lines.index("tool git"),
+        )
+
+    def test_an_entry_s_fields_are_indented_two_spaces(self) -> None:
+        for line in self.block_for("tool git"):
+            with self.subTest(line=line):
+                self.assertTrue(line.startswith("  "))
+                self.assertFalse(line.startswith("     "))
+
+    def test_the_source_field_names_layer_file_and_line(self) -> None:
+        self.assertRegex(
+            self.text, r"\n  source: collection:starter starter\.py:\d+"
+        )
+
+    def test_a_rule_reads_verdict_label_subcommand(self) -> None:
+        self.assertIn("  deny [forced push] push", self.lines)
+
+    def test_a_rule_s_own_lines_are_indented_four_spaces(self) -> None:
+        start = self.lines.index("  deny [forced push] push")
+        self.assertEqual(
+            self.lines[start + 1],
+            "    reason: A forced push rewrites remote history.",
+        )
+        self.assertRegex(
+            self.lines[start + 2],
+            r"^    source: collection:starter starter\.py:\d+$",
+        )
+
+    def test_rules_keep_their_declaration_order(self) -> None:
+        # The ranking decides a verdict, not the order (§3.2) — but an
+        # operator comparing this block against the file they wrote
+        # needs the two to run in step.
+        self.assertLess(
+            self.lines.index("  deny [forced push] push"),
+            self.lines.index("  ask [git:ask:commit] commit"),
+        )
+
+    def test_a_field_a_declaration_did_not_use_is_absent(self) -> None:
+        # An empty `aliases:` line is noise in a registry an operator
+        # scans, and noise is what makes a rule easy to miss.
+        self.assertNotIn("  aliases:", self.block_for("tool adeploy"))
+
+    def test_the_two_sections_follow_the_entries(self) -> None:
+        self.assertIn("benign assignments", self.lines)
+        self.assertIn("redirections", self.lines)
+        self.assertLess(
+            self.lines.index("tool git"),
+            self.lines.index("benign assignments"),
+        )
+
+    def test_a_matcher_carries_its_outcome_as_a_suffix(self) -> None:
+        def declare() -> None:
+            tool(
+                "stubtool",
+                rules=[
+                    ask(
+                        "apply",
+                        when=flag("--mode", one_of("destroy")),
+                        reason="A destroying mode.",
+                        label="destroying mode",
+                    )
+                ],
+            )
+
+        described = self.compose(declare).describe(value="destroy")
+        line = next(
+            each
+            for each in described.splitlines()
+            if each.strip().startswith("when:")
+        )
+        self.assertTrue(line.startswith("    when: "))
+        self.assertTrue(line.endswith(" [satisfied]"))
+
+    def test_the_whole_output_is_ascii(self) -> None:
+        self.assertTrue(self.text.isascii())
+
+
 class InspectionTests(CollectionFixture):
     """The effective registry is inspectable, by requirement (§3.4, §9)."""
 
