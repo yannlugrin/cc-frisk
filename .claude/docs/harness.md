@@ -139,31 +139,31 @@ above, mutating settings between runs. Worktree case:
 
 ## On the forge
 
-`.github/workflows/ci.yml` (step `005`) runs the same entry points, two
-parallel jobs, `just setup` then `just check` / `just test`. It carries
-three pins to bump by hand, and the first tracks this workstation:
-`pipx install rust-just==1.45.0`, `python-version: "3.14"`, and the
-`actions/*` major tags. **Bumping `just` locally without bumping the
-workflow leaves CI deciding what `just check` means on a different
-program** — the drift the pin exists to prevent.
+`.github/workflows/ci.yml` (step `005`) runs the same entry points as
+two jobs; its own comments carry why it is shaped as it is. Two facts
+about it are the harness's business rather than the workflow's:
 
-One divergence is deliberate: both guard gates key on
-`refs/backups/bash-guard`, which no clone or default refspec carries, so
-on a runner they report the guard absent by design and pass (invariant 6,
-exit-0 row). Everything else must be identical.
+**Bumping a tool locally without bumping the workflow is the drift the
+pins exist to prevent.** `rust-just==1.45.0` tracks *this workstation*,
+not the newest release (1.58.0 at `005`); `python-version: "3.14"`
+tracks its interpreter. The three `actions/*` uses are pinned by commit
+SHA with the release in a trailing comment, so re-resolving one means
+`gh api repos/<owner>/<repo>/git/ref/tags/<tag>`, following an
+annotated-tag object through `git/tags/<sha>` to its commit.
 
-No scheduled run, so nothing but a dependency edit or GitHub's
-seven-day cache eviction produces a cold `just setup`. The local proxy,
-which is also the fastest way to see what CI sees — a clone receives no
-backup ref, no guard, and nothing gitignored:
+**The clone probe is the local proxy for a runner**, and the fastest way
+to see what CI sees: a clone receives no backup ref, no guard, and
+nothing gitignored.
 
 ```sh
 git clone -q . /path/to/scratch/ci-probe   # scratch, outside this repo
 cd /path/to/scratch/ci-probe && just setup && just verify
 ```
 
-Measured at `005`: green, with `check` reporting the boundary intact
-with no guard present and `test` skipping the selftest.
+Measured green at `005`: `check` reports the boundary intact with no
+guard present — invariant 6's exit-0 row, and note that only
+`check-guard.sh`'s *second* question is skipped there, the governance
+half runs on every machine — and `test` skips the guard's selftest.
 
 ## Path exclusions
 
@@ -186,6 +186,18 @@ broader scanning is a pinned hook away (`gitleaks`, `detect-secrets`).
 
 `.pre-commit-config.yaml`'s header comment carries the families and the
 step each arrives at; the hooks below it name their tools and pins.
+
+The workflow family (`005`) is schema validation, not a workflow linter:
+`check-github-workflows` from `check-jsonschema`, pinned by `rev` like
+every other third-party hook, pure Python against a vendored SchemaStore
+copy with no network at run time. `actionlint` is the tool that would
+say more, and it was rejected here because its pre-commit hook builds
+from Go or runs in Docker — a new system prerequisite for `just setup`,
+on a workstation and on a runner both (`D-027`). Measured at `005`: a
+workflow whose `steps:` key is spelled `step:` is valid YAML, passes
+yamllint, and fails this hook naming the job — which is the class it
+exists for, since GitHub answers a malformed workflow by declining to
+run it rather than by failing.
 
 Two of them are local scripts rather than pinned third-party hooks, both
 `always_run` with `pass_filenames: false`, because what each hunts is

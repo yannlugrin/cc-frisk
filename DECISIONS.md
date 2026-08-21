@@ -1129,8 +1129,8 @@ Two conventions the format depends on:
 - **Decision:** it goes, from the working tree's index and from the
   published history both. This commit removes the 31 files from the
   index and gitignores the path so it cannot return by accident; the
-  history rewrite removes them from all 53 commits, and the operator
-  force-pushes `main` and the five step tags. **The directory itself
+  history rewrite removes them from every commit that carried them, and
+  the operator force-pushes `main` and the five step tags. **The directory itself
   stays on the operator's disk, untouched** — rule 1's never-read
   quarantine is unaffected, and this is a change of what is published,
   not a deletion of the operator's material. Two residues are stated
@@ -1183,3 +1183,52 @@ Two conventions the format depends on:
   *Strip the corpus too* — never on the table: later steps consume it,
   and `PLAN.md` `005` fixes it in place until parity.
 - **Approved by:** operator, 2026-08-21.
+
+### D-027 — The workflow family is schema validation; the actions are pinned by commit
+
+- **Date:** 2026-08-21
+- **Step:** `005`
+- **Context:** `.github/workflows/ci.yml` is the first artifact of a new
+  class, and rule 2 binds twice on it: a check family arrives with the
+  first artifact of its class, and third-party tools arrive pinned with
+  their version or digest recorded. The step's first draft satisfied
+  neither. `yamllint --strict` proved the file was YAML, which cannot
+  tell a workflow from any other mapping; and the three `actions/*` uses
+  carried major tags — `@v4`, `@v5` — which their publisher retargets on
+  every point release, so what CI ran would have been whatever the tag
+  resolved to that morning, recorded by no diff in this repository. The
+  workflow's own comment argued against exactly that for `just` while
+  doing it for the actions.
+- **Decision:** two parts, one step. **The family** is
+  `check-github-workflows` from `check-jsonschema`, pinned by `rev`
+  0.38.0 like every other third-party hook: schema validation against a
+  vendored SchemaStore copy, pure Python, no network at run time.
+  `actionlint` says more and was rejected on its prerequisite — its
+  pre-commit hook builds from Go or runs in Docker, which would put a
+  new system requirement in front of `just setup` on a workstation and
+  on a runner both. What the family buys was measured rather than
+  assumed: a workflow whose `steps:` key is spelled `step:` is valid
+  YAML, passes yamllint, and fails this hook naming the job. That is the
+  class it exists for — GitHub answers a malformed workflow by declining
+  to run it, not by failing loudly. **The pins** are commit SHAs with
+  the release in a trailing comment, and they moved to the current
+  majors (`checkout` v7.0.1, `setup-python` v7.0.0, `cache` v6.1.0)
+  rather than the `@v4`/`@v5` the house conventions carried, which are
+  several majors behind. `.claude/docs/harness.md` carries the
+  re-resolution recipe.
+- **Alternatives considered:** *`actionlint`* — the tool that would
+  catch more, including some of what this step's review caught by
+  reading; rejected on the Go/Docker prerequisite alone, and revisitable
+  the day a pure-binary hook exists. *No family until a second workflow
+  exists* — rejected: `.pre-commit-config.yaml`'s own stated policy is
+  that families arrive with the first artifact of their class, and a
+  silent non-loading failure is precisely what this repository gates
+  elsewhere. *Major tags with a logged exception* — defensible for
+  GitHub-owned actions, rejected because every other third-party tool
+  here is pinned exactly and a documented "pin" that floats is worse
+  than an honest float. *Dependabot to bump the SHAs* — not rejected,
+  simply not built at `005`: a bump today is one `gh api` read and an
+  edit, and machinery arrives at the moment of need (rule 11).
+- **Approved by:** implementer (within latitude: rule 2's check-family
+  and pinning clauses, and rule 11's boring-standard-tool test; which
+  tool implements a required family is a workflow choice left open).

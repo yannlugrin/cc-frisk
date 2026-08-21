@@ -22,7 +22,7 @@ operator.
 [![ci](https://github.com/yannlugrin/cc-frisk/actions/workflows/ci.yml/badge.svg)](https://github.com/yannlugrin/cc-frisk/actions/workflows/ci.yml)
 
 **Status: public, not yet installable.** The repository is readable and
-its CI runs, but nothing here installs as a plugin yet — the install
+carries its CI, but nothing here installs as a plugin yet — the install
 channel opens later. `PLAN.md` is the authority on where the work
 stands.
 
@@ -36,7 +36,7 @@ stands.
 | `CLAUDE.md` | Standing instructions for the implementing AI. Directive, and addressed to it alone — not a description of the project. |
 | `justfile`, `scripts/` | The documented entry points: `just setup`, `just check [all\|changed]`, `just test`, `just verify`. The scripts are thin glue; the checks themselves are configured, not written. The one check written here rather than configured is `scripts/check_frontmatter.py`, a few lines asserting that every skill and agent definition still loads. |
 | `.pre-commit-config.yaml`, `requirements.txt`, `.yamllint.yml`, `.pymarkdown.json` | The pinned toolchain and its configuration. The same checks run from the commit hook and from `just check`, so the two cannot disagree. |
-| `.github/workflows/` | Continuous integration. It runs the same entry points as the commit hook and `just verify` — `just check` and `just test`, one job each — so CI and the local runners cannot disagree about what "green" means. The one deliberate exception is the guard gate below, which is loud locally and inert on a runner that never receives it. |
+| `.github/workflows/` | Continuous integration. It runs the same entry points as the commit hook and `just verify` — `just check` and `just test`, one job each — so CI and the local runners cannot disagree about what "green" means. The one deliberate exception is half of the guard gate below: whether the settings still describe an intact boundary is asked everywhere, while whether the guard itself answers is asked only where the guard exists. |
 | `.claude/settings.json` | The permission baseline for development *in this repository* — not part of the product, and not what frisk will ship. It sets the permission mode, allows the tools a `PreToolUse` guard then judges, denies a short list of acts that cannot be undone, and registers the guard itself. The guard (`.claude/hooks/bash_guard.py`) is machine-local, deliberately untracked, and absent from every clone; the registration is written so that its absence costs nothing. **Read it as this repository's own development baseline, not as a template to copy:** the allow list is broad precisely because a guard judges what it allows, so in a clone — where that guard is absent — it grants more than it appears to. `.claude/docs/guard-record.md` explains the arrangement. |
 | `.claude/docs/` | Working notes for the implementing AI: the measured behaviour of the harness, of that guard, and of the subagent and skill machinery, each with its version and a recipe to re-measure it. Notes, not deliverables — `docs/` will hold the documentation for humans (§12). |
 | `.claude/skills/`, `.claude/agents/` | The implementing AI's own workflow tooling: the session rituals it invokes as slash commands, and the reviewer and maintenance agents it spawns. Development scaffolding for this repository — not the `frisk` skill the product ships (§10), which lands later under its own plugin tree. |

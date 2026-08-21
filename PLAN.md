@@ -324,8 +324,10 @@ Claude Code), §11 (one codebase, two doors).
   **pinned to the committed floor** — syntax and type checking — so the
   floor is checked, not asserted. The type checker is a toolchain
   addition the specification does not ask for; it is taken from the house
-  conventions in `.claude/refs/infra-conventions/` and logged as a
-  within-latitude workflow decision at this step. TOML's parse check
+  conventions in `.claude/refs/infra-conventions/` — machine-local since
+  `005` and absent from clones (`D-026`), and taken as shape, never as
+  content — and logged as a within-latitude workflow decision at this
+  step. TOML's parse check
   joins with `pyproject.toml`.
 - `frisk --version` and a `frisk explain <command>` that parses nothing
   yet and says so.

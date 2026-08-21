@@ -104,7 +104,7 @@ that applies to what you changed passes, through the repository's
 documented commands: `just check [scope]` — is what is committed here
 well-formed? Syntax, lint and formatting over the whole working tree,
 **untracked files included and gitignored paths excluded**, with
-`.claude/spec-work/` and `.claude/refs/` excluded by path; the narrowed
+`.claude/refs/` excluded by path; the narrowed
 what-changed form is a scope argument to the same command. `just test` —
 is the implementation right? Fixtures and expectations proving the
 behaviour **this repository itself ships, the cases that must fail
@@ -187,8 +187,9 @@ parity yardstick — read before designing any engine suite and before
 declaring any §4 behaviour done (rulings, not design: where one
 conflicts with the specification, the specification wins and the
 conflict is reported) — and `.claude/refs/infra-conventions/`, the house
-harness shape — read before writing harness, lint configuration or CI,
-taking the shape, not the content.
+harness shape, machine-local since `005` (`D-026`) — read before writing
+harness, lint configuration or CI, taking the shape, **never the
+content**: its prose is another project's.
 **Your own tooling lives in `.claude/skills/` and `.claude/agents/`**,
 created when it earns its place and logged per rule 4: a ritual repeated
 every step is a natural skill (skills define slash commands), while work
@@ -336,8 +337,8 @@ outcomes.
 own tree, whose paths `PLAN.md` `021` confirms against the installed
 platform rather than assuming; `docs/` is documentation for humans
 (§12). Under `.claude/`: `settings.json` is the permission baseline, and
-`docs/`, `skills/`, `agents/`, `hooks/`, `refs/` and `spec-work/` are
-what rules 1 and 3 make them.
+`docs/`, `skills/`, `agents/`, `hooks/` and `refs/` are what rules 1 and
+3 make them; `spec-work/` is machine-local since `005` (`D-025`).
 
 ## Current state
 
@@ -350,8 +351,8 @@ what rules 1 and 3 make them.
   guard is live and untracked. The workflow tooling is complete — four
   skills, five agents — and the handoff templates are gone. `origin` is
   `github.com/yannlugrin/cc-frisk`, **public**, and no backup remote
-  exists; CI runs the same two entry points on every push. **Every write under `.claude/` prompts** — no setting removes
-  it.
+  exists. CI is committed, unproven until the first authorised push.
+  **Every write under `.claude/` prompts** — no setting removes it.
 - **Open obligations:** `PLAN.md` §14 carries eleven open questions,
   each answered at the step that needs it. The sentinel may be re-staged
   before parity if `D-007`'s residue proves uncomfortable. `D-010` was

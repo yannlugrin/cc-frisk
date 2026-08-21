@@ -21,8 +21,10 @@
 # letting the next `git commit -a` sweep the file into an unrelated
 # commit.
 #
-# Path exclusions (.claude/spec-work/, .claude/refs/) live in
-# .pre-commit-config.yaml, in one place, so this script holds no policy.
+# The one path exclusion (.claude/refs/) lives in
+# .pre-commit-config.yaml, so this script holds no policy; gitignored
+# paths — .claude/spec-work/ and .claude/refs/infra-conventions/ since
+# step 005 — drop out of the enumeration below for free.
 #
 # This command asserts and never repairs. Some hooks are fixers, and the
 # commit hook is where they are allowed to write; here their edits are

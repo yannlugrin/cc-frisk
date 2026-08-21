@@ -13,7 +13,8 @@
 # file this repository ships, so Python *well-formedness* joined in the
 # same breath — it parses, and it carries no debugger left behind.
 # Python style and TOML still join at step 006 with the engine, where
-# there is a body of code for a style to be about.
+# there is a body of code for a style to be about. Workflow
+# well-formedness joined at step 005 with the first workflow.
 ---
 # .claude/refs/ is supplied material whose authority lives at its source
 # (CLAUDE.md rule 3), so nothing here lints it. Only behavior-corpus.md
@@ -93,6 +94,19 @@ repos:
     hooks:
       - id: pymarkdown
         args: [--config, .pymarkdown.json, scan]
+
+  # Workflow well-formedness, arriving with the first workflow (D-027).
+  # yamllint above proves the file is YAML; it cannot tell a workflow
+  # from any other mapping, and a file that is valid YAML but not a
+  # valid workflow does not fail loudly — GitHub simply declines to run
+  # it, which is the same silent non-loading the two local hooks below
+  # exist to catch. Schema validation against the vendored SchemaStore
+  # copy: pure Python, no network at run time, and no Go or Docker
+  # prerequisite, which is what ruled out actionlint here.
+  - repo: https://github.com/python-jsonschema/check-jsonschema
+    rev: 0.38.0
+    hooks:
+      - id: check-github-workflows
 
   # Two local scripts, two hooks, one subject: the things that break
   # silently. Nothing standard asks what a Claude Code settings file must
