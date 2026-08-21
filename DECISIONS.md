@@ -661,3 +661,37 @@ Detail in git history.
   but not clone-delivered; offered and not taken.
 - **Approved by:** operator, 2026-08-21, choosing the branch after the
   publication and clone-delivery consequences were put to them twice.
+
+### D-029 — The interpreter floor stands at 3.9; the 3.6 platforms are documented, not covered
+
+- **Date:** 2026-08-21
+- **Step:** `006`
+- **Context:** open-fact inventory item 12 (§2.1, §3.1). The floor is a
+  safety property, not a convenience one — an engine the shipped
+  `python3` cannot parse fails open — and §3.1 ordered its table
+  re-verified before the floor was committed. The table cannot be
+  measured from this machine, so the operator authorised the
+  distribution-data lookups.
+- **Decision:** the floor is **3.9**. Verified 2026-08-21 from vendor
+  documentation: macOS 26 / Xcode command-line tools 26.x ship 3.9.6;
+  RHEL 9 ships 3.9 "for the whole life cycle of RHEL 9"; Amazon Linux
+  2023's `/usr/bin/python3` is "always Python 3.9"; Ubuntu 22.04/24.04/
+  26.04 ship 3.10/3.12/3.14; Debian 12/13 ship 3.11/3.13; SLES 16 ships
+  3.13. §3.1's parenthetical claim — "every current LTS distribution" —
+  was false: **SLES 15 SP7 / openSUSE Leap 15 and RHEL 8 ship 3.6** as
+  the system `python3`, and RHEL 8 is in maintenance until May 2029. The
+  amendment names them as a documented limitation instead: there the
+  engine does not parse, the hook fails open, and only the sentinel
+  (§7.4) says so.
+- **Alternatives considered:** *dropping the floor to 3.6* to cover
+  those two — rejected by the operator: §3.1 forbids a dual path, so it
+  would cost the engine every 3.7–3.9 feature permanently, for two
+  platforms the specification never named and whose vendors ship a
+  newer Python beside the system one. *Narrowing the parenthetical to
+  the platforms actually verified, with no limitation text* — smallest
+  amendment, rejected because a reader cannot tell the claim shrank.
+  *Recording the table unmeasured* — §2.1's pre-commitment would then
+  have driven the floor down; not needed once the lookups were
+  authorised.
+- **Approved by:** operator, 2026-08-21, both for the lookups and for
+  the floor-plus-limitation shape of the amendment.

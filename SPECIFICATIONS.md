@@ -238,7 +238,9 @@ place:
 9. Settings deny/ask enforcement under each permissive mode (§6.1).
 10. Prefix-rule word-boundary behavior (§6.1 rule 1).
 11. The platform's built-in read-only command handling (§6.1 rule 1).
-12. The Python-floor table of OS-shipped interpreters (§3.1).
+12. The Python-floor table of OS-shipped interpreters (§3.1) —
+    **settled** at implementation; the floor stands at 3.9 and §3.1
+    carries the outcome.
 13. Whether the Bash tool persists shell state across tool calls
     (§4.4 — decides the reach of the export blind spot).
 
@@ -390,11 +392,19 @@ against a millisecond budget. The operator's `python3` is whatever their
 OS shipped —
 and a floor guessed too high fails in the worst direction, since an engine
 the shipped interpreter cannot parse fails open (§2.1) and only the
-optional sentinel would notice. The floor should be **3.9** (what current
-macOS command-line tools, RHEL 9 and every current LTS distribution
-ship, as researched at this document's date); the implementation
-re-verifies that table before committing to it and may move the floor
-with reason.
+optional sentinel would notice. The floor is **3.9**, re-verified at
+implementation before it was committed: the macOS command-line tools
+ship 3.9.6, RHEL 9 and Amazon Linux 2023 pin `/usr/bin/python3` to 3.9
+for their whole life cycle, and every current Debian and Ubuntu LTS
+ships 3.10 or later. Two current enterprise platforms sit **below** the
+floor, named here rather than left inside a claim about "every LTS":
+SLES 15 / openSUSE Leap 15 and RHEL 8 ship 3.6 as the system `python3`.
+There the engine does not parse, the hook fails open, and only the
+optional sentinel (§7.4) says so — a limitation frisk documents rather
+than covers, since covering it would forbid the engine every 3.7–3.9
+feature (a dual path being excluded above) for platforms whose own
+vendors ship a newer Python beside the system one. The verification
+record (§12) carries the table, its date and its method.
 The parsing technique itself is implementation-internal: nothing outside
 the engine may depend on how a command line is analyzed, so a stronger
 parser can replace the initial one without touching config or contract.
