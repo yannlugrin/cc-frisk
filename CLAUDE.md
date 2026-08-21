@@ -345,41 +345,35 @@ platform rather than assuming; `docs/` is documentation for humans
 - **Current step:** none — `005` closed 2026-08-21, and Milestone 1 with
   it. The state review and the compaction pass are its close ritual.
 - **Next step:** `006` — package, interpreter floor, CLI skeleton.
-- **World state:** the harness is live and green (`just setup`
-  bootstraps it), with the same checks in the commit hook, which now
-  also gate the boundary and the governance frontmatter. The permission
-  baseline is in `.claude/settings.json`, measured and unchanged; the
-  guard is live and untracked. The workflow tooling is complete — four
-  skills, five agents — and the handoff templates are gone. `origin` is
+- **World state:** the harness (`just setup/check/test/verify`) runs the
+  same checks locally, in the commit hook and in CI, green. The
+  permission boundary — guard plus `.claude/settings.json` — is live,
+  untracked and unchanged since `002`. `origin` is
   `github.com/yannlugrin/cc-frisk`, **public**, and no backup remote
-  exists. CI runs both entry points on the forge, green, with Dependabot
-  holding its action pins current.
-  **Every write under `.claude/` prompts** — no setting removes it.
+  exists yet. **Every write under `.claude/` prompts** — no setting
+  removes it.
 - **Open obligations:** `PLAN.md` §14 carries eleven open questions,
-  each answered at the step that needs it. The sentinel may be re-staged
-  before parity if `D-007`'s residue proves uncomfortable. `D-010` was
-  logged after the fact rather than put to the operator before it was
-  built, and is reversible on request. The publish-or-strip question is
-  ruled: both directories are stripped (`D-025`, `D-026`), and the
-  operator's own rewrite and force-push are **still owed** — until they
-  run, the published history carries what the ruling removes.
-  `.claude/settings.json` still publishes an allow list only as narrow
-  as the guard no clone receives (`001`). `D-024` is resolved: the
-  budget stands and the gap closes in the compaction pass below.
-- **`.claude/docs/` pointers:** `harness.md` — the measured behaviour of
-  `just check`/`test`/`verify` and the commit hooks, with re-measure
-  recipes, and what CI pins; read before changing the `justfile`,
-  `scripts/`, `.pre-commit-config.yaml`, `.github/workflows/` or any
-  linter config. `guard-record.md` —
-  the quarantined guard's restore recipe, commands, reach, blind spots
-  and platform probes with the liveness triple; read before touching
-  `.claude/settings.json` or anything under `.claude/hooks/`, **and
-  before designing any probe of a permission mechanism**. `subagents.md`
-  — what a subagent's context carries and how stale it is, what skill
-  and agent frontmatter binds, when a definition loads, and the house
-  policy every agent definition leaves out; read before
-  writing or changing anything under `.claude/skills/` or
-  `.claude/agents/`, or relying on a subagent to know a rule.
+  each answered at the step that needs it. The sentinel may be
+  re-staged before parity if `D-007`'s residue proves uncomfortable;
+  `D-010` stays reversible on request. `.claude/spec-work/` and
+  `.claude/refs/infra-conventions/` are stripped from tracking
+  (`D-025`, `D-026`); the operator's own history rewrite and force-push
+  of `main` and the step tags are **still owed**. `.claude/settings.json`
+  still publishes an allow list only as narrow as the guard no clone
+  receives (`001`). `D-024`'s budget stands at 390/~365; the compaction
+  reached 381, so the handover figure is still 16 lines away and the
+  trim-or-raise choice returns at `006`'s close.
+- **`.claude/docs/` pointers:** `harness.md` — harness behaviour,
+  re-measure recipes, what CI pins; read before touching the
+  `justfile`, `scripts/`, `.pre-commit-config.yaml`,
+  `.github/workflows/` or any linter config. `guard-record.md` — the
+  guard's restore recipe, reach, blind spots and platform probes; read
+  before touching `.claude/settings.json` or `.claude/hooks/`, **and
+  before designing any probe of a permission mechanism**.
+  `subagents.md` — what a subagent's context carries, what skill/agent
+  frontmatter binds, when a definition loads, and the house policy
+  every agent leaves out; read before touching `.claude/skills/` or
+  `.claude/agents/`, or trusting a subagent on a rule.
 
 *A closed list of item kinds — current and next step, live world-state,
 open obligations, `.claude/docs/` pointers — and nothing else. A closed

@@ -830,6 +830,11 @@ same-configuration), §8.2 (the CI pin), §13 (what first exposure owes).
   recorded in `.claude/docs/` with version, method and re-measure recipe.
   `018`'s hook path is settled by the same probe. JSON parse checks
   extend to both manifests once their paths are known.
+- **`D-021`'s revisit**: `claude plugin validate --strict` becomes
+  necessary here for the plugin's own manifest rather than optional dev
+  tooling. Re-measure its coverage against `.claude/docs/harness.md`'s
+  table and decide whether `scripts/check_frontmatter.py`'s duplicated
+  parse diagnostics retire.
 - **The plugin-side CLI invocation mechanism**, stated and confirmed
   build-free: §2.2 forbids the plugin from requiring dependency
   installation, so `006`'s console entry point cannot serve here. The
