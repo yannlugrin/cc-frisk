@@ -1,32 +1,16 @@
-# The pinned toolchain, installed by `just setup` into ./.venv.
+# The pinned toolchain, installed into ./.venv by `just setup`.
 #
-# Every *third-party linter* is a pre-commit hook pinned by `rev` in
-# .pre-commit-config.yaml, in its own isolated environment — one pin per
-# tool, in one place, and none of them shares this interpreter. What
-# lives here is the hook runner itself, plus what this repository's own
-# checks import. `just` itself is a system tool, installed per
-# workstation like python3 and git, so `just setup` is the entry point
-# with nothing before it.
+# Third-party linters are not here: each is a pre-commit hook pinned by
+# `rev` in .pre-commit-config.yaml, in its own environment. What lives
+# here is the hook runner, what this repository's own checks import, and
+# the build backend pyproject.toml names.
 pre-commit==4.4.0
 
-# PyYAML, for scripts/check_frontmatter.py. Our own checks are not
-# third-party linters and cannot be pinned by a `rev`: a skill or agent
-# whose frontmatter does not parse never loads and never complains, and
-# answering that needs a real YAML parser rather than a hand-rolled one
-# (rule 11: the boring standard tool). It shares this interpreter
-# because `.venv` is guaranteed wherever the checks run — pre-commit
-# itself lives there.
+# scripts/check_frontmatter.py (D-018).
 PyYAML==6.0.3
 
-# setuptools, the build backend pyproject.toml names. Pinned and
-# installed here so that `pip install --no-build-isolation -e .` in
-# scripts/setup.sh builds the package from what this file pins, rather
-# than fetching an unpinned backend from the network on every setup.
-# The engine itself still has zero dependencies (§3.1): this is a
-# build-time tool for the repository-installable door, and nothing the
-# plugin needs — that door is build-free by requirement (§2.2).
-#
-# Not the newest release: setuptools 83 and later require Python 3.10,
-# above the engine's floor, so this pin is the last one a machine at
-# the floor could also install.
+# Build backend, for the editable install in scripts/setup.sh. Pinned so
+# --no-build-isolation has something to build with; not the newest
+# release, because setuptools 83+ requires Python 3.10, above the
+# engine's floor (D-029).
 setuptools==82.0.1

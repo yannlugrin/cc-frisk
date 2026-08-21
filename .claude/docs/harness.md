@@ -25,9 +25,10 @@ names, and with build isolation on, pip would fetch an unpinned copy on
 every setup. It gives `.venv/bin/frisk`, the console script of §8.2's
 repository-installable door, so a broken `pyproject.toml` fails at
 every setup rather than at an adopter's install. The script itself is
-*run* in CI, where every matrix row installs the package and calls it; nothing local executes it, so a `main` that grew a required
-argument would be caught there and by the `python3 -m frisk` tests, not
-by `just check`. Development needs a higher floor than the engine, and
+*run* in CI, where every matrix row installs the package and calls it;
+nothing local executes it, so a `main` that grew a required argument
+would be caught there and by the `python3 -m frisk` tests, not by
+`just check`. Development needs a higher floor than the engine, and
 this is where: PEP 660 editable installs need pip 21.3, newer than the
 pip a 3.9 platform ships. The *engine* still has zero dependencies;
 `tests/test_packaging.py` fails if an import escapes the standard
@@ -210,8 +211,8 @@ broader scanning is a pinned hook away (`gitleaks`, `detect-secrets`).
 
 ## Check families
 
-`.pre-commit-config.yaml`'s header comment carries the families and the
-step each arrives at; the hooks below it name their tools and pins.
+`.pre-commit-config.yaml` names the tools and their pins; which step
+each family arrived at is git history, not a list to maintain.
 
 ### The Python family and the interpreter floor (`006`)
 
