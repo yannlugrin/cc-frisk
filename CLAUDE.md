@@ -340,9 +340,8 @@ platform rather than assuming; `docs/` is documentation for humans
 
 ## Current state
 
-- **Current step:** none — `005` closed 2026-08-21, and Milestone 1 with
-  it. The state review and the compaction pass are its close ritual.
-- **Next step:** `006` — package, interpreter floor, CLI skeleton.
+- **Current step:** `006` — package, interpreter floor, CLI skeleton.
+- **Next step:** `007` — declarations, matchers, layering.
 - **World state:** the harness (`just setup/check/test/verify`) runs the
   same checks locally, in the commit hook and in CI, green. The
   permission boundary — guard plus `.claude/settings.json` — is live,

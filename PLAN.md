@@ -232,7 +232,7 @@ review. The behavior corpus (`.claude/refs/behavior-corpus.md`) is read
 before designing any suite in this milestone and before declaring any §4
 behaviour done.
 
-### 006 — Package, interpreter floor, CLI skeleton — `pending`
+### 006 — Package, interpreter floor, CLI skeleton — `in progress`
 
 **Objective.** A Python package that installs from the repository, a
 committed interpreter floor that is a *checked* claim, and a CLI shell
