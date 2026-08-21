@@ -147,7 +147,9 @@ about it are the harness's business rather than the workflow's:
 pins exist to prevent.** `rust-just==1.45.0` tracks *this workstation*,
 not the newest release (1.58.0 at `005`); `python-version: "3.14"`
 tracks its interpreter. The three `actions/*` uses are pinned by commit
-SHA with the release in a trailing comment, so re-resolving one means
+SHA with the release in a trailing comment, and
+`.github/dependabot.yml` — not a session — is what bumps them (`D-027`).
+By hand, if one is ever needed before the bot gets to it:
 `gh api repos/<owner>/<repo>/git/ref/tags/<tag>`, following an
 annotated-tag object through `git/tags/<sha>` to its commit.
 
@@ -188,7 +190,8 @@ broader scanning is a pinned hook away (`gitleaks`, `detect-secrets`).
 step each arrives at; the hooks below it name their tools and pins.
 
 The workflow family (`005`) is schema validation, not a workflow linter:
-`check-github-workflows` from `check-jsonschema`, pinned by `rev` like
+`check-github-workflows` and `check-dependabot` from `check-jsonschema`,
+pinned by `rev` like
 every other third-party hook, pure Python against a vendored SchemaStore
 copy with no network at run time. `actionlint` is the tool that would
 say more, and it was rejected here because its pre-commit hook builds
@@ -197,7 +200,10 @@ on a workstation and on a runner both (`D-027`). Measured at `005`: a
 workflow whose `steps:` key is spelled `step:` is valid YAML, passes
 yamllint, and fails this hook naming the job — which is the class it
 exists for, since GitHub answers a malformed workflow by declining to
-run it rather than by failing.
+run it rather than by failing. `check-dependabot` answers the same
+question for the bot's own config: `github-action` for `github-actions`
+fails the hook, and would otherwise show up only as updates that never
+arrive.
 
 Two of them are local scripts rather than pinned third-party hooks, both
 `always_run` with `pass_filenames: false`, because what each hunts is

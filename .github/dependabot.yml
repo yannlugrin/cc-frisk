@@ -1,0 +1,33 @@
+# The maintenance half of ci.yml's action pins (D-027).
+#
+# Those three `uses:` lines are commit SHAs, which is the only spelling
+# that says exactly what will run — and the only one a human cannot read.
+# A digest nobody can see and nothing bumps does not age into safety; it
+# ages into an action several releases behind while the file still looks
+# deliberate. This is what bumps it, and it rewrites the trailing version
+# comment along with the SHA, so the file stays legible.
+#
+# github-actions only, deliberately. requirements.txt and the `rev:` pins
+# in .pre-commit-config.yaml are readable versions attached to measured
+# facts — .claude/docs/harness.md records what was measured on which
+# version — so bumping one means re-measuring, which is a step's work and
+# not a bot's. The SHAs are the one place where the pin is opaque.
+#
+# This is not the scheduled workflow ci.yml declines to have: nothing
+# here runs the repository's checks on a timer. It opens a pull request,
+# which CI then verifies through the `pull_request` trigger that already
+# exists.
+---
+version: 2
+
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    # Maintenance belonging to no step, which is what CLAUDE.md rule 6
+    # spells `meta: …`. Dependabot renders this as "meta: bump …".
+    commit-message:
+      prefix: "meta"
+    open-pull-requests-limit: 3

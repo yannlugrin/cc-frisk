@@ -1214,8 +1214,21 @@ Two conventions the format depends on:
   the release in a trailing comment, and they moved to the current
   majors (`checkout` v7.0.1, `setup-python` v7.0.0, `cache` v6.1.0)
   rather than the `@v4`/`@v5` the house conventions carried, which are
-  several majors behind. `.claude/docs/harness.md` carries the
-  re-resolution recipe.
+  several majors behind. **A SHA pin is only half a decision, and the
+  operator supplied the other half**: `.github/dependabot.yml` bumps
+  those three and rewrites the trailing version comment with them,
+  because a digest nobody can read and nothing bumps does not age into
+  safety — it ages into an action several releases behind a file that
+  still looks deliberate. It is scoped to `github-actions` alone:
+  `requirements.txt` and the `rev:` pins are readable versions attached
+  to measurements in `.claude/docs/harness.md`, so bumping one means
+  re-measuring, which is a step's work and not a bot's. Its schedule is
+  not the scheduled workflow `ci.yml` declines to have — it opens a pull
+  request, which the existing `pull_request` trigger then verifies.
+  `check-dependabot` joins the family in the same breath, on the same
+  first-artifact rule; measured, it fails on `github-action` for
+  `github-actions`, a one-character typo whose only other symptom would
+  be a bot that silently never runs.
 - **Alternatives considered:** *`actionlint`* — the tool that would
   catch more, including some of what this step's review caught by
   reading; rejected on the Go/Docker prerequisite alone, and revisitable
@@ -1226,9 +1239,14 @@ Two conventions the format depends on:
   elsewhere. *Major tags with a logged exception* — defensible for
   GitHub-owned actions, rejected because every other third-party tool
   here is pinned exactly and a documented "pin" that floats is worse
-  than an honest float. *Dependabot to bump the SHAs* — not rejected,
-  simply not built at `005`: a bump today is one `gh api` read and an
-  edit, and machinery arrives at the moment of need (rule 11).
-- **Approved by:** implementer (within latitude: rule 2's check-family
-  and pinning clauses, and rule 11's boring-standard-tool test; which
-  tool implements a required family is a workflow choice left open).
+  than an honest float. *SHA pins with no bump mechanism* — what this
+  entry first proposed, and wrong: the operator's objection is that the
+  pin and the bot are one decision, not two, and a pin without a bot is
+  a maintenance burden with no maintainer. *Dependabot over
+  `requirements.txt` and the hook `rev:`s too* — rejected above: those
+  bumps invalidate recorded measurements and belong to a step.
+- **Approved by:** operator, 2026-08-21, for the pinning-and-Dependabot
+  pairing, which they required; implementer for the rest (within
+  latitude: rule 2's check-family and pinning clauses, and rule 11's
+  boring-standard-tool test — which tool implements a required family is
+  a workflow choice left open).

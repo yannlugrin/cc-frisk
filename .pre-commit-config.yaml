@@ -107,6 +107,7 @@ repos:
     rev: 0.38.0
     hooks:
       - id: check-github-workflows
+      - id: check-dependabot
 
   # Two local scripts, two hooks, one subject: the things that break
   # silently. Nothing standard asks what a Claude Code settings file must
