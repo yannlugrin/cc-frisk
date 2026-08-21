@@ -25,4 +25,8 @@ PyYAML==6.0.3
 # The engine itself still has zero dependencies (§3.1): this is a
 # build-time tool for the repository-installable door, and nothing the
 # plugin needs — that door is build-free by requirement (§2.2).
-setuptools==84.0.0
+#
+# Not the newest release: setuptools 83 and later require Python 3.10,
+# above the engine's floor, so this pin is the last one a machine at
+# the floor could also install.
+setuptools==82.0.1

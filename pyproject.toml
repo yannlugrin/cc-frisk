@@ -8,7 +8,14 @@
 # decided at PLAN.md 021. Until then, `python3 -m frisk` is that door.
 
 [build-system]
-requires = ["setuptools>=84"]
+# The backend's own floor must not sit above the engine's: setuptools
+# 83 and later require Python 3.10, so pinning one of those here would
+# leave `pip install .` unresolvable on exactly the platforms the floor
+# exists for (RHEL 9, Amazon Linux 2023, the macOS command-line tools).
+# 77 is where the PEP 639 `license` expression below became supported.
+# The floor job in CI installs this package on 3.9, so the constraint is
+# checked rather than reasoned about.
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -18,14 +25,6 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = "MIT"
 authors = [{ name = "Yann Lugrin" }]
-keywords = ["claude-code", "permissions", "hook", "bash", "security"]
-classifiers = [
-  "Development Status :: 3 - Alpha",
-  "Environment :: Console",
-  "Intended Audience :: Developers",
-  "Programming Language :: Python :: 3 :: Only",
-  "Topic :: Security",
-]
 
 # Zero dependencies is a requirement, not an accident (§3.1): the audit
 # surface of code in the permission path must equal the repository, and

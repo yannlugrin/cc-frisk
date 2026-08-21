@@ -20,7 +20,8 @@ and both are requirements of `SPECIFICATIONS.md` §3.1:
 __all__ = ["__version__"]
 
 #: The engine's version, and the plugin's (§11: one codebase, two
-#: doors, the same version). Read from `pyproject.toml` at build time,
-#: so this assignment is the single source — the CLI reports it without
-#: needing the package to be installed, which the plugin door requires.
+#: doors, the same version). This assignment is the single source:
+#: `pyproject.toml` reads it at build time, and the CLI reports it
+#: without the package being installed at all, which the plugin door
+#: requires. There is nothing to bump anywhere else.
 __version__ = "0.1.0"

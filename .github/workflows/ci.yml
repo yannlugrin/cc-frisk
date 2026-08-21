@@ -104,3 +104,13 @@ jobs:
 
       - name: Run just test
         run: just test
+
+      # §8.2's repository-installable door, on the floor: a project's
+      # CI installs frisk exactly this way. It also holds the build
+      # backend honest — setuptools 83 and later require 3.10, so a
+      # pin that drifted above the floor would fail here rather than on
+      # an adopter's runner.
+      - name: Install the engine the way a project's CI would
+        run: |
+          python3 -m pip install .
+          frisk --version
