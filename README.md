@@ -41,10 +41,11 @@ stands.
 | `.claude/docs/` | Working notes for the implementing AI: the measured behaviour of the harness, of that guard, and of the subagent and skill machinery, each with its version and a recipe to re-measure it. Notes, not deliverables — `docs/` will hold the documentation for humans (§12). |
 | `.claude/skills/`, `.claude/agents/` | The implementing AI's own workflow tooling: the session rituals it invokes as slash commands, and the reviewer and maintenance agents it spawns. Development scaffolding for this repository — not the `frisk` skill the product ships (§10), which lands later under its own plugin tree. |
 | `.claude/refs/` | Material supplied by the project owner as input: the adjudicated behavior corpus, the parity yardstick of §8.1. Read-only; its authority lives at its source. |
+| `docs/` | Documentation for humans (§12), written as the work reaches it. It holds the platform verification record so far: what the implementation measured about the platforms frisk runs on, when, and with what method. |
 
-Directories that appear as the implementation proceeds — `src/frisk/`,
-`tests/`, `hooks/`, `skills/frisk/`, `.claude-plugin/`, `collections/`,
-`docs/` — are described in `PLAN.md` at the step that creates them.
+Directories that appear as the implementation proceeds — `hooks/`,
+`skills/frisk/`, `.claude-plugin/`, `collections/` — are described in
+`PLAN.md` at the step that creates them.
 
 To build and check the repository: `just setup`, then `just verify`.
 
@@ -89,8 +90,9 @@ If you are reviewing this repository, human or AI, this is the frame:
 The specification's own §12 names the documentation the finished product
 owes — a README, an operator configuration reference, an honesty
 document, a platform verification record, `SECURITY.md` and
-`CONTRIBUTING.md`. None of them exists yet; this file is the repository's
-entry point until they do.
+`CONTRIBUTING.md`. Only the verification record has been started, and
+only for the facts already measured; this file is the repository's entry
+point until the rest arrive.
 
 ## License
 
