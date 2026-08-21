@@ -10,14 +10,23 @@ Measured 2026-08-19 on `just` 1.45.0, `pre-commit` 4.4.0, Python 3.14.4
 
 | Command | Runs |
 |---|---|
-| `just setup` | `scripts/setup.sh` — `./.venv`, `requirements.txt`, `pre-commit install` |
+| `just setup` | `scripts/setup.sh` — `./.venv`, `requirements.txt`, an editable install of this repository, `pre-commit install` |
 | `just check [all\|changed]` | `scripts/check.sh`, scope as argument |
-| `just test` | `scripts/test.sh` |
+| `just test` | `scripts/test.sh`; `PYTHON=… just test` picks the interpreter |
 | `just verify` | `check` then `test`; no script of its own |
 
 `just` is a system tool, unpinned, so `just setup` has nothing before it.
-Only `pre-commit` is pinned in `requirements.txt`; every linter is pinned
-by `rev`. Pre-commit's transitive dependencies float.
+`requirements.txt` pins `pre-commit`, `PyYAML` and `setuptools`; every
+linter is pinned by `rev`. Pre-commit's transitive dependencies float.
+
+The editable install (`pip install --no-build-isolation -e .`) is why
+`setuptools` is pinned there: it is the build backend `pyproject.toml`
+names, and with build isolation on, pip would fetch an unpinned copy on
+every setup. It gives `.venv/bin/frisk`, the console script of §8.2's
+repository-installable door — installed at every setup so that the door
+is exercised rather than asserted. The *engine* still has zero
+dependencies; `tests/test_packaging.py` fails if an import escapes the
+standard library.
 
 ## Invariants — each breaks silently
 
@@ -140,7 +149,10 @@ above, mutating settings between runs. Worktree case:
 ## On the forge
 
 `.github/workflows/ci.yml` (step `005`) runs the same entry points as
-two jobs. Two facts about it are the harness's business:
+two jobs, plus the `floor` job added at `006` — `just test` on a bare
+3.9 with no `just setup`, no venv and no caches, which is possible only
+because the engine has no dependencies and the suite needs nothing
+installed. Three facts about it are the harness's business:
 
 **Bumping a tool locally without bumping the workflow is the drift the
 pins exist to prevent.** `rust-just==1.45.0` tracks *this workstation*,
@@ -191,6 +203,37 @@ broader scanning is a pinned hook away (`gitleaks`, `detect-secrets`).
 
 `.pre-commit-config.yaml`'s header comment carries the families and the
 step each arrives at; the hooks below it name their tools and pins.
+
+### The Python family and the interpreter floor (`006`)
+
+ruff (`v0.16.4`: `ruff-check`, and `ruff-format` with `--check` so it
+asserts instead of writing) and mypy (`mirrors-mypy v2.3.1`, `strict`,
+`pass_filenames: false`), both configured in `pyproject.toml`, plus
+`check-toml`. Three things about them are not obvious from the config:
+
+**The floor is checked in four places and they must move together.**
+`requires-python`, `[tool.ruff] target-version`, `[tool.mypy]
+python_version`, and `.github/workflows/ci.yml`'s `floor` job. mypy is
+the one that catches a standard-library name that arrived after 3.9 —
+`tomllib`, `str.removeprefix` — on a workstation running 3.14. The
+table of what each platform ships, its date and its sources are in
+`docs/verification-record.md`, not here: it is operator-facing, and a
+second copy would age out of sight.
+
+**Static targeting is not execution, and one gap is known.**
+`ruff-format` emits parenthesized context managers at `target-version =
+"py39"` — official 3.10 grammar that 3.9's parser accepts in practice.
+The formatter is therefore trusted about the floor only as far as the
+`floor` CI job confirms; if that job ever fails on syntax the formatter
+produced, the fix is `target-version = "py38"` for the formatter, not a
+hand-formatted file. The suite's own
+`ast.parse(..., feature_version=(3, 9))` catches the loud classes
+(a `match` statement above all) on any interpreter, and does not catch
+this one.
+
+**mypy sees `src/` and `tests/`, never `scripts/`.** The harness
+scripts have no callers, so there is no type error there to have. If a
+script ever grows an importable module, that changes.
 
 The workflow family (`005`) is schema validation, not a workflow linter:
 `check-github-workflows` and `check-dependabot` from `check-jsonschema`,

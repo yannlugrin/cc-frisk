@@ -232,7 +232,7 @@ review. The behavior corpus (`.claude/refs/behavior-corpus.md`) is read
 before designing any suite in this milestone and before declaring any §4
 behaviour done.
 
-### 006 — Package, interpreter floor, CLI skeleton — `in progress`
+### 006 — Package, interpreter floor, CLI skeleton — `awaiting test`
 
 **Objective.** A Python package that installs from the repository, a
 committed interpreter floor that is a *checked* claim, and a CLI shell
@@ -1372,7 +1372,7 @@ Every section of `SPECIFICATIONS.md`, mapped.
 | §9 The CLI | `006`, `007` (registry inspection), `008`, `019`, `021` (resolution), `024` (the project entry point); complete at `037` |
 | §10 The maintenance skill | `024` (adoption in guided-manual form), `036` (the full loop) |
 | §11 Packaging, distribution, versioning | `021`, `029` |
-| §12 Documentation deliverables | `021` (the minimum at first exposure), `028` (README, SECURITY.md), `015`/`016`/`022` (the verification record), `024` (`docs/pairing.md`), `039` (the rest, status-line sample included) |
+| §12 Documentation deliverables | `021` (the minimum at first exposure), `028` (README, SECURITY.md), `006`/`015`/`016`/`022` (the verification record — opened at `006` by item 12, which settles before the verification pass), `024` (`docs/pairing.md`), `039` (the rest, status-line sample included) |
 | §13 Release path | This plan's structure and §1's re-inventory |
 | §14 Future Considerations | **Excluded from this pass**, by the specification's own staging: rule collections beyond the project, the declarative configuration layer, transcript mining, the guard-internal decision log, user-global configuration, and native Windows support. §3.4's composition, §2.2's data directory and §3.5's stability keep each adoptable later. |
 | §15 Non-Goals | **Excluded by definition**; stated in SECURITY.md at `021`/`028` and the honesty document at `039`. |

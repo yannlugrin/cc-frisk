@@ -363,7 +363,7 @@ platform rather than assuming; `docs/` is documentation for humans
 - **`.claude/docs/` pointers:** `harness.md` — harness behaviour,
   re-measure recipes, what CI pins; read before touching the
   `justfile`, `scripts/`, `.pre-commit-config.yaml`,
-  `.github/workflows/` or any linter config. `guard-record.md` — the
+  `.github/workflows/`, `pyproject.toml` or any linter config. `guard-record.md` — the
   guard's restore recipe, reach, blind spots and platform probes; read
   before touching `.claude/settings.json` or `.claude/hooks/`, **and
   before designing any probe of a permission mechanism**.
