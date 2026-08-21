@@ -341,7 +341,7 @@ what rules 1 and 3 make them.
 
 ## Current state
 
-- **Current step:** `005` — the same harness on the forge, in progress.
+- **Current step:** `005` — the same harness on the forge, awaiting test.
 - **Next step:** `006` — package, interpreter floor, CLI skeleton.
 - **World state:** the harness is live and green (`just setup`
   bootstraps it), with the same checks in the commit hook, which now
@@ -365,8 +365,9 @@ what rules 1 and 3 make them.
   budget stands and the gap closes in `005`'s compaction pass.
 - **`.claude/docs/` pointers:** `harness.md` — the measured behaviour of
   `just check`/`test`/`verify` and the commit hooks, with re-measure
-  recipes; read before changing the `justfile`, `scripts/`,
-  `.pre-commit-config.yaml` or any linter config. `guard-record.md` —
+  recipes, and what CI pins; read before changing the `justfile`,
+  `scripts/`, `.pre-commit-config.yaml`, `.github/workflows/` or any
+  linter config. `guard-record.md` —
   the quarantined guard's restore recipe, commands, reach, blind spots
   and platform probes with the liveness triple; read before touching
   `.claude/settings.json` or anything under `.claude/hooks/`, **and
