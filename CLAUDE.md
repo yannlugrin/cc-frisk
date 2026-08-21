@@ -69,15 +69,14 @@ subagent** that reads and edits the file and reports outcomes (what is
 gated, what the settings pairing requires, whether its checks pass),
 never the file's text, parsing approach or API shapes. Executing it
 (`--selftest`, `--liveness`) is fine: output is verdicts, not code.
-**The file is never tracked** — its path is gitignored, because this
-repository is the plugin's public install channel and no later strip
-removes what an initial commit carries.
-Versioning comes back as the backup ref **`refs/backups/bash-guard`**,
-outside `refs/heads/` so no `push --all`, default refspec or clone
-carries it: the in-channel subagent chains a snapshot onto it at
-instantiation and after every `--selftest`-green edit, and the ref rides
-rule 6's step-close push **to the operator's private backup remote,
-never to `origin`**. Restore:
+**The file is never tracked on `main`** — its path is gitignored, so no
+clone's working tree carries it. Versioning is the backup ref
+**`refs/backups/bash-guard`**, which the in-channel subagent chains a
+snapshot onto at instantiation and after every `--selftest`-green edit.
+It rides rule 6's step-close push to **`origin`'s `backup/bash-guard`
+branch** (`D-028`, reversing `D-017`): the operator ruled the guard's
+off-machine copy worth publishing the prototype's source, which a public
+branch does permanently and delivers into every clone. Restore:
 `git show refs/backups/bash-guard:.claude/hooks/bash_guard.py`
 redirected onto the path, content never rendered. Details — probes, the
 three liveness commands, the restore recipe, the backup remote's name —
@@ -233,8 +232,7 @@ any `docs/` deliverable touched. What a step teaches a future session
 goes into `.claude/docs/` as part of finishing it. You commit locally;
 pushing happens only when asked, with **one standing exception: at a
 step close, attempt the push** — rule 1's backup ref riding the same
-attempt, to the backup remote. Where the remote does not exist yet, say
-so in the close summary instead of attempting anything. The exception is
+attempt, to `origin`'s `backup/bash-guard` branch. The exception is
 cited, never extended.
 
 **7. Language.** Repository files, code and comments in English.
@@ -349,8 +347,8 @@ platform rather than assuming; `docs/` is documentation for humans
   same checks locally, in the commit hook and in CI, green. The
   permission boundary — guard plus `.claude/settings.json` — is live,
   untracked and unchanged since `002`. `origin` is
-  `github.com/yannlugrin/cc-frisk`, **public**, and no backup remote
-  exists yet. **Every write under `.claude/` prompts** — no setting
+  `github.com/yannlugrin/cc-frisk`, **public**, and carries the guard's
+  backup branch (`D-028`). **Every write under `.claude/` prompts** — no setting
   removes it.
 - **Open obligations:** `PLAN.md` §14 carries eleven open questions,
   each answered at the step that needs it. The sentinel may be

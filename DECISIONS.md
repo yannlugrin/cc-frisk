@@ -617,3 +617,42 @@ Detail in git history.
   boring-tool test).
 
 Detail in git history.
+
+### D-028 — The guard's backup is a branch on the public `origin`, reversing `D-017`
+
+- **Date:** 2026-08-21
+- **Step:** — (Milestone 1 close)
+- **Context:** `D-017` named a private remote `backup` for
+  `refs/backups/bash-guard`, and after four closes no such remote
+  existed. Milestone 1's state review raised it as the milestone's one
+  unheld obligation: `.claude/hooks/bash_guard.py` is gitignored and
+  never tracked by design, so that ref is the guard's **only** copy, in
+  one clone, on one machine — and the guard is what gates every Bash
+  call in this project. A disk failure would leave
+  `guard-record.md`'s restore recipe with nothing to restore from.
+- **Decision:** the backup is **`origin`'s `backup/bash-guard` branch**,
+  pushed at each step close as
+  `git push origin refs/backups/bash-guard:refs/heads/backup/bash-guard`.
+  The local ref keeps its name and its place outside `refs/heads/`,
+  because both gates and `scripts/test.sh` key on it and `001`'s twelve
+  measured states depend on that spelling — so nothing in the harness
+  changes, no invariant needs re-measuring, and a clone still receives
+  `backup/bash-guard` but never `refs/backups/bash-guard`, leaving CI
+  reporting the guard absent by design.
+- **What this costs, recorded because it is irreversible.** `origin` is
+  public, so the branch publishes the prototype's source permanently and
+  — a branch being carried by default clone, and the plugin's install
+  channel being `git clone` of this repository — delivers it into every
+  future user's checkout. `D-025` established this step that force-push
+  removal is removal going forward, not retraction. Rule 1's quarantine
+  is unaffected in its other half: the file still never enters a
+  session's context, and it is still absent from every working tree.
+- **Alternatives considered:** *a separate private repository as remote
+  `backup`* — `D-017`'s shape, recommended by the implementer, nothing
+  published, no amendment needed anywhere; rejected by the operator.
+  *A separate public repository* — off the install channel, so users
+  never receive it, still public; not chosen. *Pushing the ref to
+  `origin` under `refs/backups/` rather than as a branch* — published
+  but not clone-delivered; offered and not taken.
+- **Approved by:** operator, 2026-08-21, choosing the branch after the
+  publication and clone-delivery consequences were put to them twice.

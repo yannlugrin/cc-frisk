@@ -66,7 +66,7 @@ In order:
    | Command | What it establishes |
    |---|---|
    | `just test` | the shipped behaviour still passes, guard `--selftest` included |
-   | `git remote -v` | which remotes exist — `origin`, and whether a backup remote does |
+   | `git ls-remote --heads origin backup/bash-guard` | whether the guard's backup branch is published (`D-028`) |
    | `git show-ref refs/backups/bash-guard` | the guard's backup ref, the marker the two gates key on |
    | `ls -l .claude/hooks/bash_guard.py` | the guard is materialized and executable — **never read its contents** (CLAUDE.md rule 1) |
    | `.claude/hooks/bash_guard.py --liveness` | its registry builds; output is verdicts, not code |

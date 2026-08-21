@@ -97,8 +97,8 @@ bootstrap instructions prescribe four steps; this plan splits two of
 them (`D-003`), and CI stays **last within the foundation**. The
 repository is not bootstrapped until its CI has run green. ("Leaves this
 machine" means shared, public state — the forge; rule 6's close-riding
-backup-ref push to the operator's private backup remote is earlier and
-does not count against this ordering.)
+backup-ref push was ruled earlier and outside this ordering, and since
+`D-028` it goes to `origin` itself.)
 
 ### 000 — The harness, local only — `done`
 
@@ -1386,7 +1386,7 @@ it.
 |---|---|
 | `just` installed on this machine | `000` |
 | A working `python3` and `pip` (any version) for the pinned toolchain | `000` |
-| A private backup remote for rule 1's backup ref | `001` |
+| A home for rule 1's backup ref — ruled at Milestone 1's close as `origin`'s `backup/bash-guard` branch (`D-028`), not a private remote | `001`, supplied `005` |
 | Authorisation to push. The forge and remote already exist — `origin` is the public `github.com/yannlugrin/cc-frisk`, whose `main` is still the initial commit — so what is owed is the operator's go-ahead for the first push of this work | `001`'s close (rule 6 attempts a push at every close) |
 | The publish-or-strip ruling on `.claude/spec-work/` and `.claude/refs/`, both already public via the initial commit | `005` |
 | A second strong model for the milestone passes — the state review and the memory compaction must not run on the model that wrote the work | the foundation-milestone close, after `005` |

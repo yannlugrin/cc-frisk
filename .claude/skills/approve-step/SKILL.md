@@ -95,38 +95,31 @@ In order:
    signal, and a gate here would make deletion the cheapest way to go
    green.
 
-   Then, as **three separate tool calls, never chained**:
+   Then, as **two separate tool calls, never chained**:
 
    ```sh
    git push --follow-tags
    ```
 
    ```sh
-   git remote get-url backup
-   ```
-
-   ```sh
-   git push backup refs/backups/bash-guard
+   git push origin refs/backups/bash-guard:refs/heads/backup/bash-guard
    ```
 
    `--follow-tags` carries the annotated tag with the commit, where a
    bare `git push` leaves the step tag behind, and a tag that exists only
-   locally is invisible to everything reading the remote. The third call
-   carries the quarantined guard's backup ref (`CLAUDE.md` rule 1) to the
-   operator's private backup remote — **`backup`, never `origin`**,
-   which is public — and runs **only if** the second succeeded. A
-   non-zero `git remote get-url` means the remote does not exist: say so
-   in the close summary and attempt nothing.
-   `.claude/docs/guard-record.md` § "Restore, and the backup ref" records
-   its current absence.
+   locally is invisible to everything reading the remote. The second call
+   carries the quarantined guard's backup ref (`CLAUDE.md` rule 1) to
+   `origin`'s `backup/bash-guard` branch — `D-028` reversed `D-017`'s
+   private remote, and the operator accepted that this publishes the
+   prototype's source. The local ref keeps its name and its place outside
+   `refs/heads/`, which is what the gates key on.
+   `.claude/docs/guard-record.md` § "Restore, and the backup ref" carries
+   the reasoning.
 
-   **Separate calls, because a chain defeats both gates.** `002`
-   measured that settings-level prefix rules match only from the start of
-   the command line, so a `git push` buried after `&&` is invisible to
-   the platform gate and reaches the guard alone. And a shell `||` cannot
-   tell absence from refusal: it would print "no backup remote" for a
-   push the operator just denied, which is precisely the case the next
-   paragraph exists to handle.
+   **Separate calls, because a chain defeats the gate.** `002` measured
+   that settings-level prefix rules match only from the start of the
+   command line, so a `git push` buried after `&&` is invisible to the
+   platform gate and reaches the guard alone.
 
    **This is a named exception to rule 9's "never on your own
    initiative", and it does not generalise.** It holds here because the

@@ -32,11 +32,20 @@ fi
 git update-ref refs/backups/bash-guard "$commit"
 ```
 
-**The backup remote is named `backup`** (`D-017`) — a name, not a
-remote: none exists yet, so rule 6's step-close push resolves it with
-`git remote get-url backup`, reports its absence and attempts nothing.
-`origin` is public and this ref never goes there. `/approve-step`
-carries the exact command pair.
+**The backup lives on `origin`, as the branch `backup/bash-guard`**
+(`D-028`, reversing `D-017`). Rule 6's step-close push carries it:
+
+```sh
+git push origin refs/backups/bash-guard:refs/heads/backup/bash-guard
+```
+
+The local ref keeps its name and its place outside `refs/heads/`, which
+is what both gates and `scripts/test.sh` key on — so a clone receives
+`backup/bash-guard` but never `refs/backups/bash-guard`, and CI still
+reports the guard absent by design. `origin` is public: the branch
+publishes the prototype's source permanently and delivers it into every
+clone, which the operator ruled acceptable in exchange for the guard
+having any off-machine copy at all.
 
 ## The commands
 
