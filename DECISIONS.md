@@ -940,3 +940,28 @@ Detail in git history.
   to them at the test gate after the review found two cases
   contradicting each other. (1) to (3) are implementer, within latitude
   (§3.2 leaves them to the implementation; the corpus constrains two).
+
+### D-036 — `frisk registry` ships text only; §9's JSON waits for a consumer
+
+- **Date:** 2026-08-21
+- **Step:** `007`
+- **Context:** §9 says output is for humans first and that a
+  machine-readable option (JSON) is *the recommended way* to make
+  "stable enough to script against" cheap to keep. `registry` is the
+  first command with structure worth serializing, so the deviation has
+  to be a decision rather than an omission.
+- **Decision:** `registry` prints text only, in the layout
+  `Registry.describe` fixes and the suite pins. JSON is added at the
+  step that gains a consumer for it — §9 names two, the status-line
+  sample and whatever the maintenance skill needs programmatically, and
+  neither exists yet. The pinned text layout is what keeps the promise
+  in the meantime: it is stable by test, not by convention.
+- **Alternatives considered:** *ship `--json` now* — cheap in isolation,
+  rejected under rule 11: a second output format with no reader is a
+  second thing every later step's changes have to keep true, and its
+  shape would be guessed rather than fitted to a consumer. *Ship JSON
+  instead of text* — rejected outright: §9 says humans first, and the
+  registry is what the operator reads to know their boundary.
+- **Approved by:** implementer (within latitude: §9's JSON is a
+  *should*, and rule 4 asks that a within-latitude deviation be logged),
+  reported with the step.

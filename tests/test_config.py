@@ -116,10 +116,13 @@ class GenerationTests(ProjectFixture):
     def test_a_deprecated_generation_is_still_a_supported_one(
         self,
     ) -> None:
-        # Deprecated means accepted with a nudge, not dropped.
-        for generation in DEPRECATED_GENERATIONS:
-            with self.subTest(generation=generation):
-                self.assertIn(generation, SUPPORTED_GENERATIONS)
+        # Deprecated means accepted with a nudge, not dropped. Stated
+        # as a set relation rather than a loop, so that it is an
+        # assertion today, with nothing deprecated yet, rather than an
+        # empty loop passing for a case.
+        self.assertLessEqual(
+            set(DEPRECATED_GENERATIONS), set(SUPPORTED_GENERATIONS)
+        )
 
     def test_a_configuration_in_range_loads(self) -> None:
         registry = load(

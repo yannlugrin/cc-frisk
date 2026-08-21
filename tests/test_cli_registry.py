@@ -102,7 +102,13 @@ class RegistryCommandTests(unittest.TestCase):
         self.assertIn("no configuration", err.lower())
 
     def test_a_configuration_that_will_not_load_is_loud(self) -> None:
-        self.write("api_generation(0)\n")
+        # An out-of-range generation, not a config that fails to
+        # import: both are loud, and only one is the refusal §3.5 asks
+        # for. Without the import this reads like the first and is the
+        # second.
+        self.write(
+            "from frisk.declare import api_generation\n\napi_generation(0)\n"
+        )
         status, out, err = run("registry", "--project", str(self.root))
         self.assertEqual(status, EXIT_CONFIG_ERROR)
         self.assertEqual(out, "")

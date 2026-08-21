@@ -89,6 +89,14 @@ class StringMatcherTests(unittest.TestCase):
         self.assertEqual(digits.evaluate("4x"), Outcome.UNSATISFIED)
         self.assertIn("only digits", digits.describe())
 
+    def test_a_description_names_what_it_matches(self) -> None:
+        # A citation has to be recognizable as the declaration that
+        # produced it (§6.2); "matches" would satisfy the floor below
+        # and name nothing.
+        self.assertIn("cat", one_of("cat").describe())
+        self.assertIn("/tmp", path_under("/tmp").describe())
+        self.assertIn(VALIDATES, matching(VALIDATES).describe())
+
     def test_every_matcher_describes_itself(self) -> None:
         # `describe` is what a citation and `frisk registry` print
         # (§6.2, §9), so an empty one is a matcher nobody can review.

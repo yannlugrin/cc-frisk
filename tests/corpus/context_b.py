@@ -16,6 +16,15 @@ Transcribed from `.claude/refs/behavior-corpus.md`'s "Context B"
 section, flag for flag. The exact sets matter: several rulings turn on
 `-i` being value-taking, on `--mode` being accounted, and on the
 `validates?` pattern being anchored and dot-escaped.
+
+One reading had to be chosen rather than copied. The corpus writes the
+`exec` handoff's option as "own **value-opt** `-u`", which could mean
+value-taking or value-optional; context A's docker `exec` list puts
+`-u --user` under value-taking, and both readings give the same verdict
+for the two rulings that use it, so this fixture reads it as
+value-taking and the suite asserts that arity rather than the flag's
+name alone. If a later ruling separates the two, this is the line to
+revisit.
 """
 
 from __future__ import annotations

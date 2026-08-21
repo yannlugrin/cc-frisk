@@ -681,30 +681,34 @@ class InspectionTests(CollectionFixture):
 
         self.registry = self.compose(declare, with_defaults=True)
         self.text = self.registry.describe()
+        self.lines = self.text.splitlines()
 
     def test_it_names_every_effective_entry(self) -> None:
-        for name in ("git", "sudo", "myrunner"):
-            with self.subTest(name=name):
-                self.assertIn(name, self.text)
+        # As whole lines, not as substrings: "git" appears in a path,
+        # in a reason and in a label, and an assertion satisfied by any
+        # of those proves nothing about the entry.
+        for header in ("tool git", "wrapper sudo", "wrapper myrunner"):
+            with self.subTest(header=header):
+                self.assertIn(header, self.lines)
 
     def test_it_says_which_layer_each_came_from(self) -> None:
-        self.assertIn("collection:starter", self.text)
-        self.assertIn(PROJECT_LAYER, self.text)
-        self.assertIn(ENGINE_LAYER, self.text)
-
-    def test_it_prints_the_line_a_declaration_was_written_on(
-        self,
-    ) -> None:
-        # The layer decides a conflict; the file and line are what an
-        # operator opens to change it.
-        self.assertIn("starter.py:", self.text)
+        self.assertRegex(
+            self.text, r"\n  source: collection:starter starter\.py:\d+"
+        )
+        self.assertRegex(self.text, rf"\n  source: {ENGINE_LAYER} \S+:\d+")
+        self.assertRegex(self.text, rf"\n    source: {PROJECT_LAYER} \S+:\d+")
 
     def test_it_prints_the_label_an_amendment_would_drop(self) -> None:
-        self.assertIn("forced push", self.text)
-        self.assertIn("any push", self.text)
+        # In the position `drop` reads them from, so a label printed
+        # inside a reason could not satisfy this.
+        self.assertIn("  deny [forced push] push", self.lines)
+        self.assertIn("  ask [any push] push", self.lines)
 
     def test_it_carries_the_reason_of_every_rule(self) -> None:
-        self.assertIn("A forced push rewrites remote history.", self.text)
+        self.assertIn(
+            "    reason: A forced push rewrites remote history.",
+            self.lines,
+        )
 
     def test_a_value_annotates_every_matcher_with_its_outcome(
         self,

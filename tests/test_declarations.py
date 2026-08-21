@@ -159,8 +159,14 @@ class RecognitionTests(unittest.TestCase):
 
     def test_aliases_are_the_same_declaration(self) -> None:
         # Corpus: `stub2 wipe` → deny, exactly as `stubtool wipe` does.
+        # The claim is one declaration, not one object: an entry equal
+        # in everything but its name would satisfy the corpus and fail
+        # an identity assertion.
         registry = compose(context_b.declare)
-        self.assertIs(registry.lookup("stub2"), registry.lookup("stubtool"))
+        under_alias = registry.lookup("stub2")
+        assert under_alias is not None
+        self.assertEqual(under_alias.name, "stubtool")
+        self.assertIn("stub2", under_alias.aliases)
 
     def test_a_longer_name_is_a_different_tool(self) -> None:
         # Corpus: `stub2x wipe`, `stubtool-extra deploy.yml` and
@@ -307,6 +313,14 @@ class ToolKindTests(unittest.TestCase):
 class ConditionTests(unittest.TestCase):
     """Every condition of §5.2 is sayable, and names itself."""
 
+    def test_a_description_names_what_it_constrains(self) -> None:
+        # The floor below says a description exists; this says it is
+        # the operator's own declaration read back. `describe()`
+        # returning "x" satisfies the first and no citation at all.
+        self.assertIn("--force", flag("--force").describe())
+        self.assertIn("STUB_DANGER", env("STUB_DANGER").describe())
+        self.assertIn("-C", option("-C").describe())
+
     def test_the_whole_vocabulary_describes_itself(self) -> None:
         for condition in (
             flag("--force"),
@@ -347,13 +361,19 @@ class ConditionTests(unittest.TestCase):
 
     def test_a_value_condition_is_available_to_deny_and_ask(self) -> None:
         # Closing the prototype's asymmetry: it could deny on a flag's
-        # presence but not on its value (§3.2).
+        # presence but not on its value (§3.2). Asserting the verdict
+        # alone would pass on an API that dropped `when=` on the floor,
+        # which is the very asymmetry being closed.
         rule = deny(
             "apply",
             when=flag("--mode", one_of("destroy")),
             reason="A destroying mode.",
         )
         self.assertEqual(rule.verdict, Verdict.DENY)
+        self.assertEqual(len(rule.conditions), 1)
+        matcher = rule.conditions[0].matchers()[0]
+        self.assertEqual(matcher.evaluate("destroy"), Outcome.SATISFIED)
+        self.assertEqual(matcher.evaluate("check"), Outcome.UNSATISFIED)
 
 
 class OperandQuantifierTests(unittest.TestCase):
@@ -375,10 +395,14 @@ class OperandQuantifierTests(unittest.TestCase):
         )
 
     def test_one_failing_operand_fails_the_quantifier(self) -> None:
-        # Corpus: `stubtool clean /tmp/x /etc/passwd` → ask.
-        self.assertNotEqual(
+        # Corpus: `stubtool clean /tmp/x /etc/passwd` → ask. The exact
+        # answer is unproven, not merely "not satisfied": `/etc/passwd`
+        # is cross-form to the `.scratch` half of the boundary set
+        # (D-035). A loose assertion here is what let two cases
+        # contradict each other unnoticed.
+        self.assertEqual(
             self.every.evaluate(["/tmp/x", "/etc/passwd"]),
-            Outcome.SATISFIED,
+            Outcome.UNPROVEN,
         )
 
     def test_every_operand_requires_at_least_one(self) -> None:
@@ -483,9 +507,13 @@ class HandoffTests(unittest.TestCase):
         }
         self.assertEqual(by_subcommand[("run",)].keeps_operands, 1)
         self.assertEqual(by_subcommand[("exec",)].keeps_operands, 1)
-        self.assertEqual(
-            tuple(by_subcommand[("exec",)].flags[0].names), ("-u",)
-        )
+        # The corpus writes exec's option as "value-opt `-u`"; context
+        # A's analogous docker exec list puts `-u --user` under
+        # value-taking, and the fixture reads it that way. Assert the
+        # arity, not only the name, so the reading is recorded.
+        exec_flags = by_subcommand[("exec",)].flags[0]
+        self.assertEqual(tuple(exec_flags.names), ("-u",))
+        self.assertEqual(exec_flags.arity, Arity.VALUE)
 
     def test_a_multi_word_handoff_position(self) -> None:
         # docker's compose forms: `compose run SERVICE cmd`.
