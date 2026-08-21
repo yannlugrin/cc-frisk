@@ -238,61 +238,23 @@ review. The behavior corpus (`.claude/refs/behavior-corpus.md`) is read
 before designing any suite in this milestone and before declaring any §4
 behaviour done.
 
-### 006 — Package, interpreter floor, CLI skeleton — `awaiting test`
+### 006 — Package, interpreter floor, CLI skeleton — `done`
 
-**Objective.** A Python package that installs from the repository, a
-committed interpreter floor that is a *checked* claim, and a CLI shell
-the operator can run — so every later engine step has a hand-testable
-surface.
-
-**Spec sections.** §3.1 (Python, standard library only, zero
-dependencies, conservative floor), §2.3, §9 (the CLI must run without
-Claude Code), §11 (one codebase, two doors).
-
-**Deliverables.**
-
-- The engine package at `src/frisk/`, standard library only, zero
-  dependencies.
-- `pyproject.toml` at the root — packaging metadata and the `frisk`
-  console entry point. **This is the repository-installable door only**
-  (§8.2's CI case, §11's second door): §2.2 forbids the plugin from
-  requiring dependency installation to function, so a console script
-  created by `pip install` cannot be how the CLI is reached on a machine
-  where the *plugin* is installed. The plugin-side invocation mechanism
-  is decided and stated at `021`, must be build-free, and is flagged in
-  §14 Q8.
-- **Open-fact inventory item 12 settled**: the §3.1 table of OS-shipped
-  interpreters re-verified before the floor is committed. The floor
-  should be 3.9; the implementation may move it with reason. A floor
-  guessed too high fails in the worst direction — an engine the shipped
-  interpreter cannot parse fails open. **The method is named here because
-  it is not local**: what current macOS command-line tools, RHEL 9 and
-  the current LTS distributions ship cannot be measured from this
-  machine. Either the operator authorises the distribution-data lookups,
-  or the operator supplies the table and the implementation checks the
-  floor against it. §2.1's global pre-commitment governs the failure:
-  an unverifiable table is recorded as unmeasured and drives the floor
-  **down**, never up.
-- Python's check family joins the harness at `000`'s entry points,
-  **pinned to the committed floor** — syntax and type checking — so the
-  floor is checked, not asserted. The type checker is a toolchain
-  addition the specification does not ask for; it is taken from the house
-  conventions in `.claude/refs/infra-conventions/` — machine-local since
-  `005` and absent from clones (`D-026`), and taken as shape, never as
-  content — and logged as a within-latitude workflow decision at this
-  step. TOML's parse check
-  joins with `pyproject.toml`.
-- `frisk --version` and a `frisk explain <command>` that parses nothing
-  yet and says so.
-- `tests/` created with the first unit suite; `just test` stops reporting
-  an empty repository.
-
-**How the operator tests it.** `just verify` green; `frisk --version` and
-`frisk explain 'ls'` run from a plain shell with no Claude Code involved.
-The floor is checked statically here (ruff and mypy pinned to it) and
-executed by a CI job, `D-030` — no floor interpreter on this machine.
-Local and free. **External prerequisite**: the operator's answer on item
-12's method.
+- **Outcome (approved 2026-08-21, tag step-006):** `src/frisk/` exists —
+  standard library only, zero dependencies, one code path — with
+  `pyproject.toml` as §8.2's repository-installable door and its `frisk`
+  console script, `python3 -m frisk` as the build-free one, and a first
+  `unittest` suite under `tests/`. The interpreter floor is **3.9**,
+  settled from a re-verified table (`D-029`, open-fact item 12) that also
+  named SLES 15 and RHEL 8 as sub-floor platforms frisk documents rather
+  than covers; `docs/verification-record.md` opened to carry it.
+  `frisk --version` answers and `frisk explain` reaches no verdict
+  without ever exiting 0. Python's check family joined pinned to the
+  floor and the floor is executed, not asserted (`D-030`: ruff, mypy,
+  `check-toml`, and CI restructured into one `check` job and a `test`
+  matrix over the floor and the current version); the suite runs with
+  nothing installed, which is what makes that possible (`D-031`). Detail
+  in git history between tags step-005 and step-006.
 
 ### 007 — Declarations, matchers, layering — `pending`
 

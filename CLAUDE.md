@@ -327,15 +327,19 @@ own tree, whose paths `PLAN.md` `021` confirms rather than assumes;
 
 ## Current state
 
-- **Current step:** `006` — package, interpreter floor, CLI skeleton.
-- **Next step:** `007` — declarations, matchers, layering.
+- **Current step:** none — `006` closed 2026-08-21.
+- **Next step:** `007` — declarations, matchers, layering. **Test-gated**
+  (`D-032`), and its cases are also the config-facing API's first draft,
+  so that gate approves an interface as well as behaviour.
 - **World state:** the harness (`just setup/check/test/verify`) runs the
-  same checks locally, in the commit hook and in CI, green. The
-  permission boundary — guard plus `.claude/settings.json` — is live,
-  untracked and unchanged since `002`. `origin` is
-  `github.com/yannlugrin/cc-frisk`, **public**, and carries the guard's
-  backup branch (`D-028`). **Every write under `.claude/` prompts** — no setting
-  removes it.
+  same checks locally, in the commit hook and in CI, green; `setup` also
+  installs the engine, and the 3.9 floor is executed by CI's test
+  matrix, not asserted. `src/frisk/` ships a CLI that judges nothing yet
+  and cannot exit 0 saying so. The permission boundary — guard plus
+  `.claude/settings.json` — is live, untracked and unchanged since
+  `002`. `origin` is `github.com/yannlugrin/cc-frisk`, **public**, and
+  carries the guard's backup branch (`D-028`). **Every write under
+  `.claude/` prompts** — no setting removes it.
 - **Open obligations:** `PLAN.md` §14 carries eleven open questions,
   each answered at the step that needs it. The sentinel may be
   re-staged before parity if `D-007`'s residue proves uncomfortable;
@@ -356,6 +360,4 @@ own tree, whose paths `PLAN.md` `021` confirms rather than assumes;
 *A closed list of item kinds — current and next step, live world-state,
 open obligations, `.claude/docs/` pointers — and nothing else. A closed
 step's outcome is not one of them: it belongs to its plan entry and its
-tag, a durable fact to `.claude/docs/`, an invariant to the decision
-log. The close ritual deletes that paragraph rather than demoting it;
-otherwise each close adds a paragraph and this section is a changelog.*
+tag, and the close ritual deletes it rather than demoting it.*
