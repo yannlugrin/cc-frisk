@@ -1245,8 +1245,16 @@ Two conventions the format depends on:
   a maintenance burden with no maintainer. *Dependabot over
   `requirements.txt` and the hook `rev:`s too* — rejected above: those
   bumps invalidate recorded measurements and belong to a step.
+- **Reinstated (2026-08-21, `005`):** the `concurrency` block was
+  deleted in this step's review pass, on the reviewer's argument that it
+  arrived with the house conventions rather than with a need. The
+  operator put it back. It earns its place on the trigger this step
+  actually ships: Dependabot opens pull requests and force-pushes to
+  their branches, so superseded runs are a real case now, and keying
+  `cancel-in-progress` off `refs/heads/main` keeps every approved step's
+  verdict a record rather than something a later push can cancel.
 - **Approved by:** operator, 2026-08-21, for the pinning-and-Dependabot
-  pairing, which they required; implementer for the rest (within
+  pairing, which they required, and for the `concurrency` block; implementer for the rest (within
   latitude: rule 2's check-family and pinning clauses, and rule 11's
   boring-standard-tool test — which tool implements a required family is
   a workflow choice left open).

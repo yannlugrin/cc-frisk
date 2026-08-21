@@ -12,6 +12,13 @@ name: ci
     branches: [main]
   pull_request:
 
+# One run per ref: a superseded verdict nobody reads is what teaches
+# people to stop reading them. Never on main, where a run is the record
+# that an approved step passed.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 permissions:
   contents: read
 
