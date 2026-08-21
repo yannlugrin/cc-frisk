@@ -15,6 +15,7 @@ lives there and nowhere else, having already drifted once. Hence a few
 lines, and no more than that.
 """
 
+import re
 import sys
 from pathlib import Path
 
@@ -26,6 +27,14 @@ except ImportError:  # pinned in requirements.txt; `just setup` installs it
 ROOT = Path(__file__).resolve().parent.parent
 problems = []
 
+# An exact `---` line closes the block. Matching the delimiter by prefix
+# would accept `----`, which parses here and closes nothing for a loader
+# that wants the exact line — a definition that silently never loads,
+# which is what this file exists to catch. What the loader really accepts
+# is unmeasured (`claude plugin validate` passes `----`, and it passes
+# four other malformations too), so the guess is placed on the loud side.
+FRONTMATTER = re.compile(r"\A---\n(.*?)\n---(?:\n|\Z)", re.DOTALL)
+
 
 def check(path, expected_name):
     try:
@@ -33,11 +42,14 @@ def check(path, expected_name):
     except (OSError, UnicodeDecodeError) as exc:
         problems.append("%s: cannot be read as UTF-8: %s" % (path, exc))
         return
-    if not text.startswith("---\n") or (end := text.find("\n---", 3)) == -1:
-        problems.append("%s: frontmatter missing or never closed" % path)
+    block = FRONTMATTER.match(text)
+    if block is None:
+        problems.append(
+            "%s: no frontmatter fenced by exact `---` lines" % path
+        )
         return
     try:
-        meta = yaml.safe_load(text[4:end])
+        meta = yaml.safe_load(block.group(1))
     except yaml.YAMLError as exc:
         problems.append("%s: frontmatter does not parse: %s" % (path, exc))
         return

@@ -185,11 +185,12 @@ fixture tree per class, each `<root>/skills/<name>/SKILL.md`, run as
 | Malformation swallows the closing `---`         | **0**     | caught     |
 | `name` disagrees with the path it loads from    | **0**     | caught     |
 | Skill directory with no `SKILL.md`              | **0**     | uncovered  |
+| Close fence is `----` or `--- x`                | **0**     | caught     |
 | `description` key absent                        | 1 (warn)  | caught     |
 | `description:` present but null                 | **0**     | caught     |
 | `description` present but not a string           | 1 (warn)  | caught     |
 
-The five zeros are silent: the validator prints `Validation passed` and,
+The six zeros are silent: the validator prints `Validation passed` and,
 for the swallowed-delimiter case, never lists the file at all — the flow
 scalar consumes the delimiter, so nothing recognises the block as
 frontmatter. That is the whole argument for `D-021`'s "both exist": what
@@ -205,6 +206,9 @@ three: an absent key and a non-string both fail `--strict`, while
 `004` fixed ours, because `str(None).strip()` is truthy. That is the
 likeliest way to reach an empty description and it was the last one
 either tool saw.
+
+A CRLF definition is not a class: `Path.read_text` does universal-newline
+translation, so `\r\n` never reaches either the fence match or the parser.
 
 Two traps when re-measuring — a tree holding **no** valid component falls
 back to *manifest* validation and fails on a missing manifest, which
@@ -234,6 +238,7 @@ mk no-skill-md     ''                                                       # rc
 mk desc-absent     '---\nname: case\n---\nb\n'                               # rc=1
 mk desc-null       '---\nname: case\ndescription:\n---\nb\n'                 # rc=0
 mk desc-not-string '---\nname: case\ndescription: [a, b]\n---\nb\n'          # rc=1
+mk bad-fence       '---\nname: case\ndescription: x\n----\nb\n'                # rc=0
 claude --version                                                            # stamp the reading
 rm -rf "$S"
 ```
