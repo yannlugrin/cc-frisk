@@ -1,7 +1,7 @@
 # The harness
 
-**Read before changing `justfile`, `scripts/`, `.pre-commit-config.yaml`
-or any linter config.**
+**Read before changing `justfile`, `scripts/`, `.pre-commit-config.yaml`,
+`.github/workflows/` or any linter config.**
 
 Measured 2026-08-19 on `just` 1.45.0, `pre-commit` 4.4.0, Python 3.14.4
 (system), git 2.53.0, Linux 6.18 (WSL2).
@@ -136,6 +136,34 @@ the guard as a script echoing a liveness line for `--liveness` and
 with `git update-ref refs/backups/bash-guard HEAD`; walk the states
 above, mutating settings between runs. Worktree case:
 `git worktree add` a second checkout, run from inside it.
+
+## On the forge
+
+`.github/workflows/ci.yml` (step `005`) runs the same entry points, two
+parallel jobs, `just setup` then `just check` / `just test`. It carries
+three pins to bump by hand, and the first tracks this workstation:
+`pipx install rust-just==1.45.0`, `python-version: "3.14"`, and the
+`actions/*` major tags. **Bumping `just` locally without bumping the
+workflow leaves CI deciding what `just check` means on a different
+program** — the drift the pin exists to prevent.
+
+One divergence is deliberate: both guard gates key on
+`refs/backups/bash-guard`, which no clone or default refspec carries, so
+on a runner they report the guard absent by design and pass (invariant 6,
+exit-0 row). Everything else must be identical.
+
+No scheduled run, so nothing but a dependency edit or GitHub's
+seven-day cache eviction produces a cold `just setup`. The local proxy,
+which is also the fastest way to see what CI sees — a clone receives no
+backup ref, no guard, and nothing gitignored:
+
+```sh
+git clone -q . /path/to/scratch/ci-probe   # scratch, outside this repo
+cd /path/to/scratch/ci-probe && just setup && just verify
+```
+
+Measured at `005`: green, with `check` reporting the boundary intact
+with no guard present and `test` skipping the selftest.
 
 ## Path exclusions
 
