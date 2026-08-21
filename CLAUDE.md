@@ -341,8 +341,8 @@ what rules 1 and 3 make them.
 
 ## Current state
 
-- **Current step:** none — `004` closed 2026-08-21.
-- **Next step:** `005` — the same harness on the forge.
+- **Current step:** `005` — the same harness on the forge, in progress.
+- **Next step:** `006` — package, interpreter floor, CLI skeleton.
 - **World state:** the harness is live and green (`just setup`
   bootstraps it), with the same checks in the commit hook, which now
   also gate the boundary and the governance frontmatter. The permission
@@ -350,19 +350,19 @@ what rules 1 and 3 make them.
   guard is live and untracked. The workflow tooling is complete — four
   skills, five agents — and the handoff templates are gone. `origin` is
   `github.com/yannlugrin/cc-frisk`, **public**, and no backup remote
-  exists. **Every write under `.claude/` prompts** — no setting removes
+  exists; CI runs the same two entry points on every push. **Every write under `.claude/` prompts** — no setting removes
   it.
 - **Open obligations:** `PLAN.md` §14 carries eleven open questions,
   each answered at the step that needs it. The sentinel may be re-staged
   before parity if `D-007`'s residue proves uncomfortable. `D-010` was
   logged after the fact rather than put to the operator before it was
-  built, and is reversible on request. `005`'s publish-or-strip question
-  stays at `005` (operator, 2026-08-19); it now decides whether to accept
-  the already published `.claude/spec-work/` and `.claude/refs/` or
-  rewrite history — and, added at `001`, that `.claude/settings.json`
-  publishes an allow list only as narrow as the guard no clone
-  receives. `D-024`'s trim-or-raise question is open: this file is over
-  its ~365 handover figure, and `005`'s close re-presents it.
+  built, and is reversible on request. The publish-or-strip question is
+  ruled: both directories are stripped (`D-025`, `D-026`), and what is
+  owed is the operator's own rewrite and force-push — until they run,
+  the published history still carries what the ruling removes.
+  `.claude/settings.json` still publishes an allow list only as narrow
+  as the guard no clone receives (`001`). `D-024` is resolved: the
+  budget stands and the gap closes in `005`'s compaction pass.
 - **`.claude/docs/` pointers:** `harness.md` — the measured behaviour of
   `just check`/`test`/`verify` and the commit hooks, with re-measure
   recipes; read before changing the `justfile`, `scripts/`,

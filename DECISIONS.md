@@ -1107,3 +1107,79 @@ Two conventions the format depends on:
   clause and `D-002`'s pre-committed arithmetic). The trim-or-raise
   question above is the operator's and is put to them at `004`'s
   handover.
+- **Resolved (2026-08-21, `005`):** the operator ruled **trim at the
+  milestone close**. The 390/~365 budget stands exactly as written; the
+  gap closes in `005`'s `optimize-memory` pass, on a model that did not
+  write the work, rather than by unreviewed edits inside a step. `005`
+  therefore does not trim and does not re-present the question.
+
+### D-025 — `.claude/spec-work/` is stripped from the published history
+
+- **Date:** 2026-08-21
+- **Step:** `005`
+- **Context:** the initial commit published `.claude/spec-work/` — 31
+  files: the specification phase's working notes, its twelve cold-read
+  and challenge reviews, the external review packet and the handoff
+  material — to a public repository that is also the plugin's install
+  channel. `PLAN.md` `005` reserved the ruling for this step and framed
+  it as a transparency question. Nothing in the implementation depends
+  on the directory being present: rule 1 forbids this session from
+  reading it at all, and its one sanctioned use, the tooling templates,
+  expired at `004`.
+- **Decision:** it goes, from the working tree's index and from the
+  published history both. This commit removes the 31 files from the
+  index and gitignores the path so it cannot return by accident; the
+  history rewrite removes them from all 53 commits, and the operator
+  force-pushes `main` and the five step tags. **The directory itself
+  stays on the operator's disk, untouched** — rule 1's never-read
+  quarantine is unaffected, and this is a change of what is published,
+  not a deletion of the operator's material. Two residues are stated
+  rather than discovered: a public history that is already cloned,
+  forked or cached by the forge keeps the old objects, so this is
+  removal going forward and not retraction; and every commit hash in
+  the repository changes, which is why the step tags are rewritten with
+  it. `git filter-branch` does the work — deprecated but shipped with
+  git 2.53, where the standard replacement is not installed and
+  fetching it would cross rule 9's boundary for a one-time act on a
+  53-commit history.
+- **The boundary held on the way here.** The session's first attempt to
+  measure the available tooling was denied by the guard for naming a
+  history-rewriting program at all, which is `001`'s ground rules
+  working exactly as `PLAN.md` `005` predicted. The rewrite and the
+  force-push are therefore the operator's own acts, run from their
+  shell against a prepared recipe; no session performs them.
+- **Alternatives considered:** *accept it public* — the reasoning behind
+  a specification is genuinely interesting to a reader judging the
+  product, and it costs nothing to keep; rejected by the operator.
+  *Remove it going forward only, with no rewrite* — rejected on the same
+  ruling: a normal deletion buys tidiness while leaving every published
+  object exactly where it was, which is precisely what the ruling is
+  about.
+- **Approved by:** operator, 2026-08-21.
+
+### D-026 — The house conventions go with it; the behavior corpus stays
+
+- **Date:** 2026-08-21
+- **Step:** `005`
+- **Context:** `.claude/refs/` is the operator's supplied material and
+  was ruled separately from `D-025`, because its authority lives at its
+  source rather than in this repository. It holds two unlike things:
+  `behavior-corpus.md`, §8.1's adjudicated yardstick, which later steps
+  consume and `PLAN.md` `005` fixes in place until parity is declared;
+  and `infra-conventions/`, five files of another project's harness
+  shape, read for shape and never for content (rule 3).
+- **Decision:** `infra-conventions/` leaves by the same route as
+  `D-025` — untracked and gitignored here, stripped from history in the
+  same rewrite — and `behavior-corpus.md` stays tracked and published.
+  Both stay on disk, and rule 3's read triggers are unchanged: the
+  conventions were read for this step's CI shape and remain readable.
+  Publishing another project's harness material in this one's install
+  channel is what the ruling removes; the corpus is this project's own
+  yardstick and belongs in the open, where a reader judging whether
+  frisk decides correctly can see what it is measured against.
+- **Alternatives considered:** *accept both public* — rejected by the
+  operator. *Remove the conventions going forward only* — rejected for
+  `D-025`'s reason, and it would have meant two mechanisms for one act.
+  *Strip the corpus too* — never on the table: later steps consume it,
+  and `PLAN.md` `005` fixes it in place until parity.
+- **Approved by:** operator, 2026-08-21.

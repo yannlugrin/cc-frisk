@@ -32,3 +32,12 @@ htmlcov/
 # untracked file and break the rituals' clean-tree preconditions.
 CLAUDE.local.md
 .claude/settings.local.json
+
+# Ruled out of the repository at step 005 (D-025, D-026), and stripped
+# from the published history in the same step. Both still exist on this
+# machine and stay readable: the specification phase's own working
+# history is CLAUDE.md rule 1's never-read directory, and the house
+# harness conventions are supplied material rule 3 keeps read-only.
+# Ignored here so neither can return to the index by accident.
+.claude/spec-work/
+.claude/refs/infra-conventions/

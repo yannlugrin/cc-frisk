@@ -139,11 +139,14 @@ above, mutating settings between runs. Worktree case:
 
 ## Path exclusions
 
-`.claude/spec-work/` and `.claude/refs/` are excluded in
-`.pre-commit-config.yaml`, keyed on path not tracked status — one place,
-so `scripts/check.sh` holds no policy. Gitignored paths are excluded for
-free by `--others --exclude-standard`, which is also what keeps
-`.claude/hooks/bash_guard.py` out of every file list (rule 1).
+`.claude/refs/` is excluded in `.pre-commit-config.yaml`, keyed on path
+not tracked status — one place, so `scripts/check.sh` holds no policy.
+Gitignored paths are excluded for free by `--others --exclude-standard`,
+which is what keeps `.claude/hooks/bash_guard.py` out of every file list
+(rule 1) and, since `005`, `.claude/spec-work/` and
+`.claude/refs/infra-conventions/` too — both left the repository at
+`D-025`/`D-026` and are ignored rather than excluded. The exclusion that
+remains covers `behavior-corpus.md`, which is still tracked.
 
 `check-added-large-files` needs `--enforce-all`: without it the hook
 intersects its list with what is *staged*, so outside a commit it checks

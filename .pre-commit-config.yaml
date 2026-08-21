@@ -15,10 +15,14 @@
 # Python style and TOML still join at step 006 with the engine, where
 # there is a body of code for a style to be about.
 ---
+# .claude/refs/ is supplied material whose authority lives at its source
+# (CLAUDE.md rule 3), so nothing here lints it. Only behavior-corpus.md
+# is still in the repository to exclude: the house conventions beside it
+# and .claude/spec-work/ left at step 005 (D-025, D-026) and are
+# gitignored, which scripts/check.sh's enumeration already excludes.
 exclude: |
   (?x)^(
-      \.claude/spec-work/.*
-    | \.claude/refs/.*
+    \.claude/refs/.*
   )$
 
 repos:
