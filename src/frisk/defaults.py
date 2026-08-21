@@ -10,6 +10,13 @@ is how an operator promotes a wrapper to a rule-bearing tool, corrects
 an arity, adds an exotic runner, or removes an entry whose name collides
 with a project binary.
 
+The third layer is the **benign assignment list** of §3.2 — the
+display/locale class, variables that cannot direct execution — declared
+with `benign_assignments()` and shadowable the same way. It is here for
+the same reason the wrappers are: without it `LC_ALL=C git status` is an
+unaccounted assignment on a registered tool, and every project would
+have to teach the engine its own locale.
+
 These entries carry no rules and no grants, which is what keeps them
 outside the coverage gate of §8.2: there is nothing here for a project's
 cases to prove.

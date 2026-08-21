@@ -202,6 +202,26 @@ class PathBoundaryTests(unittest.TestCase):
         # the boundary set answers with the stricter of the two.
         self.assertEqual(self.clean.evaluate("/etc/passwd"), Outcome.UNPROVEN)
 
+    def test_a_mixed_form_boundary_set_never_answers_no(self) -> None:
+        # The consequence of the rule above, pinned deliberately rather
+        # than left to be rediscovered (D-035): with one absolute and
+        # one relative boundary, an absolute value is cross-form to the
+        # second and a relative value to the first, so this matcher can
+        # answer satisfied or unproven and nothing else. It costs a
+        # prompt on a deny rule and nothing at all on a grant, which is
+        # the only place the corpus uses such a set.
+        for value in ("/etc/passwd", "elsewhere/x", "/tmp/../etc"):
+            with self.subTest(value=value):
+                self.assertNotEqual(
+                    self.clean.evaluate(value), Outcome.UNSATISFIED
+                )
+
+    def test_a_single_form_boundary_can_answer_no(self) -> None:
+        # And the same value against a boundary set it shares a form
+        # with is a clean miss, so "unproven" above is the cross-form
+        # rule at work rather than a matcher that cannot say no.
+        self.assertEqual(self.tmp.evaluate("/etc/passwd"), Outcome.UNSATISFIED)
+
     def test_one_bad_operand_does_not_borrow_a_good_one_s_answer(
         self,
     ) -> None:

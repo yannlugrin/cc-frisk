@@ -904,13 +904,39 @@ Detail in git history.
   the environment's `HOME`, and `~other` is unproven.** Resolving
   another user's home means reading the password database, which §4.5
   forbids; an absent `HOME` is unproven for the same reason.
+  (4) **Matchers combine by Kleene's rule, and a boundary set is an
+  `any_of`.** `any_of` answers satisfied if any does, else unproven if
+  any is unproven, else unsatisfied; `all_of` answers unsatisfied if any
+  does, else unproven if any is unproven, else satisfied — a decision
+  outranks an unknown, and an unknown outranks nothing. A `path_under`
+  with several boundaries is that same `any_of` over its boundaries.
+  The consequence is worth stating because it looks like a defect and
+  is not: a boundary set mixing absolute and relative forms —
+  `path_under("/tmp", ".scratch")` — can answer satisfied or unproven
+  and **never** unsatisfied, since an absolute value is cross-form to
+  the relative boundary and a relative one to the absolute boundary. On
+  a grant that is invisible (neither releases); on a deny rule it costs
+  a prompt for everything outside the set. The suite pins the property
+  deliberately rather than leaving it to be rediscovered.
 - **Alternatives considered:** for (1), *one `path` constructor with a
   `boundary=` switch* — one name, rejected because the two behaviours
   differ in what they accept, not in a setting, and a switch is where
   that difference would be misread. For (2), *unproven* — the safer
   reflex, rejected because it buys a prompt with a fiction. For (3),
   *leaving `~` literal* — rejected: §3.2 names it among what must be
-  resolved before comparing.
-- **Approved by:** implementer (within latitude: §3.2 leaves these to
-  the implementation; the corpus constrains two of the three), reported
-  with the step.
+  resolved before comparing. For (4), *treating a cross-form boundary
+  as "not applicable" rather than unproven*, so a boundary set answers
+  from the boundaries sharing the value's form alone — it would let a
+  mixed set say a clean no, and it has a hole: `tmp/x` against
+  `("/tmp", ".scratch")` would be a clean miss on `.scratch` and
+  therefore unsatisfied, while the value may genuinely sit inside
+  `/tmp` when the working directory is `/`. A deny rule going quiet on
+  a value that may be in the gated location is the hole three-valued
+  matching exists to close. A third reading — proving an absolute value
+  outside a relative boundary by the absence of the boundary's
+  component — is sound and is subtle machinery on the permission path
+  for a case the corpus never exercises (rule 11).
+- **Approved by:** operator, 2026-08-21, for (4) — the ruling was put
+  to them at the test gate after the review found two cases
+  contradicting each other. (1) to (3) are implementer, within latitude
+  (§3.2 leaves them to the implementation; the corpus constrains two).

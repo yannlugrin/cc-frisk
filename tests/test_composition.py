@@ -19,12 +19,16 @@ from typing import Callable
 
 from frisk.declare import (
     Arity,
+    accounted,
     amend,
     ask,
     bare,
+    benign_assignments,
     deny,
+    every_operand,
     flag,
     one_of,
+    path_under,
     silent,
     takes_value,
     tool,
@@ -57,6 +61,44 @@ from frisk.declare import ask, tool
 tool("git", rules=[ask("push", reason="Pushing is reviewed here.")])
 """
 
+GATED = """
+from frisk.declare import ask, grant, no_operands, tool
+
+tool(
+    "stubtool",
+    default=ask(reason="stubtool changes infrastructure."),
+    grants=[
+        grant(
+            "clean",
+            when=no_operands(),
+            reason="Cleaning nothing in particular.",
+            label="empty clean",
+        )
+    ],
+)
+"""
+
+ALIASED = """
+from frisk.declare import ask, handoff, tool
+
+tool(
+    "docker",
+    aliases=["podman"],
+    handoffs=[handoff("run", keeps_operands=1)],
+    rules=[ask("push", reason="A registry write.")],
+)
+"""
+
+ASSIGNED = """
+from frisk.declare import accounted, ask, tool
+
+tool(
+    "git",
+    assignments=[accounted("GIT_PAGER")],
+    rules=[ask("push", reason="A push publishes work.")],
+)
+"""
+
 
 class CollectionFixture(unittest.TestCase):
     """A directory of collection files, as the config directory is."""
@@ -67,6 +109,10 @@ class CollectionFixture(unittest.TestCase):
         self.base = Path(self.directory.name)
         (self.base / "starter.py").write_text(STARTER)
         (self.base / "infra.py").write_text(INFRA)
+
+    def write_collection(self, name: str, source: str) -> None:
+        """One more collection file, for the cases that need one."""
+        (self.base / f"{name}.py").write_text(source)
 
     def compose(
         self,
@@ -117,6 +163,59 @@ class EngineDefaultTests(CollectionFixture):
         self.assertEqual(entry.flags["-u"], Arity.VALUE)
         self.assertNotIn("--prompt-file", entry.flags)
 
+    def test_every_wrapper_the_corpus_relies_on_is_declared(
+        self,
+    ) -> None:
+        # Spot-checking a few names would let a missing
+        # `keeps_operands` on `flock` surface for the first time at the
+        # parity audit, against a ruling written years earlier.
+        for name, (values, keeps) in CORPUS_WRAPPERS.items():
+            with self.subTest(name=name):
+                entry = self.registry.lookup(name)
+                assert entry is not None
+                self.assertEqual(entry.kind, "wrapper")
+                self.assertEqual(entry.keeps_operands, keeps)
+                self.assertEqual(
+                    sorted(
+                        flag
+                        for flag, arity in entry.flags.items()
+                        if arity is Arity.VALUE
+                    ),
+                    sorted(values),
+                )
+
+    def test_xargs_is_the_stdin_fed_runner(self) -> None:
+        # Its command word is visible and its operands are not, which
+        # is what makes operand conditions on the inner command
+        # unprovable (§4.3).
+        entry = self.registry.lookup("xargs")
+        assert entry is not None
+        self.assertTrue(entry.operands_from_stdin)
+
+    def test_eval_joins_its_operands_instead_of_taking_a_payload(
+        self,
+    ) -> None:
+        # Corpus: `eval stubtool wipe`, `eval "stubtool wipe"` and
+        # `eval 'stubtool wipe'` all deny, while `eval` alone is
+        # silent. Stepping over it would leave the quoted forms as one
+        # unrecognizable token.
+        entry = self.registry.lookup("eval")
+        assert entry is not None
+        self.assertEqual(entry.kind, "shell")
+        self.assertTrue(entry.joins_operands)
+
+    def test_the_benign_assignment_layer_is_declared(self) -> None:
+        # §3.2's display/locale class. Without it every project would
+        # have to teach the engine its own locale before
+        # `LC_ALL=C git status` stopped asking.
+        described = " ".join(
+            str(assignment.name)
+            for assignment in self.registry.benign_assignments()
+        )
+        for expected in ("LC_", "LANG", "TZ", "NO_COLOR"):
+            with self.subTest(name=expected):
+                self.assertIn(expected, described)
+
     def test_shells_and_interpreters_are_declared_apart(self) -> None:
         for name in ("sh", "bash"):
             with self.subTest(name=name):
@@ -141,6 +240,53 @@ class EngineDefaultTests(CollectionFixture):
         entry = self.registry.lookup("sudo")
         assert entry is not None
         self.assertEqual(entry.source.layer, ENGINE_LAYER)
+
+
+#: The wrapper layer the corpus states as fact across all three of its
+#: policy contexts: each name, the options it takes a value for, and the
+#: positional operands it keeps before the wrapped command begins.
+#: Undeclared options are presumed bare, so this table is the whole of
+#: what the engine claims to know. Several corpus rulings depend on an
+#: exact entry — most sharply `sudo`, whose `--prompt-file` is
+#: deliberately absent.
+CORPUS_WRAPPERS = {
+    "sudo": (("-u", "--user", "-g", "--group", "-p", "--prompt"), 0),
+    "doas": (("-u", "-C"), 0),
+    "env": (("-u", "--unset", "-C", "--chdir", "-S", "--split-string"), 0),
+    "command": ((), 0),
+    "builtin": ((), 0),
+    "exec": (("-a",), 0),
+    "nohup": ((), 0),
+    "setsid": ((), 0),
+    "time": (("-f", "--format", "-o", "--output"), 0),
+    "nice": (("-n", "--adjustment"), 0),
+    "ionice": (("-c", "-n", "-p"), 0),
+    "stdbuf": (
+        ("-i", "-o", "-e", "--input", "--output", "--error"),
+        0,
+    ),
+    "timeout": (("-s", "--signal", "-k", "--kill-after"), 1),
+    "chrt": (("-p",), 1),
+    "taskset": (("-c", "-p"), 1),
+    "flock": (("-w", "--wait", "-E", "--conflict-exit-code"), 1),
+    "xargs": (
+        (
+            "-n",
+            "-P",
+            "-I",
+            "-d",
+            "-E",
+            "-L",
+            "-s",
+            "--max-args",
+            "--max-procs",
+            "--replace",
+            "--delimiter",
+            "--max-lines",
+        ),
+        0,
+    ),
+}
 
 
 class ShadowingTests(CollectionFixture):
@@ -205,6 +351,62 @@ class ShadowingTests(CollectionFixture):
             "git:ask:commit", [placed.label for placed in entry.rules]
         )
 
+    def test_an_amendment_reaches_a_collection_s_grant(self) -> None:
+        self.write_collection("gated", GATED)
+
+        def declare() -> None:
+            use("gated")
+            amend("stubtool", drop=["empty clean"])
+
+        entry = self.compose(declare).lookup("stubtool")
+        assert entry is not None
+        self.assertEqual(entry.grants, ())
+
+    def test_an_amendment_can_remove_an_alias_and_a_handoff(
+        self,
+    ) -> None:
+        self.write_collection("aliased", ALIASED)
+
+        def declare() -> None:
+            use("aliased")
+            amend("docker", drop_aliases=["podman"], drop_handoffs=["run"])
+
+        registry = self.compose(declare)
+        entry = registry.lookup("docker")
+        assert entry is not None
+        self.assertEqual(entry.handoffs, ())
+        self.assertIsNone(registry.lookup("podman"))
+
+    def test_an_amendment_can_remove_an_accounted_assignment(
+        self,
+    ) -> None:
+        self.write_collection("assigned", ASSIGNED)
+
+        def declare() -> None:
+            use("assigned")
+            amend("git", drop_assignments=["GIT_PAGER"])
+
+        entry = self.compose(declare).lookup("git")
+        assert entry is not None
+        self.assertEqual(entry.assignments, ())
+
+    def test_a_wrapper_can_be_given_a_default_verdict(self) -> None:
+        # §4.3 names this as the operator's mechanism for gating
+        # everything a runner runs: shadow the wrapper into something
+        # with an ask default, rather than teach the engine a
+        # heuristic.
+        def declare() -> None:
+            wrapper(
+                "myrunner",
+                flags=[takes_value("--as")],
+                default=ask(reason="Whatever myrunner runs is unseen."),
+            )
+
+        entry = self.compose(declare).lookup("myrunner")
+        assert entry is not None
+        assert entry.default is not None
+        self.assertEqual(entry.kind, "wrapper")
+
     def test_amending_a_name_nothing_declared_is_refused(self) -> None:
         # An amendment that silently does nothing is a boundary the
         # operator believes they have.
@@ -221,6 +423,42 @@ class ShadowingTests(CollectionFixture):
         entry = self.compose(declare, with_defaults=True).lookup("time")
         assert entry is not None
         self.assertEqual(entry.kind, "tool")
+
+
+class BenignAssignmentTests(CollectionFixture):
+    """The third default layer, shadowable like the others (§3.2)."""
+
+    def test_a_project_can_add_to_it(self) -> None:
+        def declare() -> None:
+            benign_assignments(accounted("PROJECT_LOCALE"))
+
+        registry = self.compose(declare, with_defaults=True)
+        names = [
+            str(assignment.name)
+            for assignment in registry.benign_assignments()
+        ]
+        self.assertIn("PROJECT_LOCALE", names)
+        self.assertIn("TZ", names)
+
+    def test_a_project_can_drop_from_it(self) -> None:
+        # Shadowable means removable: a variable the engine considers
+        # unable to direct execution may still matter here.
+        def declare() -> None:
+            benign_assignments(drop=["TZ"])
+
+        registry = self.compose(declare, with_defaults=True)
+        names = [
+            str(assignment.name)
+            for assignment in registry.benign_assignments()
+        ]
+        self.assertNotIn("TZ", names)
+
+    def test_dropping_what_is_not_there_is_refused(self) -> None:
+        with self.assertRaises(ConfigurationError):
+            self.compose(
+                lambda: benign_assignments(drop=["NOT_A_VARIABLE"]),
+                with_defaults=True,
+            )
 
 
 class CollectionOrderTests(CollectionFixture):
@@ -278,6 +516,18 @@ class CollectionOrderTests(CollectionFixture):
     def test_a_collection_that_is_not_there_is_refused(self) -> None:
         with self.assertRaises(ConfigurationError):
             self.compose(lambda: use("absent"))
+
+    def test_adopting_a_collection_with_nowhere_to_look_is_refused(
+        self,
+    ) -> None:
+        # Without a configuration directory there is no "beside the
+        # config" to resolve against, and searching for one would be
+        # the engine choosing what to execute.
+        with (
+            self.assertRaises(ConfigurationError),
+            collecting(with_defaults=False),
+        ):
+            use("starter")
 
     def test_a_collection_outside_the_config_directory_is_refused(
         self,
@@ -352,5 +602,28 @@ class InspectionTests(CollectionFixture):
             )
 
         registry = self.compose(declare)
-        self.assertIn("satisfied", registry.describe(value="destroy"))
-        self.assertIn("unsatisfied", registry.describe(value="check"))
+        # Bracketed, because "unsatisfied" contains "satisfied": an
+        # assertion on the bare word passes whichever answer came back,
+        # which is the shape of defect D-032 exists to stop.
+        self.assertIn("[satisfied]", registry.describe(value="destroy"))
+        self.assertIn("[unsatisfied]", registry.describe(value="check"))
+        self.assertNotIn("[satisfied]", registry.describe(value="check"))
+
+    def test_a_value_it_cannot_decide_reads_as_unproven(self) -> None:
+        def declare() -> None:
+            tool(
+                "stubtool",
+                rules=[
+                    ask(
+                        "clean",
+                        when=every_operand(path_under("/tmp")),
+                        reason="Cleaning outside scratch space.",
+                    )
+                ],
+            )
+
+        registry = self.compose(declare)
+        # A relative value against an absolute boundary: the third
+        # answer has to reach the inspection surface too, or the
+        # surface cannot show the model it exists to show.
+        self.assertIn("[unproven]", registry.describe(value="tmp/x"))

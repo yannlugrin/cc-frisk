@@ -99,11 +99,12 @@ class RegistryCommandTests(unittest.TestCase):
         _, out, _ = run(
             "registry", "--project", str(self.root), "--value", "destroy"
         )
-        self.assertIn("satisfied", out)
+        self.assertIn("[satisfied]", out)
         _, other, _ = run(
             "registry", "--project", str(self.root), "--value", "check"
         )
-        self.assertIn("unsatisfied", other)
+        self.assertIn("[unsatisfied]", other)
+        self.assertNotIn("[satisfied]", other)
 
     def test_the_output_is_ascii_and_escapes_what_it_prints(
         self,
@@ -120,4 +121,8 @@ class RegistryCommandTests(unittest.TestCase):
         _, out, _ = run("registry", "--project", str(self.root))
         self.assertTrue(out.isascii())
         self.assertNotIn("\x1b", out)
-        self.assertIn("one", out)
+        # The reason survives as one escaped line: its newline must not
+        # have become a line break in frisk's own output, which is what
+        # forging a line means here.
+        self.assertIn("one\\ntwo", out)
+        self.assertNotIn("one\ntwo", out)

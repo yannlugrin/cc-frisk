@@ -99,6 +99,7 @@ __all__ = [
     "interpreter",
     "handoff",
     "accounted",
+    "benign_assignments",
     "redirections",
     # Composition.
     "amend",
@@ -467,20 +468,44 @@ SILENT = Verdict.SILENT
 
 @dataclass(frozen=True)
 class Assignment:
-    """An environment assignment this tool accounts for."""
+    """An environment assignment a declaration accounts for."""
 
-    name: str
+    name: str | Matcher
     value: Matcher | None = None
 
 
-def accounted(name: str, value: Matcher | None = None) -> Assignment:
-    """This tool expects this assignment, optionally only with a value.
+def accounted(name: str | Matcher, value: Matcher | None = None) -> Assignment:
+    """This assignment is expected, optionally only with a value.
 
     Assignments are closed-world for every registered tool, not only
     gated ones (§3.2): one that is neither on the engine's benign list
     nor accounted for here is an explicit ask citing the assignment.
     `accounted("GIT_PAGER", one_of("cat"))` accepts the pager and asks
     about every other value.
+
+    The name may itself be a matcher, which is what a family of
+    variables needs — `accounted(matching(r"^LC_[A-Z_]+$"))` — and it
+    is why the benign layer below needs no vocabulary of its own.
+    """
+    raise NotImplementedError
+
+
+def benign_assignments(
+    *declared: Assignment, drop: Sequence[str] = ()
+) -> None:
+    """The assignments no registered tool has to account for (§3.2).
+
+    The display/locale class — `LC_*`, `LANG`, `TZ`, `NO_COLOR` and kin
+    — variables that cannot direct execution. It is an engine default
+    layer like the wrappers: enumerated, reviewable, and shadowable, so
+    a configuration adds to it and drops from it by name. Without this
+    layer `LC_ALL=C git status` would be an unaccounted assignment on a
+    registered tool, and therefore an ask.
+
+    What belongs here is exactly what cannot change what runs.
+    `GIT_SSH_COMMAND` and its dozens of siblings are the reason the
+    closed world exists (§3.2); an addition here is a decision to stop
+    reading a variable at all.
     """
     raise NotImplementedError
 
@@ -636,12 +661,19 @@ def shell(
     *,
     aliases: Sequence[str] = (),
     flags: Sequence[FlagSet] = (),
+    joins_operands: bool = False,
 ) -> None:
     """A shell: its `-c` payload is a command line and is re-analyzed.
 
     Combined spellings (`-lc`, `-ec`) are the same payload. A shell
     reached with no `-c` payload and no file operand — `curl url | sh`
     — is running a program the line cannot show, and asks (§4.3).
+
+    `joins_operands` is `eval`, which has no payload flag at all: it
+    joins its arguments and runs the result, so the joined string is
+    what gets re-analyzed. Stepping over it instead would leave a
+    quoted payload as one unrecognizable token, and `eval "git push
+    --force"` would say nothing.
     """
     raise NotImplementedError
 

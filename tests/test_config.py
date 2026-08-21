@@ -135,8 +135,12 @@ class GenerationTests(ProjectFixture):
         with self.assertRaises(ConfigurationError) as raised:
             load(self.write(VALID.format(generation=beyond)))
         message = str(raised.exception)
-        self.assertIn(str(beyond), message)
-        self.assertIn(str(CURRENT_GENERATION), message)
+        # Both numbers as numbers, not as digits appearing somewhere in
+        # a path or a version string: the operator has to be able to
+        # read what they wrote and what this engine speaks.
+        self.assertRegex(message, rf"\b{beyond}\b")
+        self.assertRegex(message, rf"\b{CURRENT_GENERATION}\b")
+        self.assertIn("generation", message.lower())
 
     def test_the_refusal_points_at_the_migration_help(self) -> None:
         # §3.5: fail closed with a message pointing at the skill's
@@ -144,7 +148,9 @@ class GenerationTests(ProjectFixture):
         # operator ends up deleting the guard instead of upgrading it.
         with self.assertRaises(ConfigurationError) as raised:
             load(self.write(VALID.format(generation=0)))
-        self.assertIn("frisk", str(raised.exception).lower())
+        # "frisk" would be satisfied by the configuration's own path;
+        # what §3.5 requires is a pointer to the migration assistance.
+        self.assertIn("migrat", str(raised.exception).lower())
 
     def test_a_configuration_declaring_no_generation_is_refused(
         self,

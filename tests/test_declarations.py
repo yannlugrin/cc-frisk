@@ -202,6 +202,31 @@ class RecognitionTests(unittest.TestCase):
         registry = compose(declare)
         self.assertIsNone(registry.lookup("deploy.py"))
 
+    def test_a_path_declaration_is_more_specific_than_a_basename(
+        self,
+    ) -> None:
+        # §4.2's most-specific-wins: a basename registration would let
+        # a grant written for the operator's script release a same-named
+        # file anywhere, so the path declaration must answer for the
+        # file the operator meant.
+        def declare() -> None:
+            tool(
+                "deploy.py",
+                default=silent(),
+            )
+            tool(
+                path="tools/deploy.py",
+                default=ask(reason="This deploy reaches production."),
+            )
+
+        registry = compose(declare)
+        by_path = registry.lookup_path("tools/deploy.py")
+        by_name = registry.lookup("deploy.py")
+        assert by_path is not None and by_name is not None
+        self.assertIsNot(by_path, by_name)
+        assert by_path.default is not None
+        self.assertEqual(by_path.default.rule.verdict, Verdict.ASK)
+
     def test_a_tool_needs_a_name_or_a_path(self) -> None:
         with self.assertRaises(ConfigurationError):
             compose(lambda: tool())
@@ -297,6 +322,16 @@ class ConditionTests(unittest.TestCase):
             with self.subTest(condition=type(condition).__name__):
                 self.assertTrue(condition.describe().strip())
 
+    def test_the_end_of_options_marker_is_matchable(self) -> None:
+        # §4.2: `--` is recognized as the end-of-options marker and is
+        # itself matchable — it is the explicit "operand is a path"
+        # signal some rules key on. The corpus needs it: context A asks
+        # on `checkout` with `--` (pathspec) and not on plain checkout,
+        # so the starter rules of `023` are written against this
+        # spelling.
+        marker = flag("--")
+        self.assertTrue(marker.describe().strip())
+
     def test_a_condition_exposes_the_matchers_inside_it(self) -> None:
         # `frisk registry --value` walks these (§3.4's inspection).
         self.assertEqual(len(flag("--mode", one_of("a")).matchers()), 1)
@@ -326,6 +361,11 @@ class OperandQuantifierTests(unittest.TestCase):
 
     def setUp(self) -> None:
         self.every = every_operand(path_under("/tmp", ".scratch"))
+        # A single-form boundary, where a clean miss is reachable at
+        # all: against the mixed set above, an absolute value is
+        # cross-form to `.scratch` and a relative one to `/tmp`, so it
+        # answers satisfied or unproven and never unsatisfied (D-035).
+        self.every_absolute = every_operand(path_under("/tmp"))
         self.at_least_one = at_least_one_operand(matching(r"^(list|show)$"))
 
     def test_every_operand_needs_all_of_them(self) -> None:
@@ -371,13 +411,22 @@ class OperandQuantifierTests(unittest.TestCase):
         )
 
     def test_a_clean_miss_outranks_an_unknown(self) -> None:
+        # One operand decided against, one unreadable: the quantifier
+        # answers with the decision. Nothing is uncertain about whether
+        # every operand matched — one of them provably did not.
         self.assertEqual(
-            self.every.evaluate(["/etc/passwd", Value("$FOO", dynamic=True)]),
-            Outcome.UNPROVEN,
-        )
-        self.assertEqual(
-            self.every.evaluate(["/tmp/../etc", Value("$FOO", dynamic=True)]),
+            self.every_absolute.evaluate(
+                ["/etc/passwd", Value("$FOO", dynamic=True)]
+            ),
             Outcome.UNSATISFIED,
+        )
+
+    def test_an_unknown_outranks_a_match(self) -> None:
+        self.assertEqual(
+            self.every_absolute.evaluate(
+                ["/tmp/x", Value("$FOO", dynamic=True)]
+            ),
+            Outcome.UNPROVEN,
         )
 
     def test_the_line_s_context_reaches_the_operands(self) -> None:
@@ -477,6 +526,22 @@ class ScopeTests(unittest.TestCase):
             scope=inside("docker run"),
         )
         self.assertEqual(rule.scope.handoff, "docker run")
+
+
+class GrantScopeTests(unittest.TestCase):
+    """A grant is scopable by execution context too (§5.2)."""
+
+    def test_a_grant_can_be_confined_to_a_handoff(self) -> None:
+        # §5.2 asks for judgment scopable by execution context, not for
+        # rules scopable by it: a shape that is safe inside a container
+        # need not be safe on the host.
+        released = grant(
+            "clean",
+            when=no_operands(),
+            reason="Cleaning inside the container.",
+            scope=inside("docker run"),
+        )
+        self.assertEqual(released.scope.handoff, "docker run")
 
 
 class RedirectionTests(unittest.TestCase):

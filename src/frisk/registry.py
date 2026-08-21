@@ -96,6 +96,7 @@ class Entry:
     closed_world: bool = False
     keeps_operands: int = 0
     operands_from_stdin: bool = False
+    joins_operands: bool = False
 
     @property
     def gated(self) -> bool:
@@ -136,6 +137,10 @@ class Registry:
         """Every case the configuration declared, tool-sited or not."""
         raise NotImplementedError
 
+    def benign_assignments(self) -> Sequence[Assignment]:
+        """The effective benign assignment layer (§3.2)."""
+        raise NotImplementedError
+
     def redirections(self) -> Sequence[PlacedRule]:
         """The effective rules on redirection targets (§4.3)."""
         raise NotImplementedError
@@ -146,9 +151,12 @@ class Registry:
         Every entry with its kind, its layer and the line it was
         written on, and every rule and grant with the label `amend`'s
         `drop` takes. With `value`, each matcher additionally carries
-        what it answers for that value — satisfied, unsatisfied or
-        unproven — which is how the three-valued model is inspected
-        before any command line exists to judge.
+        what it answers for that value, rendered as `[satisfied]`,
+        `[unsatisfied]` or `[unproven]` — bracketed because the three
+        words contain one another and a reader scanning a long registry
+        must not have to tell `satisfied` from `unsatisfied` by the
+        letters in front of it. That annotation is how the three-valued
+        model is inspected before any command line exists to judge.
         """
         raise NotImplementedError
 
