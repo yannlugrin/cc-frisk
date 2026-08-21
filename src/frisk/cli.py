@@ -10,6 +10,13 @@ This build carries the skeleton. `--version` answers; `explain` reports
 that there is no engine to answer with, and says so in the direction
 that is safe to misread: not a verdict, not an allow.
 
+One cost is worth knowing before the hook door is designed: importing
+this module costs about 5 ms over a bare interpreter on a current
+machine, nearly all of it `argparse` pulling in `re` and `gettext`,
+where importing `frisk` itself costs nothing measurable. A per-call
+decision budget is single-digit milliseconds (§4.5), so the hook path
+must reach the engine without coming through here.
+
 Two invariants hold for every path through this module, and both are
 asserted in the suite rather than left to argparse's defaults:
 
