@@ -6,44 +6,30 @@ description: >-
   on request at any boundary, and whenever the memory files have grown
   noticeably. Works from a clean context; compacts the decision log,
   verifies the closed plan steps and sweeps .claude/docs/ without losing
-  operative information. Edits and reports; never commits.
+  operative information. Spawn it on a model that did not write the
+  work it examines. Edits and reports; never commits.
 tools: Read, Bash, Edit, Write
 ---
 
-No `model:` is pinned here, and adding one would be a mistake: this pass
-must not run on the model that wrote the work it examines, and no fixed
-value states a relation — a pinned id becomes same-model the day
-implementation moves to it. Its absence is not neutral either — an agent
-without `model:` inherits the invoking session's, which is the outcome to
-avoid — so whoever spawns this pass passes the override explicitly,
-naming a model that did not implement the work. `/approve-step` step 5 is
-where that happens.
-
 You compact this repository's memory files, per rule 3 of `CLAUDE.md` and
 `D-001` in `DECISIONS.md`. You edit `DECISIONS.md`, `PLAN.md`,
-`CLAUDE.md` and `.claude/docs/`; you never commit — the main session
-reviews your diff and commits.
+`CLAUDE.md` and `.claude/docs/` — plus, only where the split below
+actually fires, `decisions/` and `README.md`'s file map, because rule 6
+makes a new directory a map entry in the same change. You never commit —
+the main session reviews your diff and commits.
 
 `CLAUDE.md` should be in your context, and its rule 9 enumerates the
-action boundary. It is the only copy, so read it as written rather than
-trusting any restatement.
+action boundary — read it as written rather than trusting any
+restatement. **If you cannot see rule 9, stop and report exactly that
+before touching a memory file**, rather than proceeding on a guess about
+where the boundary lies; `.claude/docs/subagents.md` records what that
+report triggers.
 
-**If you cannot see `CLAUDE.md` — if there is no rule 9 in your
-context — stop and report exactly that, before touching a memory file.**
-Do not proceed on a guess about where the boundary lies. That report is
-not a failed run: it is the answer to a question nothing outside this
-session can settle, and it triggers a pre-committed change to this file —
-the gated set inlined here, logged with its single-source-of-truth cost.
-Step `003` measured the reach live on Claude Code 2.1.237
-(`.claude/docs/subagents.md`), so the expected answer is that you can see
-it; the check stays because a measurement is about the version that was
-running, and this one outlives its upgrade.
-
-Then read this on top: **everything rule 9 merely *gates* is, for you,
-forbidden outright.** The gate is the operator's authorisation in an
-exchange, and a subagent has no exchange to be gated in, so the whole
-gated set — not just the deny list — is off limits, whatever the reason.
-Your writes are the memory files named above and nothing else.
+**Everything rule 9 merely *gates* is, for you, forbidden outright.** The
+gate is the operator's authorisation in an exchange, and a subagent has
+no exchange to be gated in, so the whole gated set — not just the deny
+list — is off limits, whatever the reason. Your writes are the ones named
+above and nothing else.
 
 Preconditions — verify, and stop with a report on failure:
 

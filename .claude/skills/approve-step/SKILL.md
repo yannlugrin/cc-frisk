@@ -85,9 +85,12 @@ In order:
 6. **Report, then attempt the push.** Show the step summary and what the
    close commit and tag contain — with `CLAUDE.md`'s line count and its
    change since the last close, so growth is visible at the moment it
-   happens and in front of the operator. Over budget, present **both**
-   remedies and let them rule: what could move out, and raising the
-   budget. Never resolve it by compressing something that cannot be
+   happens and in front of the operator. **Over the handover figure —
+   not only over the hard cap** — present **both** remedies and let them
+   rule: what could move out, and raising the figure. The cap is the
+   breach; the handover figure is the one that says the next step
+   arrives without room, and a prompt that waits for the cap fires only
+   once there is nothing left to decide. Never resolve it by compressing something that cannot be
    compressed without loss — the number is a signal, and a gate here
    would make deletion the cheapest way to go green.
 

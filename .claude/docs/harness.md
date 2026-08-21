@@ -170,41 +170,59 @@ stdlib-only).
 
 ### What `claude plugin validate` covers, and what it misses
 
-Measured on **Claude Code 2.1.238**, 2026-08-21, exit codes captured
-without a pipe (a pipeline reports the *last* command's status, which is
-how the 2.1.237 reading in `D-021` went partly wrong). One fixture tree
-per class, each `<root>/skills/<name>/SKILL.md`, run as
+Measured on **Claude Code 2.1.238**, 2026-08-21 — the table re-measured
+in full at step `004`, every row from its own fixture. Exit codes are
+captured without a pipe (a pipeline reports the *last* command's status,
+which is how the 2.1.237 reading in `D-021` went partly wrong). One
+fixture tree per class, each `<root>/skills/<name>/SKILL.md`, run as
 `claude plugin validate --strict <root>`:
 
-| Failure class                                | validator | our script |
-| -------------------------------------------- | --------- | ---------- |
-| No frontmatter block                          | 1 (warn)  | caught     |
-| Unparseable YAML, `---` delimiters intact     | 1 (error) | caught     |
-| Malformation swallows the closing `---`       | **0**     | caught     |
-| `name` disagrees with the path it loads from  | **0**     | caught     |
-| Skill directory with no `SKILL.md`            | **0**     | uncovered  |
-| Missing or empty `description`                | 1 (warn)  | caught     |
+| Failure class                                 | validator | our script |
+| --------------------------------------------- | --------- | ---------- |
+| No frontmatter block                           | 1 (warn)  | caught     |
+| Unparseable YAML — bad indentation             | 1 (error) | caught     |
+| Unparseable YAML — colon inside a plain scalar | **0**     | caught     |
+| Malformation swallows the closing `---`        | **0**     | caught     |
+| `name` disagrees with the path it loads from   | **0**     | caught     |
+| Skill directory with no `SKILL.md`             | **0**     | uncovered  |
+| Missing or empty `description`                 | 1 (warn)  | caught     |
 
-The three zeros are silent: the validator prints `Validation passed` and,
+The four zeros are silent: the validator prints `Validation passed` and,
 for the swallowed-delimiter case, never lists the file at all — the flow
 scalar consumes the delimiter, so nothing recognises the block as
-frontmatter. That is the whole argument for `D-021`'s "both exist":
+frontmatter. "Unparseable YAML" is two rows because it splits: the
+validator catches an indentation error and misses `name: case: colon`,
+which PyYAML rejects and it accepts. The single row `D-021` and `D-023`
+argued over was measured on the catching half only. That is the whole argument for `D-021`'s "both exist":
 what the ecosystem tool misses is exactly the class this family exists
 to catch. Two traps when re-measuring — a tree holding **no** valid
 component falls back to *manifest* validation and fails on a missing
 manifest, which reads as a catch and is not one; and `--strict` is what
 turns the two warning classes into failures.
 
-Re-measure (`$S` any scratch path; add a valid sibling skill so the
-manifest fallback cannot fire):
+Re-measure — one tree per class, each carrying a valid sibling so the
+manifest fallback cannot fire (`$S` any scratch path outside the
+repository). Run as written; the expectations are the table's:
 
 ```sh
-mkdir -p $S/skills/good $S/skills/mismatch
-printf -- '---\nname: good\ndescription: valid\n---\nbody\n' > $S/skills/good/SKILL.md
-printf -- '---\nname: other\ndescription: valid\n---\nbody\n' > $S/skills/mismatch/SKILL.md
-claude plugin validate --strict $S; echo "rc=$?"   # expect: passed, rc=0
-claude --version                                    # stamp the reading
+mk() {   # $1 class, $2 the case skill's body — empty means omit the file
+  rm -rf "$S/t"; mkdir -p "$S/t/skills/good" "$S/t/skills/case"
+  printf -- '---\nname: good\ndescription: valid\n---\nbody\n' > "$S/t/skills/good/SKILL.md"
+  [ -n "$2" ] && printf -- "$2" > "$S/t/skills/case/SKILL.md"
+  claude plugin validate --strict "$S/t" >/dev/null 2>&1; echo "$1 rc=$?"
+}
+mk no-frontmatter '<body only>\n'                             # rc=1
+mk unparseable    '---\nname: case\n  stray: 1\ndescription: x\n---\nb\n'  # rc=1
+mk unparseable-2  '---\nname: case: colon\ndescription: x\n---\nb\n'        # rc=0
+mk swallowed      '---\nname: case\ndescription: [x\n---\nb\n'              # rc=0
+mk name-mismatch  '---\nname: other\ndescription: x\n---\nb\n'              # rc=0
+mk no-skill-md    ''                                           # rc=0
+mk no-description '---\nname: case\n---\nb\n'                 # rc=1
+claude --version                                               # stamp the reading
 ```
+
+Run the same seven bodies through `scripts/check_frontmatter.py` for the
+right-hand column; `no-skill-md` is the one it does not see.
 
 A version that starts failing this retires part of the check — the
 `021` revisit in `D-021` is where that is decided, on a fresh reading.

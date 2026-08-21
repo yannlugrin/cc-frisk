@@ -1053,6 +1053,13 @@ Two conventions the format depends on:
   reported to the operator, whose call it is to touch the skill.
 - **Approved by:** operator, 2026-08-21, approving the U-066 triage and
   the `D-021` amendment.
+- **Refined (2026-08-21, `004`):** the declining measurement was taken on
+  one fixture. Re-measured across all seven failure classes, "unparseable
+  YAML with the delimiters intact" splits: the validator catches an
+  indentation error and misses `name: case: colon`, which PyYAML rejects.
+  The decision is unaffected — U-066's parenthetical is still too broad
+  and the corrected form still lives in `harness.md`, which now carries
+  both rows and a recipe reproducing every one.
 
 ### D-024 — `CLAUDE.md`'s budget re-derived at 390, the shrink `D-002` scheduled
 

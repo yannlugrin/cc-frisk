@@ -54,6 +54,32 @@ same prompt, is the agent arm — one arm alone cannot tell a restriction
 from a refusal. For the skill arm, a throwaway skill declaring
 `allowed-tools: Read` that is then asked to run Bash and Write.
 
+## What an agent definition does not carry
+
+Two policies live here rather than in each agent file, which carried
+five copies of each with nothing checking them against one another.
+
+**The `model:` key.** No agent under `.claude/agents/` pins one, and none
+should. A cold-context reviewer — `step-reviewer`, `code-reviewer`,
+`test-reviewer` — buys a fresh context, which any model gives, so
+inheriting the invoking session's model is correct; a run wanting a
+second opinion passes an override at invocation. The two milestone
+passes — `state-reviewer`, `optimize-memory` — must **not** run on the
+model that wrote the work they examine, and no fixed value states a
+relation: a pinned id becomes same-model the day implementation moves to
+it. Their missing key is therefore not neutral, since an agent without
+one inherits the spawner's; whoever spawns them passes the override
+explicitly, and `/approve-step` step 5 is where that happens.
+
+**The rule-9 visibility check.** Every agent carries the instruction to
+stop and report if rule 9 is not in its context, rather than guess where
+the boundary lies. The measurement above says it will be there; the check
+stays because a measurement is about the version that was running. **If
+an agent ever reports that it cannot see rule 9**, the pre-committed
+response is to inline rule 9's gated set into the agent definitions and
+log the single-source-of-truth cost — never to leave an agent citing a
+rule it cannot read.
+
 ## When a definition loads
 
 **Not immediately, but within the session — no restart needed.** A file
