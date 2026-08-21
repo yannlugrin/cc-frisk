@@ -190,70 +190,22 @@ does not count against this ordering.)
   tool and not the harness. Detail in git history between tags
   `step-002` and `step-003`.
 
-### 004 — Workflow tooling, part two: the agents — `awaiting test`
+### 004 — Workflow tooling, part two: the agents — `done`
 
-**Objective.** The five reviewer and maintenance agents, written under
-`003`'s measured answer about what a subagent can read — and the end of
-the templates directory.
-
-**Spec sections.** None (workflow foundation).
-
-**Deliverables.**
-
-- Agents at `.claude/agents/<name>.md`: `step-reviewer` (whose trigger
-  `003` wired into `handover-step`), the milestone pair `state-reviewer`
-  and `optimize-memory` (the foundation is one milestone, so a milestone
-  close arrives whatever later grouping applies, and both must exist
-  before it arrives rather than be improvised at the boundary), and
-  rule 2's review pair `code-reviewer` and `test-reviewer`, certainties
-  from the engine's first step on. A recovery ritual created during the
-  crisis it is needed for is too late.
-- `code-reviewer` is adapted **twice**: to carry the three standing foci
-  (security — permission-path code, the §5.1/§15 trust model must not
-  weaken; performance — §4.5's per-call latency budget; code quality),
-  and to swap its on-request, operator-named-files invocation contract
-  for rule 2's **standing per-code-step gate**.
-- `optimize-memory`'s plan-compaction section reduces to verifying each
-  closed entry is compacted and reporting any that is not, since
-  `approve-step` compacts at every close; its whole-carry protections —
-  never-compress and budget-yield alike — extend to rule 1's quarantine
-  text beside rule 9's boundary enumeration, for as long as that block
-  lives. Its compaction targets are stated: closed steps to outcomes,
-  **decision entries to their kernel** — the decision, the reason that
-  stops re-litigation, the approval — with git history the sole archive
-  and no forward obligation orphaned.
-- `code-reviewer`'s `{{CODE_PATHS}}` and `state-reviewer`'s inspection
-  scope both exclude `.claude/hooks/bash_guard.py` **unconditionally** —
-  they read files, not diffs; these are the quarantine's tooling-step
-  mechanisms, symmetric across every file-reading agent.
-- **`003`'s three probe fixtures are deleted here**, their answers
-  having been recorded in `.claude/docs/subagents.md` by then:
-  `.claude/agents/probe-tools-restricted.md`,
-  `.claude/agents/probe-tools-open.md` and
-  `.claude/skills/probe-frontmatter/SKILL.md`. They are tracked and
-  appear in every session's agent and skill lists until they go, which
-  is the price of measuring rather than assuming — paid for one step,
-  not two.
-- **In the same commit**: `.claude/spec-work/handoff/assets/` is deleted
-  and every pointer and exception referring to it — `CLAUDE.md`'s
-  temporary tooling-templates block among them — goes with it. All nine
-  templates have adopted by now, so no not-yet-adopted list is needed.
-  Git history keeps the templates; the untracked guard template alone is
-  not kept, and need not be — rule 1's restore story never rests on it.
-  Rule 1's `bash_guard.py` quarantine text **survives** this deletion,
-  attached to `.claude/hooks/bash_guard.py`, and leaves only at the
-  retirement step.
-
-**How the operator tests it.** For the agents whose true trigger arrives
-later, a smoke test — spawn, report shape, the model-override plumbing —
-with their real proof deferred to that trigger and the instructions
-saying so, because **a test that waits on a trigger the step cannot fire
-is not a test**. `just check` green over the now-instantiated tooling,
-including the frontmatter parse. A new agent appears after a rescan
-delay rather than at once (`.claude/docs/subagents.md`), so allow for it
-or restart.
-**Crosses the boundary**: the smoke tests spawn subagents and spend
-usage. Cleanup: none.
+- **Outcome (approved 2026-08-21, tag step-004):** the five reviewer and
+  maintenance agents are live under `.claude/agents/`, with
+  `code-reviewer` and `test-reviewer` written as standing gates rather
+  than errands, both file-reading agents excluding the quarantined guard
+  unconditionally, and `optimize-memory` verifying the plan rather than
+  re-compacting it. The model-key policy and the rule-9 visibility check
+  live once in `.claude/docs/subagents.md` instead of five times. The
+  probe fixtures, `.claude/spec-work/handoff/assets/` and every pointer
+  to it are gone, the quarantine re-anchored to the one path that
+  remains. Five review passes on the step's own new agents found two
+  silent passes in the governance check and an unset-variable `rm -rf` in
+  a documented recipe, all fixed and measured; `D-024` took the budget
+  shrink `D-002` had scheduled here. Detail in git history between tags
+  `step-003` and `step-004`.
 
 ### 005 — The same harness on the forge — `pending`
 

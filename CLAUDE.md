@@ -341,13 +341,14 @@ what rules 1 and 3 make them.
 
 ## Current state
 
-- **Current step:** `004` — workflow tooling, part two: the agents.
+- **Current step:** none — `004` closed 2026-08-21.
 - **Next step:** `005` — the same harness on the forge.
 - **World state:** the harness is live and green (`just setup`
   bootstraps it), with the same checks in the commit hook, which now
   also gate the boundary and the governance frontmatter. The permission
   baseline is in `.claude/settings.json`, measured and unchanged; the
-  guard is live and untracked. `origin` is
+  guard is live and untracked. The workflow tooling is complete — four
+  skills, five agents — and the handoff templates are gone. `origin` is
   `github.com/yannlugrin/cc-frisk`, **public**, and no backup remote
   exists. **Every write under `.claude/` prompts** — no setting removes
   it.
@@ -360,7 +361,8 @@ what rules 1 and 3 make them.
   the already published `.claude/spec-work/` and `.claude/refs/` or
   rewrite history — and, added at `001`, that `.claude/settings.json`
   publishes an allow list only as narrow as the guard no clone
-  receives.
+  receives. `D-024`'s trim-or-raise question is open: this file is over
+  its ~365 handover figure, and `005`'s close re-presents it.
 - **`.claude/docs/` pointers:** `harness.md` — the measured behaviour of
   `just check`/`test`/`verify` and the commit hooks, with re-measure
   recipes; read before changing the `justfile`, `scripts/`,
@@ -370,7 +372,8 @@ what rules 1 and 3 make them.
   `.claude/settings.json` or anything under `.claude/hooks/`, **and
   before designing any probe of a permission mechanism**. `subagents.md`
   — what a subagent's context carries and how stale it is, what skill
-  and agent frontmatter binds, and when a definition loads; read before
+  and agent frontmatter binds, when a definition loads, and the house
+  policy every agent definition leaves out; read before
   writing or changing anything under `.claude/skills/` or
   `.claude/agents/`, or relying on a subagent to know a rule.
 
