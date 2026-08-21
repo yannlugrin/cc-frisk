@@ -5,11 +5,14 @@ CLAUDE.md rule 2 puts this family on the list whatever the stack, because
 a malformed skill does not fail — it silently never loads, and a ritual
 nobody can invoke looks exactly like one nobody needed.
 
-Claude Code's own `claude plugin validate --strict` covers most of it and
-is the better tool where it applies, but it is the operator's unpinned
-live CLI and it misses the one failure that matters most here: a `name`
-disagreeing with its path, which leaves you editing one definition while
-another loads (`D-021`). Hence a few lines, and no more than that.
+Claude Code's own `claude plugin validate --strict` is the better tool
+where it applies, but it is the operator's unpinned live CLI and several
+failure classes pass it silently — a `name` disagreeing with its path
+among them, which leaves you editing one definition while another loads
+(`D-021`). What each tool catches is measured in `.claude/docs/harness.md`
+§ "What `claude plugin validate` covers, and what it misses"; the count
+lives there and nowhere else, having already drifted once. Hence a few
+lines, and no more than that.
 """
 
 import sys
@@ -25,7 +28,11 @@ problems = []
 
 
 def check(path, expected_name):
-    text = path.read_text(encoding="utf-8")
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        problems.append("%s: cannot be read as UTF-8: %s" % (path, exc))
+        return
     if not text.startswith("---\n") or (end := text.find("\n---", 3)) == -1:
         problems.append("%s: frontmatter missing or never closed" % path)
         return
@@ -39,14 +46,21 @@ def check(path, expected_name):
         return
     if meta.get("name") != expected_name:
         problems.append("%s: declares name %r but loads as %r" % (path, meta.get("name"), expected_name))
-    if not str(meta.get("description", "")).strip():
+    description = meta.get("description")
+    if not isinstance(description, str) or not description.strip():
         problems.append("%s: no description — it is what routes invocations" % path)
 
 
-for entry in sorted((ROOT / ".claude/skills").glob("*/SKILL.md")):
-    check(entry, entry.parent.name)
-for entry in sorted((ROOT / ".claude/agents").glob("*.md")):
-    check(entry, entry.stem)
+for pattern, name_of in (("skills/*/SKILL.md", lambda p: p.parent.name),
+                         ("agents/*.md", lambda p: p.stem)):
+    found = sorted((ROOT / ".claude").glob(pattern))
+    if not found:
+        # A moved or renamed directory would otherwise exit 0 having
+        # checked nothing — the silent non-loading this file exists to
+        # catch, one level up.
+        problems.append(".claude/%s: matches nothing — has the tree moved?" % pattern)
+    for entry in found:
+        check(entry, name_of(entry))
 
 for problem in problems:
     print("governance: %s" % problem.replace(str(ROOT) + "/", ""), file=sys.stderr)

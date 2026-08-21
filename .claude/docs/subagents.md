@@ -4,18 +4,19 @@
 `.claude/skills/`, and before relying on a subagent to know a rule.**
 
 Measured on **Claude Code 2.1.237**, 2026-08-20, step `003`. Every claim
-here is a live measurement with its recipe. Documentation is not a
-measurement: the published docs agreed with two of these and were silent
-on the rest, and the probes are what this repository stands on.
+about the platform is a live measurement with its recipe — documentation
+is not a measurement: the published docs agreed with two of these and
+were silent on the rest, and the probes are what this repository stands
+on. The last section is the exception, and says so: it is house policy
+for our own definitions, not a platform fact.
 
 ## What a subagent's context carries
 
 **`CLAUDE.md` reaches a subagent — both the built-in kinds and a
 project-defined one.** Measured twice: a built-in `general-purpose`
-agent, and a project-defined probe agent. Each was
-forbidden every tool and asked for three things that exist only in
-`CLAUDE.md`; each returned rule 9's opening line verbatim and rule 11 as
-"Proportion".
+agent, and a project-defined probe agent. Each was forbidden every tool
+and asked for three things that exist only in `CLAUDE.md`; each returned
+rule 9's opening line verbatim and rule 11 as "Proportion".
 
 **But the copy it carries is the parent session's, not the file on
 disk.** Both agents reported the current-step pointer as `none` — the
@@ -54,31 +55,25 @@ same prompt, is the agent arm — one arm alone cannot tell a restriction
 from a refusal. For the skill arm, a throwaway skill declaring
 `allowed-tools: Read` that is then asked to run Bash and Write.
 
-## What an agent definition does not carry
+## House policy for our own definitions — not a measurement
 
-Two policies live here rather than in each agent file, which carried
-five copies of each with nothing checking them against one another.
+These two are stated once here because five agent files each carried a
+copy, with nothing checking them against one another. Why they are the
+policy is `D-001`'s workflow and rule 2's gates; what follows is only
+what to do.
 
-**The `model:` key.** No agent under `.claude/agents/` pins one, and none
-should. A cold-context reviewer — `step-reviewer`, `code-reviewer`,
-`test-reviewer` — buys a fresh context, which any model gives, so
-inheriting the invoking session's model is correct; a run wanting a
-second opinion passes an override at invocation. The two milestone
-passes — `state-reviewer`, `optimize-memory` — must **not** run on the
-model that wrote the work they examine, and no fixed value states a
-relation: a pinned id becomes same-model the day implementation moves to
-it. Their missing key is therefore not neutral, since an agent without
-one inherits the spawner's; whoever spawns them passes the override
-explicitly, and `/approve-step` step 5 is where that happens.
+**`model:`.** Pin none. `step-reviewer`, `code-reviewer` and
+`test-reviewer` inherit the invoking session's model, and a run wanting a
+second opinion passes an override. `state-reviewer` and `optimize-memory`
+must **not** run on the model that wrote the work they examine: their
+spawner passes the override explicitly, since a missing key inherits.
+`/approve-step` step 5 is where that happens.
 
 **The rule-9 visibility check.** Every agent carries the instruction to
-stop and report if rule 9 is not in its context, rather than guess where
-the boundary lies. The measurement above says it will be there; the check
-stays because a measurement is about the version that was running. **If
-an agent ever reports that it cannot see rule 9**, the pre-committed
-response is to inline rule 9's gated set into the agent definitions and
-log the single-source-of-truth cost — never to leave an agent citing a
-rule it cannot read.
+stop and report if rule 9 is not in its context. **If one ever does**,
+inline rule 9's gated set into the agent definitions and log the
+single-source-of-truth cost — never leave an agent citing a rule it
+cannot read.
 
 ## When a definition loads
 

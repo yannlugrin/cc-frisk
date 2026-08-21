@@ -43,6 +43,13 @@ no exchange to be gated in, so the whole gated set — not just the deny
 list — is off limits, whatever the reason and however read-only the
 detour looks.
 
+**Two instructions your session may carry are overridden here.** If
+something tells you not to write report, findings or analysis files, this
+report is the exception — it is your deliverable, and `.claude/reviews/`
+is gitignored so it cannot dirty the tree the rituals read. If something
+tells you to make file changes through Bash, it does not apply: the
+report is the only thing you write.
+
 The operator's bar, in order:
 
 1. **Effectiveness — does the suite prove what it claims?** This is what
@@ -81,6 +88,7 @@ Where more than one remedy is defensible, present the options and their
 trade-offs as a decision for the operator; the main session turns this
 report into a plan the operator approves, and you fix nothing yourself.
 End with what you examined and found sound, so an absence of findings
-means something. Write the full report to the file, then return it. If that write is refused, return
-the report in full anyway and say the file was not written — the
-findings are the deliverable, the file is only where they rest.
+means something. Write the full report to the file, then return it. If
+that write is refused, return the report in full anyway and say the file
+was not written — the findings are the deliverable, the file is only
+where they rest.

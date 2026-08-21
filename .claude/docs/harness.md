@@ -177,52 +177,74 @@ which is how the 2.1.237 reading in `D-021` went partly wrong). One
 fixture tree per class, each `<root>/skills/<name>/SKILL.md`, run as
 `claude plugin validate --strict <root>`:
 
-| Failure class                                 | validator | our script |
-| --------------------------------------------- | --------- | ---------- |
-| No frontmatter block                           | 1 (warn)  | caught     |
-| Unparseable YAML — bad indentation             | 1 (error) | caught     |
-| Unparseable YAML — colon inside a plain scalar | **0**     | caught     |
-| Malformation swallows the closing `---`        | **0**     | caught     |
-| `name` disagrees with the path it loads from   | **0**     | caught     |
-| Skill directory with no `SKILL.md`             | **0**     | uncovered  |
-| Missing or empty `description`                 | 1 (warn)  | caught     |
+| Failure class                                  | validator | our script |
+| ---------------------------------------------- | --------- | ---------- |
+| No frontmatter block                            | 1 (warn)  | caught     |
+| Unparseable YAML — bad indentation              | 1 (error) | caught     |
+| Unparseable YAML — colon inside a plain scalar  | **0**     | caught     |
+| Malformation swallows the closing `---`         | **0**     | caught     |
+| `name` disagrees with the path it loads from    | **0**     | caught     |
+| Skill directory with no `SKILL.md`              | **0**     | uncovered  |
+| `description` key absent                        | 1 (warn)  | caught     |
+| `description:` present but null                 | **0**     | caught     |
+| `description` present but not a string           | 1 (warn)  | caught     |
 
-The four zeros are silent: the validator prints `Validation passed` and,
+The five zeros are silent: the validator prints `Validation passed` and,
 for the swallowed-delimiter case, never lists the file at all — the flow
 scalar consumes the delimiter, so nothing recognises the block as
-frontmatter. "Unparseable YAML" is two rows because it splits: the
+frontmatter. That is the whole argument for `D-021`'s "both exist": what
+the ecosystem tool misses is exactly what this family exists to catch.
+
+Two rows split under measurement, and both splits were found by tools
+this repository already had. **Unparseable YAML** is two rows: the
 validator catches an indentation error and misses `name: case: colon`,
-which PyYAML rejects and it accepts. The single row `D-021` and `D-023`
-argued over was measured on the catching half only. That is the whole argument for `D-021`'s "both exist":
-what the ecosystem tool misses is exactly the class this family exists
-to catch. Two traps when re-measuring — a tree holding **no** valid
-component falls back to *manifest* validation and fails on a missing
-manifest, which reads as a catch and is not one; and `--strict` is what
-turns the two warning classes into failures.
+which PyYAML rejects and it accepts — the single row `D-021` and `D-023`
+argued over was measured on the catching half only. **`description`** is
+three: an absent key and a non-string both fail `--strict`, while
+`description:` with nothing after it passes *both* tools until step
+`004` fixed ours, because `str(None).strip()` is truthy. That is the
+likeliest way to reach an empty description and it was the last one
+either tool saw.
+
+Two traps when re-measuring — a tree holding **no** valid component falls
+back to *manifest* validation and fails on a missing manifest, which
+reads as a catch and is not one; and `--strict` is what turns the warning
+classes into failures.
 
 Re-measure — one tree per class, each carrying a valid sibling so the
-manifest fallback cannot fire (`$S` any scratch path outside the
-repository). Run as written; the expectations are the table's:
+manifest fallback cannot fire. `mktemp -d` rather than a variable you
+must remember to set: an unset `$S` in an `rm -rf "$S/t"` is an unscoped
+delete outside the project, which is rule 9's gated side. Run as written;
+the expectations are the table's:
 
 ```sh
+S=$(mktemp -d) || exit 1
 mk() {   # $1 class, $2 the case skill's body — empty means omit the file
   rm -rf "$S/t"; mkdir -p "$S/t/skills/good" "$S/t/skills/case"
   printf -- '---\nname: good\ndescription: valid\n---\nbody\n' > "$S/t/skills/good/SKILL.md"
   [ -n "$2" ] && printf -- "$2" > "$S/t/skills/case/SKILL.md"
   claude plugin validate --strict "$S/t" >/dev/null 2>&1; echo "$1 rc=$?"
 }
-mk no-frontmatter '<body only>\n'                             # rc=1
-mk unparseable    '---\nname: case\n  stray: 1\ndescription: x\n---\nb\n'  # rc=1
-mk unparseable-2  '---\nname: case: colon\ndescription: x\n---\nb\n'        # rc=0
-mk swallowed      '---\nname: case\ndescription: [x\n---\nb\n'              # rc=0
-mk name-mismatch  '---\nname: other\ndescription: x\n---\nb\n'              # rc=0
-mk no-skill-md    ''                                           # rc=0
-mk no-description '---\nname: case\n---\nb\n'                 # rc=1
-claude --version                                               # stamp the reading
+mk no-frontmatter  '<body only>\n'                                          # rc=1
+mk unparseable     '---\nname: case\n  stray: 1\ndescription: x\n---\nb\n'  # rc=1
+mk unparseable-2   '---\nname: case: colon\ndescription: x\n---\nb\n'        # rc=0
+mk swallowed       '---\nname: case\ndescription: [x\n---\nb\n'              # rc=0
+mk name-mismatch   '---\nname: other\ndescription: x\n---\nb\n'              # rc=0
+mk no-skill-md     ''                                                       # rc=0
+mk desc-absent     '---\nname: case\n---\nb\n'                               # rc=1
+mk desc-null       '---\nname: case\ndescription:\n---\nb\n'                 # rc=0
+mk desc-not-string '---\nname: case\ndescription: [a, b]\n---\nb\n'          # rc=1
+claude --version                                                            # stamp the reading
+rm -rf "$S"
 ```
 
-Run the same seven bodies through `scripts/check_frontmatter.py` for the
-right-hand column; `no-skill-md` is the one it does not see.
+For the right-hand column, our script fixes `ROOT` to the repository
+(`D-022` removed its root argument), so the fixture tree must imitate one:
+the same bodies under `$S/u/.claude/skills/case/SKILL.md`, the script
+copied to `$S/u/scripts/`, and **a valid sibling in each of
+`.claude/skills/` and `.claude/agents/`** — without them the empty-glob
+arm fires and every row reads as caught for the wrong reason, including
+`no-skill-md`, which is the one row it genuinely does not see.
 
 A version that starts failing this retires part of the check — the
 `021` revisit in `D-021` is where that is decided, on a fresh reading.

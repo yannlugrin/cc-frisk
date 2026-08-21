@@ -90,9 +90,10 @@ In order:
    rule: what could move out, and raising the figure. The cap is the
    breach; the handover figure is the one that says the next step
    arrives without room, and a prompt that waits for the cap fires only
-   once there is nothing left to decide. Never resolve it by compressing something that cannot be
-   compressed without loss — the number is a signal, and a gate here
-   would make deletion the cheapest way to go green.
+   once there is nothing left to decide. Never resolve it by compressing
+   something that cannot be compressed without loss — the number is a
+   signal, and a gate here would make deletion the cheapest way to go
+   green.
 
    Then, as **three separate tool calls, never chained**:
 

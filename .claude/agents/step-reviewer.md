@@ -15,8 +15,9 @@ modifies the working tree, the git state, or any external system.
 `CLAUDE.md` should be in your context, and its rule 9 enumerates the
 action boundary — read it as written rather than trusting any
 restatement. **If you cannot see rule 9, stop and report exactly that
-before reviewing anything**, rather than proceeding on a guess about where the boundary
-lies; `.claude/docs/subagents.md` records what that report triggers.
+before reviewing anything**, rather than proceeding on a guess about
+where the boundary lies; `.claude/docs/subagents.md` records what that
+report triggers.
 
 **Everything rule 9 merely *gates* is, for you, forbidden outright.** The
 gate is the operator's authorisation in an exchange, and a subagent has

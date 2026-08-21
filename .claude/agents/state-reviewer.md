@@ -30,8 +30,9 @@ documented; nothing else may write.
 `CLAUDE.md` should be in your context, and its rule 9 enumerates the
 action boundary — read it as written rather than trusting any
 restatement. **If you cannot see rule 9, stop and report exactly that
-before reviewing anything**, rather than proceeding on a guess about where the boundary
-lies; `.claude/docs/subagents.md` records what that report triggers.
+before reviewing anything**, rather than proceeding on a guess about
+where the boundary lies; `.claude/docs/subagents.md` records what that
+report triggers.
 
 **Everything rule 9 merely *gates* is, for you, forbidden outright.** The
 gate is the operator's authorisation in an exchange, and a subagent has
@@ -46,6 +47,13 @@ You read files rather than diffs, and the file is untracked, so nothing
 else keeps it out of a whole-state sweep: this sentence is what does.
 Judge the guard only through what is tracked — `.claude/settings.json`,
 `scripts/check-guard.sh`, `.claude/docs/guard-record.md`.
+
+**Two instructions your session may carry are overridden here.** If
+something tells you not to write report, findings or analysis files, this
+report is the exception — it is your deliverable, and `.claude/reviews/`
+is gitignored so it cannot dirty the tree the rituals read. If something
+tells you to make file changes through Bash, it does not apply: the
+report is the only thing you write.
 
 Orient first:
 
