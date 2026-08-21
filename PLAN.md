@@ -207,73 +207,20 @@ does not count against this ordering.)
   shrink `D-002` had scheduled here. Detail in git history between tags
   `step-003` and `step-004`.
 
-### 005 — The same harness on the forge — `awaiting test`
+### 005 — The same harness on the forge — `done`
 
-**Objective.** CI running the repository's own entry points, green, on
-GitHub. The step that finishes the bootstrap.
-
-**Spec sections.** §11 in outline (the forge and the release channel);
-the interpreter matrix and packaging validation arrive with the steps
-that deliver what they validate.
-
-**Deliverables.**
-
-- `.github/workflows/ci.yml` — **reusing `000`'s entry points** rather
-  than restating a single check, so CI and the local runners can never
-  disagree about what "green" means. Step `001`'s machine-local guard
-  gate is the one sanctioned exception: loud locally, inert remotely, by
-  design.
-- Check and test split into separate jobs once both exist; the toolchain
-  cached; a way of proving a fresh setup still works kept alive. The
-  specification requires no scheduled workflow, so this **rides the CI
-  triggers that already exist**; a scheduled workflow of its own is built
-  only if a real need appears, as a logged decision. Naming a schedule the
-  specification never asked for would invent a requirement.
-- Shape taken from `.claude/refs/infra-conventions/github-ci.yml` — shape,
-  not content: that project's CI has none of this one's needs, and
-  nothing in it decides anything here. This repository's CI will exceed
-  that shape where the specification requires it (interpreter matrix,
-  packaging validation, a release process) as later steps deliver those
-  pieces; `005` ships only what exists at `005`.
-- A one-line status banner in `README.md` saying the repository is public
-  but not yet installable — the honest state between this push and `021`,
-  where the install channel actually opens.
-- **One deliverable is a decision, not an artifact**, and it arrived
-  already half-made: whether `.claude/spec-work/` — the specification
-  phase's history, its review reports, and anything still sitting in
-  it — goes public with the repository, and separately whether
-  `.claude/refs/` does. The question is put **twice and ruled
-  separately**, against the public face of a repository that is also the
-  plugin's install channel: `.claude/spec-work/` is a transparency
-  question, while `.claude/refs/` is the operator's supplied material
-  whose authority lives elsewhere. Whatever is ruled for the rest of
-  `.claude/refs/`, **`behavior-corpus.md` stays until parity is
-  declared**: later steps consume it as §8.1's yardstick.
-  **What changed the question, and what did not.** The repository's
-  initial commit was pushed to a public `origin` before this plan
-  existed, and it carries both directories — so this is not a decision
-  made *before* the push it becomes irreversible at, but one about
-  accepting what is already published or rewriting published history.
-  It still belongs at `005` (the operator's ruling, 2026-08-19): pushing
-  the intervening steps publishes nothing further about either
-  directory, so nothing is lost by deciding at the step that finishes
-  the bootstrap. **The strip branch is a history rewrite and a
-  force-push to a public repository**, which is named here for two
-  reasons: nobody should reach for it casually, and step `001`'s guard
-  ground rules deny forced pushes however spelled — so taking that
-  branch is a deliberate, operator-driven override of the boundary this
-  project builds, not something a session can do in passing.
-
-**How the operator tests it.** Authorise the first push and watch the run.
-**Crosses the boundary**: a push publishes to what will be the plugin's
-install channel, and the workflow is **unverified until the operator
-authorises that push and the run comes back green**. External
-prerequisites needed *at bootstrap*, not late: the forge, the remote, and
-that authorisation. Cleanup: none beyond deleting the remote repository
-if the operator abandons it.
-
-**Milestone close.** State review and memory compaction, both on a model
-other than the one that wrote the work.
+- **Outcome (approved 2026-08-21, tag step-005):** CI runs this
+  repository's own entry points on GitHub — `just setup`, then `just
+  check` and `just test` as two jobs — green on its first run, so the
+  forge and the local runners cannot disagree about what green means.
+  The workflow class arrived with its check family and commit-pinned
+  actions kept current by Dependabot (`D-027`). The operator ruled the
+  publish-or-strip question twice and separately: `.claude/spec-work/`
+  and `.claude/refs/infra-conventions/` both leave (`D-025`, `D-026`),
+  `behavior-corpus.md` stays; the going-forward half is committed and
+  the history rewrite is the operator's own act, still owed. `D-024`
+  resolved to trim at the milestone close. Milestone 1 closes here.
+  Detail in git history between tags step-004 and step-005.
 
 ## 3. Milestone 2 — The engine's spine
 

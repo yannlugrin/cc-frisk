@@ -22,7 +22,7 @@ operator.
 [![ci](https://github.com/yannlugrin/cc-frisk/actions/workflows/ci.yml/badge.svg)](https://github.com/yannlugrin/cc-frisk/actions/workflows/ci.yml)
 
 **Status: public, not yet installable.** The repository is readable and
-carries its CI, but nothing here installs as a plugin yet — the install
+its CI is green, but nothing here installs as a plugin yet — the install
 channel opens later. `PLAN.md` is the authority on where the work
 stands.
 

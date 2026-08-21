@@ -342,7 +342,8 @@ platform rather than assuming; `docs/` is documentation for humans
 
 ## Current state
 
-- **Current step:** `005` — the same harness on the forge, awaiting test.
+- **Current step:** none — `005` closed 2026-08-21, and Milestone 1 with
+  it. The state review and the compaction pass are its close ritual.
 - **Next step:** `006` — package, interpreter floor, CLI skeleton.
 - **World state:** the harness is live and green (`just setup`
   bootstraps it), with the same checks in the commit hook, which now
@@ -351,19 +352,20 @@ platform rather than assuming; `docs/` is documentation for humans
   guard is live and untracked. The workflow tooling is complete — four
   skills, five agents — and the handoff templates are gone. `origin` is
   `github.com/yannlugrin/cc-frisk`, **public**, and no backup remote
-  exists. CI is committed, unproven until the first authorised push.
+  exists. CI runs both entry points on the forge, green, with Dependabot
+  holding its action pins current.
   **Every write under `.claude/` prompts** — no setting removes it.
 - **Open obligations:** `PLAN.md` §14 carries eleven open questions,
   each answered at the step that needs it. The sentinel may be re-staged
   before parity if `D-007`'s residue proves uncomfortable. `D-010` was
   logged after the fact rather than put to the operator before it was
   built, and is reversible on request. The publish-or-strip question is
-  ruled: both directories are stripped (`D-025`, `D-026`), and what is
-  owed is the operator's own rewrite and force-push — until they run,
-  the published history still carries what the ruling removes.
+  ruled: both directories are stripped (`D-025`, `D-026`), and the
+  operator's own rewrite and force-push are **still owed** — until they
+  run, the published history carries what the ruling removes.
   `.claude/settings.json` still publishes an allow list only as narrow
   as the guard no clone receives (`001`). `D-024` is resolved: the
-  budget stands and the gap closes in `005`'s compaction pass.
+  budget stands and the gap closes in the compaction pass below.
 - **`.claude/docs/` pointers:** `harness.md` — the measured behaviour of
   `just check`/`test`/`verify` and the commit hooks, with re-measure
   recipes, and what CI pins; read before changing the `justfile`,
