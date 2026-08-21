@@ -140,8 +140,7 @@ above, mutating settings between runs. Worktree case:
 ## On the forge
 
 `.github/workflows/ci.yml` (step `005`) runs the same entry points as
-two jobs; its own comments carry why it is shaped as it is. Two facts
-about it are the harness's business rather than the workflow's:
+two jobs. Two facts about it are the harness's business:
 
 **Bumping a tool locally without bumping the workflow is the drift the
 pins exist to prevent.** `rust-just==1.45.0` tracks *this workstation*,
@@ -153,9 +152,13 @@ By hand, if one is ever needed before the bot gets to it:
 `gh api repos/<owner>/<repo>/git/ref/tags/<tag>`, following an
 annotated-tag object through `git/tags/<sha>` to its commit.
 
-**The clone probe is the local proxy for a runner**, and the fastest way
-to see what CI sees: a clone receives no backup ref, no guard, and
-nothing gitignored.
+**The clone probe is the local proxy for a runner**, and the only proof
+of a from-nothing setup there is. With no scheduled run, a cold `just
+setup` happens on a dependency edit or after GitHub evicts a cache
+unused for seven days — so through a busy week in which neither cache
+key changes, a setup that no longer works from nothing stays hidden.
+Run the probe when that matters; a clone receives no backup ref, no
+guard, and nothing gitignored.
 
 ```sh
 git clone -q . /path/to/scratch/ci-probe   # scratch, outside this repo

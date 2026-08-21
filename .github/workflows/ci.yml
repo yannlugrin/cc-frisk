@@ -1,52 +1,17 @@
-# CI runs this repository's own entry points and nothing else, so a
-# check can never exist on one side and not the other: `just setup`,
-# then `just check` and `just test`, which together are `just verify`.
-#
-# Every tool that decides a verdict is pinned — `just` here, the
-# interpreter below, pre-commit and PyYAML in requirements.txt, each
-# linter by `rev` in .pre-commit-config.yaml. `rust-just` tracks this
-# workstation's version rather than the newest release, because the
-# point of the pin is that both places run the same program; bumping one
-# without the other is the drift a green CI must not be able to hide
-# (.claude/docs/harness.md). The runner image is the deliberate
-# exception: it supplies bash, git and coreutils, not verdicts, and
-# pinning it would mean choosing an image that stops receiving patches.
-#
-# Half of one gate is inert here, by design, and only half.
-# `scripts/check-guard.sh` asks two questions: whether the settings
-# files still describe an intact boundary, which runs everywhere and can
-# fail on this runner; and whether the guard itself answers, which is
-# keyed on refs/backups/bash-guard — a ref outside refs/heads/ that no
-# clone receives — and reports the guard absent by design here. `just
-# test` skips the guard's selftest on the same key. Nothing else differs.
-#
-# No scheduled run: §11 asks for none and PLAN.md 005 forbids inventing
-# one. What proves `just setup` still works from nothing is that both
-# cache keys hash the file that decides their contents and carry no
-# restore-keys, so any dependency edit is a cold run, and that GitHub
-# evicts a cache unused for seven days. The residue, stated rather than
-# hidden: through a busy week in which neither file changes, a setup
-# that no longer works from nothing stays hidden. A schedule joins as a
-# logged decision if that ever bites.
-#
-# §11's interpreter matrix and packaging validation extend this file at
-# PLAN.md 029, where there is a package and a floor version to be about.
+# CI runs this repository's own entry points and nothing else, so a check
+# cannot exist on one side and not the other. Pins and the check family:
+# D-027. Why there is no scheduled run: PLAN.md 005.
 ---
 name: ci
 
-# Pushes here land on main at a step close (CLAUDE.md rule 6), so main
-# is the only branch to watch; keeping tags out stops the annotated
-# step-NNN tag from re-verifying the commit its own push just verified.
-# pull_request covers the one case a push trigger cannot see at all — a
-# contribution from a fork of a public repository.
+# Work lands on main at a step close; keeping tags out stops the
+# annotated step-NNN tag re-verifying the commit its own push just did.
+# pull_request covers what a push trigger cannot see: a fork.
 "on":
   push:
     branches: [main]
   pull_request:
 
-# The jobs read the checkout and nothing else. Stated here so the token's
-# scope is a property of this file rather than of a repository setting
-# that can change without touching it.
 permissions:
   contents: read
 
@@ -55,31 +20,24 @@ jobs:
     name: ${{ matrix.target }}
     runs-on: ubuntu-latest
     strategy:
-      # Two jobs, because they answer independent questions: whether what
-      # is committed is well-formed, and whether the implementation is
-      # right. Neither verdict tells you anything about the other, so
-      # neither waits for it, and one failing must not cancel the other.
+      # Independent questions — is what is committed well-formed, is the
+      # implementation right — so neither waits on or cancels the other.
       fail-fast: false
       matrix:
         target: [check, test]
     steps:
-      # Pinned by commit, with the release each one is, because a major
-      # tag is retargeted by its publisher and would leave CI running
-      # something no diff in this repository records (rule 2).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         id: python
         with:
-          # This workstation's interpreter, named rather than floated.
-          # The floor the project commits to is decided at PLAN.md 006,
-          # and the matrix proving it arrives at 029.
+          # This workstation's interpreter. The committed floor is
+          # decided at PLAN.md 006, its matrix at 029.
           python-version: "3.14"
 
-      # Keyed exactly, with no restore-keys: a near-miss would restore an
+      # Keyed exactly, no restore-keys: a near-miss restores an
       # environment still holding a package requirements.txt no longer
-      # names — pip does not uninstall what left the file — and CI would
-      # pass on a tool a fresh clone does not have.
+      # names, and pip does not uninstall what left the file.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         name: Cache the Python environment
         with:
@@ -88,11 +46,8 @@ jobs:
             venv-${{ runner.os }}-py${{ steps.python.outputs.python-version
             }}-${{ hashFiles('requirements.txt') }}
 
-      # One isolated environment per pinned hook, shellcheck's binary
-      # among them — the larger build by far, and only `check` ever
-      # produces or reads it. `just test` never invokes pre-commit, so
-      # sharing this key would let the empty job win the race to save it
-      # and leave `check` rebuilding from scratch every run.
+      # `check` only: `just test` never invokes pre-commit, so sharing
+      # this key would let the empty job win the race to save it.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         name: Cache the pre-commit hook environments
         if: matrix.target == 'check'
@@ -102,11 +57,16 @@ jobs:
             hooks-${{ runner.os }}-py${{ steps.python.outputs.python-version
             }}-${{ hashFiles('.pre-commit-config.yaml') }}
 
+      # Tracks the workstation's version, not the newest release: the
+      # point of the pin is that both places run the same program.
       - name: Install just
         run: pipx install rust-just==1.45.0
 
       - name: Install the pinned toolchain
         run: just setup
 
+      # Both guard gates key on refs/backups/bash-guard, which no clone
+      # receives, so the guard-execution half reports absent by design
+      # here. The governance half runs, and can fail.
       - name: Run just ${{ matrix.target }}
         run: just ${{ matrix.target }}
