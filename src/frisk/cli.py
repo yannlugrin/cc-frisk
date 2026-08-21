@@ -48,6 +48,13 @@ PROGRAM = "frisk"
 #: report; 2 is argparse's own usage failure and is left to it.
 EXIT_USAGE = 2
 EXIT_NO_VERDICT = 3
+#: `registry` found no configuration: the plugin is enabled and gates
+#: nothing, which §5.4 requires be said unmissably rather than answered
+#: with an empty registry.
+EXIT_NO_CONFIG = 4
+#: The configuration exists and could not be loaded (§7.1). Loud, and
+#: never an empty registry standing in for a boundary that failed.
+EXIT_CONFIG_ERROR = 5
 
 _NO_ENGINE = """\
 {program} {version} carries no decision engine yet: this build ships the
@@ -120,6 +127,37 @@ def build_parser() -> argparse.ArgumentParser:
     )
     explain.set_defaults(handler=explain_command)
 
+    registry = subcommands.add_parser(
+        "registry",
+        help="print the effective registry the configuration composes",
+        description=(
+            "Print the effective registry: every declaration that "
+            "survived composition, the layer and line it came from, "
+            "and the label that amends it. Composition must never be "
+            "able to hide a rule (§3.4), and this is where that is "
+            "checked."
+        ),
+    )
+    registry.add_argument(
+        "--project",
+        metavar="<dir>",
+        default=None,
+        help=(
+            "the project to read the configuration of "
+            "(default: found by walking up from here)"
+        ),
+    )
+    registry.add_argument(
+        "--value",
+        metavar="<value>",
+        default=None,
+        help=(
+            "also show what each matcher answers for this value: "
+            "satisfied, unsatisfied or unproven"
+        ),
+    )
+    registry.set_defaults(handler=registry_command)
+
     return parser
 
 
@@ -133,6 +171,17 @@ def explain_command(args: argparse.Namespace) -> int:
         )
     )
     return EXIT_NO_VERDICT
+
+
+def registry_command(args: argparse.Namespace) -> int:
+    """`frisk registry` — print the composed registry and its sources.
+
+    Three outcomes, three statuses: a registry printed, no
+    configuration at all, or a configuration that would not load. The
+    second is not an empty registry and the third is not a silent one —
+    both are the visible failure §5.4 and §7.1 ask for.
+    """
+    raise NotImplementedError
 
 
 def main(argv: Sequence[str] | None = None) -> int:

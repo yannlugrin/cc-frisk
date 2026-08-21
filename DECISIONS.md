@@ -811,3 +811,106 @@ Detail in git history.
   ritual, of `guard-record.md` and of `DECISIONS.md`'s own reasoning.
 - **Approved by:** operator, 2026-08-21, choosing the behaviour-bearing
   scope and the trim-before-adding route.
+
+### D-033 — The configuration lives at `.claude/frisk/config.py`
+
+- **Date:** 2026-08-21
+- **Step:** `007`
+- **Context:** §5.1 requires a dedicated directory inside the project's
+  `.claude/`, says its name should carry the plugin's name, and leaves
+  the exact name and internal layout to the implementation. Every later
+  step presupposes an answer: the manual tests say "write a config by
+  hand in a scratch project", `018`'s hook must resolve it, `021`'s
+  same-configuration requirement compares two resolutions of it, and
+  `024`'s scaffold creates it.
+- **Decision:** the directory is `.claude/frisk/`, and the file the
+  engine executes is `config.py` in it. Collections adopted with
+  `use("name")` are `name.py` beside it, and nothing outside that
+  directory is ever executed. The scaffold creates the directory; it
+  does not choose where it goes.
+- **Alternatives considered:** *`.claude/frisk.py`, a single file* —
+  fewer paths, rejected because §5.1 wants one directory the operator
+  versions and the plugin promises about, with room for cases and a
+  future declarative source. *A configurable location* — a setting to
+  point elsewhere; rejected as the thing §9's same-configuration
+  requirement exists to prevent: two resolvers that can disagree.
+  *`config.py` versus `frisk.py` or `registry.py` inside the
+  directory* — `config.py` says what the file is to an operator reading
+  a directory listing, and the directory already carries the name.
+- **Approved by:** implementer (within latitude: §5.1 delegates the
+  name explicitly), put to the operator with the step.
+
+### D-034 — The config-facing API is declarations with one `when=`
+
+- **Date:** 2026-08-21
+- **Step:** `007`
+- **Context:** the API is the stability boundary of §3.5 and the
+  document an operator reviews to know their boundary (§5.3), so its
+  shape is a decision rather than a detail. It had to be designed
+  against the whole of §5.2 at once — nothing may be precluded by a
+  later staging — while staying readable to somebody who does not write
+  Python.
+- **Decision:** entities are declared by kind (`tool`, `wrapper`,
+  `shell`, `interpreter`), each call registering rather than returning
+  a value; verdicts are constructors (`deny`, `ask`, `allow`, `silent`,
+  `grant`) taking a subcommand path as it is typed, a mandatory
+  `reason`, and a single `when=` holding one condition or a sequence of
+  them, all of which must hold. Or lives inside the value layer
+  (`any_of`, `any_flag`, `at_least_one_operand`), never as a second
+  boolean vocabulary over conditions: where a cross-kind or is wanted,
+  two rules of the same verdict express it, which §3.2's order-free
+  ranking makes equivalent. Flag arities are declared in named buckets
+  (`bare`, `takes_value`, `may_take_value`) so a thirty-flag closed
+  world reads as three lines; on a gated tool that same declaration
+  *is* the accounted set, and `closed_world=True` says so without a
+  grant. Shadowing is `tool()` again to replace and `amend()` to
+  update, `amend` dropping rules and grants by label — declared, or
+  derived as `<name>:<verdict>:<subcommand>` and printed by
+  `frisk registry`, so what is dropped is what was read. Secure mode
+  and §7.2's failure dial are deliberately absent until the behaviour
+  they configure ships; both are additive top-level declarations.
+- **Alternatives considered:** *objects the config wires together* —
+  `git = tool("git"); git.deny(…)`; rejected because it puts
+  composition order in the operator's hands one call at a time where
+  §3.4 wants it in one declared order, and because it reads as a
+  program rather than a declaration. *A data-literal config (TOML,
+  YAML)* — the most legible surface of all, and the one §5.1 rules out:
+  the configuration is trusted *code* the hook executes, and predicates
+  and matcher composition have no literal form. *Separate `rules=` and
+  `conditions=` spellings per condition kind* — `operands=every(…)`
+  beside `when=flag(…)`; rejected as two ways to say one thing.
+- **Approved by:** operator, at the test gate of `007` (`D-032`): the
+  cases are the API's first draft, so approving them approves this.
+
+### D-035 — Three matcher rulings the specification leaves open
+
+- **Date:** 2026-08-21
+- **Step:** `007`
+- **Context:** §3.2 fixes the hard parts of matching — resolution before
+  comparison, cross-form unproven, lexical `cd` poisoning — and leaves
+  three questions to the implementation that the corpus's rulings
+  answer or constrain.
+- **Decision:** (1) **`path_under` is a boundary and `path_matching` is
+  not.** A path under a matched boundary is matched (glob boundaries
+  included: `/home/*/scratch` accepts `/home/me/scratch/build`), while a
+  regex constrains the resolved path itself (`^/mnt/\w+/build$` rejects
+  `/mnt/data/build/sub`). Both readings are forced by context B's
+  rulings, which is why the two forms are separate constructors rather
+  than one with a flag. (2) **An empty operand list is unsatisfied, not
+  unproven.** §3.2 requires "every operand" to need at least one, and
+  on a grant either reading refuses; on a deny rule they differ, and
+  nothing is uncertain about a list known to be empty — §3.3's stricter
+  direction is for what cannot be decided. (3) **`~` is expanded from
+  the environment's `HOME`, and `~other` is unproven.** Resolving
+  another user's home means reading the password database, which §4.5
+  forbids; an absent `HOME` is unproven for the same reason.
+- **Alternatives considered:** for (1), *one `path` constructor with a
+  `boundary=` switch* — one name, rejected because the two behaviours
+  differ in what they accept, not in a setting, and a switch is where
+  that difference would be misread. For (2), *unproven* — the safer
+  reflex, rejected because it buys a prompt with a fiction. For (3),
+  *leaving `~` literal* — rejected: §3.2 names it among what must be
+  resolved before comparing.
+- **Approved by:** implementer (within latitude: §3.2 leaves these to
+  the implementation; the corpus constrains two of the three), reported
+  with the step.

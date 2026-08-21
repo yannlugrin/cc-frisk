@@ -327,10 +327,11 @@ own tree, whose paths `PLAN.md` `021` confirms rather than assumes;
 
 ## Current state
 
-- **Current step:** none — `006` closed 2026-08-21.
-- **Next step:** `007` — declarations, matchers, layering. **Test-gated**
-  (`D-032`), and its cases are also the config-facing API's first draft,
-  so that gate approves an interface as well as behaviour.
+- **Current step:** `007` — declarations, matchers, layering, at its
+  test gate (`D-032`): the cases are written and red, the implementation
+  is not. They are also the config-facing API's first draft (`D-034`),
+  so this gate approves an interface as well as behaviour.
+- **Next step:** `008` — reading the line.
 - **World state:** the harness (`just setup/check/test/verify`) runs the
   same checks locally, in the commit hook and in CI, green; `setup` also
   installs the engine, and the 3.9 floor is executed by CI's test
