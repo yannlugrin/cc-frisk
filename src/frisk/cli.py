@@ -37,6 +37,7 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
+from typing import NoReturn
 
 from . import __version__
 
@@ -64,6 +65,24 @@ def render(command_line: str) -> str:
     return ascii(command_line)
 
 
+class CommandLineParser(argparse.ArgumentParser):
+    """A subcommand parser whose argument is a command line.
+
+    Such an argument routinely starts with a dash, and argparse reports
+    `frisk explain -h` as a *missing* argument — naming neither the
+    token it consumed nor the way to pass one. The failure is already
+    safe; this makes it legible.
+    """
+
+    def error(self, message: str) -> NoReturn:
+        super().error(
+            f"{message}\n"
+            "note: a command line beginning with '-' is data, not an "
+            "option.\n      Pass it after '--', as in: "
+            "frisk explain -- -h"
+        )
+
+
 def build_parser() -> argparse.ArgumentParser:
     """The whole command surface, in one place."""
     parser = argparse.ArgumentParser(
@@ -77,7 +96,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="print the engine version answering here and exit",
     )
 
-    subcommands = parser.add_subparsers(metavar="<command>")
+    subcommands = parser.add_subparsers(
+        metavar="<command>", parser_class=CommandLineParser
+    )
     explain = subcommands.add_parser(
         "explain",
         help="show the verdict frisk would return for a command line",

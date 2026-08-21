@@ -107,9 +107,12 @@ class ExplainTest(unittest.TestCase):
         # `frisk explain -h` must not be a help request answered with 0:
         # a caller writing `frisk explain "$command" || refuse` would
         # read that as approval of a command line nothing judged.
-        status, out, _ = run("explain", "-h")
+        status, out, err = run("explain", "-h")
         self.assertNotEqual(status, 0)
         self.assertEqual(out, "", "help on the verdict channel, exit 0")
+        # And the failure says what to do instead, since argparse's own
+        # message reports a *missing* argument for a supplied one.
+        self.assertIn("--", err)
         status, out, _ = run("explain", "--", "-h")
         self.assertEqual(status, EXIT_NO_VERDICT)
         self.assertIn("-h", out)
