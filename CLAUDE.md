@@ -354,9 +354,9 @@ platform rather than assuming; `docs/` is documentation for humans
   each answered at the step that needs it. The sentinel may be
   re-staged before parity if `D-007`'s residue proves uncomfortable;
   `D-010` stays reversible on request. `.claude/spec-work/` and
-  `.claude/refs/infra-conventions/` are stripped from tracking
-  (`D-025`, `D-026`); the operator's own history rewrite and force-push
-  of `main` and the step tags are **still owed**. `.claude/settings.json`
+  `.claude/refs/infra-conventions/` are gone from tracking and from the
+  published history (`D-025`, `D-026`, both executed); what the forge
+  and existing clones already served is not retracted. `.claude/settings.json`
   still publishes an allow list only as narrow as the guard no clone
   receives (`001`). `D-024`'s budget stands at 390/~365; the compaction
   reached 381, so the handover figure is still 16 lines away and the

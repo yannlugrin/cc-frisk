@@ -566,11 +566,16 @@ Detail in git history.
   fetching the replacement would cross rule 9's boundary for a one-time
   act).
 - **Approved by:** operator, 2026-08-21.
-- **Still owed:** the operator's own history rewrite and force-push of
-  `main` and the five step tags — no session performs them (the guard
-  denied the session's own attempt to even measure the tooling, working
-  as `001` intended). Carried in `CLAUDE.md`'s open obligations until
-  run.
+- **Executed (2026-08-21):** the operator ran the rewrite and both
+  force-pushes; no session performed them, the guard having denied even
+  the attempt to measure the tooling, working as `001` intended. Four
+  commits carried the paths and none does now, across every branch and
+  all six step tags, which were rewritten with their annotations intact;
+  `refs/backups/bash-guard` shares no ancestry with `main` and was
+  correctly skipped. **What this does not do:** the objects were public
+  for the repository's whole life, so forks, existing clones and the
+  forge's unreachable-object window keep them. Removal going forward,
+  not retraction.
 
 Detail in git history.
 
