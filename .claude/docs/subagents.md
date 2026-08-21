@@ -83,6 +83,14 @@ returned `Agent type not found`, the error enumerating only what existed
 at session start), then became available later in that same session
 without any restart. The rescan interval was not measured.
 
+**The two lists do not refresh together.** Step `004` deleted a skill and
+two agents and wrote five agents in one commit: the skill list dropped
+the deleted skill within a minute, while `Agent type not found` still
+enumerated both *deleted* probe agents minutes later, and the five new
+ones arrived only after that. So a refreshed skill list is no evidence
+about agents, and the error's list is the state at the last agent rescan,
+not the tree.
+
 *Consequence.* A step that writes a skill or an agent cannot verify it
 on demand, but need not hand over with a restart in its test
 instructions either: the honest instruction is that a new definition
