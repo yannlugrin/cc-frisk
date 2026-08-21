@@ -23,10 +23,16 @@ The editable install (`pip install --no-build-isolation -e .`) is why
 `setuptools` is pinned there: it is the build backend `pyproject.toml`
 names, and with build isolation on, pip would fetch an unpinned copy on
 every setup. It gives `.venv/bin/frisk`, the console script of §8.2's
-repository-installable door — installed at every setup so that the door
-is exercised rather than asserted. The *engine* still has zero
-dependencies; `tests/test_packaging.py` fails if an import escapes the
-standard library.
+repository-installable door, so a broken `pyproject.toml` fails at
+every setup rather than at an adopter's install. The script itself is
+*run* in one place, the floor CI job, which installs the package and
+calls it; nothing local executes it, so a `main` that grew a required
+argument would be caught there and by the `python3 -m frisk` tests, not
+by `just check`. Development needs a higher floor than the engine, and
+this is where: PEP 660 editable installs need pip 21.3, newer than the
+pip a 3.9 platform ships. The *engine* still has zero dependencies;
+`tests/test_packaging.py` fails if an import escapes the standard
+library.
 
 ## Invariants — each breaks silently
 
@@ -211,10 +217,16 @@ asserts instead of writing) and mypy (`mirrors-mypy v2.3.1`, `strict`,
 `pass_filenames: false`), both configured in `pyproject.toml`, plus
 `check-toml`. Three things about them are not obvious from the config:
 
-**The floor is checked in four places and they must move together.**
+**The floor is spelled in four places and they move together.**
 `requires-python`, `[tool.ruff] target-version`, `[tool.mypy]
-python_version`, and `.github/workflows/ci.yml`'s `floor` job. mypy is
-the one that catches a standard-library name that arrived after 3.9 —
+python_version`, and `.github/workflows/ci.yml`'s `floor` job —
+`tests/test_packaging.py` asserts all four against its own `FLOOR`
+constant, so moving one alone fails rather than silently leaving a
+checker judging code against a version the package no longer claims.
+A fifth constraint is not spelled as a version: `build-system.requires`
+must stay at a setuptools the floor can install (83 and later require
+3.10), which the floor job's `pip install .` is what proves. mypy is
+the tool that catches a standard-library name that arrived after 3.9 —
 `tomllib`, `str.removeprefix` — on a workstation running 3.14. The
 table of what each platform ships, its date and its sources are in
 `docs/verification-record.md`, not here: it is operator-facing, and a
@@ -230,10 +242,6 @@ hand-formatted file. The suite's own
 `ast.parse(..., feature_version=(3, 9))` catches the loud classes
 (a `match` statement above all) on any interpreter, and does not catch
 this one.
-
-**mypy sees `src/` and `tests/`, never `scripts/`.** The harness
-scripts have no callers, so there is no type error there to have. If a
-script ever grows an importable module, that changes.
 
 The workflow family (`005`) is schema validation, not a workflow linter:
 `check-github-workflows` and `check-dependabot` from `check-jsonschema`,

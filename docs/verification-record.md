@@ -12,25 +12,13 @@ take it again.
 
 ## Status
 
-| # | Fact | Status |
-|---|---|---|
-| 1 | Hook `allow` and the sandbox waiver | not yet measured |
-| 2 | Settings deny/ask precedence over hook decisions | not yet measured |
-| 3 | The substitution-prompt trigger | not yet measured |
-| 4 | Hook deny/ask survival per permission mode | not yet measured |
-| 5 | The platform hook-timeout default | not yet measured |
-| 6 | The per-plugin persistent data directory | not yet measured |
-| 7 | Plugin configuration delivered to hooks as environment | not yet measured |
-| 8 | Project-recommended-plugin prompting | not yet measured |
-| 9 | Settings deny/ask under each permissive mode | not yet measured |
-| 10 | Prefix-rule word-boundary behaviour | not yet measured |
-| 11 | The platform's built-in read-only command handling | not yet measured |
-| 12 | **The Python floor: OS-shipped interpreters** | **settled 2026-08-21** |
-| 13 | Whether the Bash tool persists shell state across calls | not yet measured |
-
-The unmeasured rows are taken during the verification pass, which runs
-against a live Claude Code and needs the operator's consent; they are
-filled in here as they settle.
+Item 12 below is settled. The other twelve facts of §2.1's inventory —
+the hook contract's four lettered facts, the platform's timeout,
+permission-mode behaviour, the plugin's data directory and configuration
+delivery, prefix-rule and read-only-command handling, and whether the
+Bash tool persists shell state — are not yet measured. They are taken
+during the verification pass, which runs against a live Claude Code and
+needs the operator's consent; each lands here as it settles.
 
 ## 12 — The Python floor: what each platform's `python3` is
 

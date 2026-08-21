@@ -357,9 +357,9 @@ platform rather than assuming; `docs/` is documentation for humans
   published history (`D-025`, `D-026`, both executed); what the forge
   and existing clones already served is not retracted. `.claude/settings.json`
   still publishes an allow list only as narrow as the guard no clone
-  receives (`001`). `D-024`'s budget stands at 390/~365; the compaction
-  reached 381, so the handover figure is still 16 lines away and the
-  trim-or-raise choice returns at `006`'s close.
+  receives (`001`). `D-024`'s budget stands at 390/~365; this file is at
+  380, so the handover figure is 15 lines away and the trim-or-raise
+  choice is due at `006`'s close.
 - **`.claude/docs/` pointers:** `harness.md` — harness behaviour,
   re-measure recipes, what CI pins; read before touching the
   `justfile`, `scripts/`, `.pre-commit-config.yaml`,

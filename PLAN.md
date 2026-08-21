@@ -282,10 +282,11 @@ Claude Code), §11 (one codebase, two doors).
   an empty repository.
 
 **How the operator tests it.** `just verify` green; `frisk --version` and
-`frisk explain 'ls'` run from a plain shell with no Claude Code involved;
-the floor interpreter runs the checks. Local and free. **External
-prerequisite**: an interpreter at the committed floor on this machine,
-and the operator's answer on item 12's method.
+`frisk explain 'ls'` run from a plain shell with no Claude Code involved.
+The floor is checked statically here (ruff and mypy pinned to it) and
+executed by a CI job, `D-030` — no floor interpreter on this machine.
+Local and free. **External prerequisite**: the operator's answer on item
+12's method.
 
 ### 007 — Declarations, matchers, layering — `pending`
 
@@ -1390,7 +1391,7 @@ it.
 | Authorisation to push. The forge and remote already exist — `origin` is the public `github.com/yannlugrin/cc-frisk`, whose `main` is still the initial commit — so what is owed is the operator's go-ahead for the first push of this work | `001`'s close (rule 6 attempts a push at every close) |
 | The publish-or-strip ruling on `.claude/spec-work/` and `.claude/refs/`, both already public via the initial commit | `005` |
 | A second strong model for the milestone passes — the state review and the memory compaction must not run on the model that wrote the work | the foundation-milestone close, after `005` |
-| An interpreter at the committed floor (rule 2's floor-pinned checks need it), and either authorisation for the distribution-data lookups item 12 needs or the operator's own table | `006` |
+| Authorisation for the distribution-data lookups item 12 needs, or the operator's own table. No floor interpreter is owed: `D-030` executes the floor in CI instead | `006` |
 | The verification-pass trio: consent to drive sessions in the permissive modes, a scratch area outside the working directory, and the platform version recorded with every measurement | `015`, with the permissive modes first needed at `016` |
 | Authorisation for any install into the live Claude Code — plugin or marketplace | `021` |
 | GitHub release capability | `029` |
