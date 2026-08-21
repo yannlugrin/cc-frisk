@@ -1053,3 +1053,50 @@ Two conventions the format depends on:
   reported to the operator, whose call it is to touch the skill.
 - **Approved by:** operator, 2026-08-21, approving the U-066 triage and
   the `D-021` amendment.
+
+### D-024 — `CLAUDE.md`'s budget re-derived at 390, the shrink `D-002` scheduled
+
+- **Date:** 2026-08-21
+- **Step:** `004`
+- **Context:** `D-002` derived this file's budget from an arithmetic with
+  a named term: "the temporary tooling-templates block is 10 and leaves
+  at step `004`". It scheduled two shrinks — `004` (−10) and the parity
+  retirement step (`PLAN.md` `027`, −29) — and pre-committed the
+  response: "**The budget is re-derived downward at each**, rather than
+  kept as slack." `D-014` raised the number to 400/~375 for a rule that
+  grew and restated both shrinks as still applying. `004` has now
+  deleted the block, and rule 3 requires the re-derivation to happen on
+  arrival: a budget left standing after the thing it measured is gone is
+  slack, and slack is what makes the next number unbelievable.
+- **Decision:** the budget is **390 lines hard, ~365 at handover**,
+  replacing `D-014`'s 400/~375 by subtracting exactly the scheduled −10.
+  `D-002` and `D-014` stand otherwise: the eviction order (minus the
+  templates item, which has no referent now), the never-leaves list and
+  the remaining `027` shrink are unchanged. The deletion actually
+  removed 17 lines, not 10 — the block plus its two satellites, rule 1's
+  reading exception and rule 3's eviction item. The extra 7 are **not**
+  subtracted: rule 3 requires a budget to land above what the file owes
+  and never at it, and 383 against a 382-line file would be a budget
+  that had recorded the file rather than measured its floor.
+- **The state this leaves, stated here rather than discovered later.**
+  `CLAUDE.md` is 382 lines: 8 under the hard cap, **17 over the ~365
+  handover figure**. Nothing is breached and no whole-carry block is at
+  risk, but the file arrives at `005` with less room than the handover
+  figure intends. Two remedies, and the choice is the operator's:
+  *trim* — the `Current state` section is 46 lines and is exactly what
+  `optimize-memory` compacts, and Milestone 1 closes one step from now
+  at `005`, whose close spawns that pass; or *raise* the handover figure
+  toward the cap. Doing neither is also a ruling, and means `005` closes
+  reporting the same gap.
+- **Alternatives considered:** *Leaving 400/~375 standing* — rejected on
+  `D-002`'s own pre-commitment, which named this step; a scheduled
+  shrink not taken on arrival is the decorative budget both prior
+  entries exist to prevent. *Subtracting the full −17* — rejected above:
+  it lands the budget on the file. *Trimming 17 lines here to reach ~365
+  before handover* — rejected as spending the milestone-close compaction
+  early and unreviewed, on live world state `005` still needs; `D-014`
+  rejected the same move for the same reason.
+- **Approved by:** implementer (within latitude: rule 3's derive-and-log
+  clause and `D-002`'s pre-committed arithmetic). The trim-or-raise
+  question above is the operator's and is put to them at `004`'s
+  handover.

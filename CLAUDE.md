@@ -67,10 +67,11 @@ avoid. Any task needing its contents — instantiation, registry and
 `CASES` edits, later guard maintenance — runs in an **isolated
 subagent** that reads and edits the file and reports outcomes (what is
 gated, what the settings pairing requires, whether its checks pass),
-never the file's text, parsing approach or API shapes. Executing it (`--selftest`, `--liveness`) is fine: output is
-verdicts, not code. **The file is never tracked** — its path is
-gitignored, because this repository is the plugin's public install
-channel and no later strip removes what an initial commit carries.
+never the file's text, parsing approach or API shapes. Executing it
+(`--selftest`, `--liveness`) is fine: output is verdicts, not code.
+**The file is never tracked** — its path is gitignored, because this
+repository is the plugin's public install channel and no later strip
+removes what an initial commit carries.
 Versioning comes back as the backup ref **`refs/backups/bash-guard`**,
 outside `refs/heads/` so no `push --all`, default refspec or clone
 carries it: the in-channel subagent chains a snapshot onto it at
@@ -156,16 +157,16 @@ against its original. It is not written for the operator: it is your
 memory, not a report. Auto memory is disabled in `.claude/settings.json`
 and stays disabled: machine-local, unversioned, outside git and outside
 these rules.
-**This file's budget is 400 lines hard, ~375 at handover (`D-014`).**
+**This file's budget is 390 lines hard, ~365 at handover (`D-024`).**
 **Every budget lands above what the file owes, never at it**, a
 re-derivation included — one set to the length of what is already
 written has recorded the file rather than budgeted it.
 When it binds, things leave in this order and the order is not yours to
 reshuffle: context-specific content a read-trigger can reach, then
-per-step detail the plan already carries. Rule 9's enumeration never leaves; rule 1's
-quarantine text leaves only at the retirement step; the current-step
-pointer stays. Memory files compact as they grow: a closed `PLAN.md`
-step compacts to its outcome, and closing a milestone includes a
+per-step detail the plan already carries. Rule 9's enumeration never
+leaves; rule 1's quarantine text leaves only at the retirement step; the
+current-step pointer stays. Memory files compact as they grow: a closed
+`PLAN.md` step compacts to its outcome, and closing a milestone includes a
 mandatory memory-compaction pass from a clean context
 (`optimize-memory`, or a freshly briefed subagent) **and a state review
 (`state-reviewer`) — neither run on the model that wrote the work**.

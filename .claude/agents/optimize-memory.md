@@ -97,10 +97,12 @@ before its old wording goes.
 already compacted. Your job is to check that it did: every step marked
 `done` should be its heading plus the single outcome bullet `CLAUDE.md`
 § "Plan conventions" prescribes — no surviving objective, spec-section
-list, deliverables or test instructions. Report any that is not, and
-compact it. Do not touch a step still `in progress` or `awaiting test`,
-and do not re-word an outcome bullet that is already in shape: it was
-written to match its tag message, and the two must not drift.
+list, deliverables or test instructions. **Report any that is not; do not
+compact it yourself.** An outcome bullet is written to match its step's
+tag message, and a second author here makes the two drift with nothing
+checking them against each other — the close that skipped it is the close
+that owes it. Do not touch a step still `in progress` or `awaiting
+test`.
 
 The plan's other sections — the re-inventory, the open-fact ledger, the
 coverage map, the prerequisites, the open questions — are live working

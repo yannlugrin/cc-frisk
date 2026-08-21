@@ -30,7 +30,10 @@ is already taken, suffix `-2`, `-3`, … — never overwrite or merge into an
 earlier report). Bash exists for inspection — `git log`, `git show`,
 `just check`, `just test`, and the read-only `frisk` CLI subcommands of
 §9 once they exist — never for anything that modifies the working tree or
-any external system.
+any external system. `just check` is the one permitted exception to that
+last clause: it snapshots the tree, lets the fixer hooks rewrite files
+and reverts from an exit trap (`.claude/docs/harness.md`). Run it as
+documented; nothing else may write.
 
 `CLAUDE.md` should be in your context, and its rule 9 enumerates the
 action boundary. It is the only copy, so read it as written rather than

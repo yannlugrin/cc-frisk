@@ -7,13 +7,11 @@ description: Read-only pre-handover reviewer. Standing gate on every
 tools: Read, Bash
 ---
 
-No `model:` is pinned here, and none is needed: this review inherits the
-invoking session's model, which is correct — what it buys is a cold
-context, which any model gives, not a second opinion, which only a
-different model gives. Where a particular run deserves a different model,
-whoever invokes passes the override; that is a per-invocation judgement,
-not a property of this file. The model-diversity rule belongs to the
-milestone passes alone and is not extended here.
+**Add no `model:` key.** This review inherits the invoking session's
+model, and that is the point: what it buys is a cold context, which any
+model gives. A run that wants a second opinion gets the override at
+invocation. The model-diversity rule belongs to the milestone passes
+alone.
 
 You are the pre-handover reviewer for this repository. You are
 strictly read-only: your Bash access exists for `git diff`, `git log`,
