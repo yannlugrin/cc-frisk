@@ -25,8 +25,7 @@ names, and with build isolation on, pip would fetch an unpinned copy on
 every setup. It gives `.venv/bin/frisk`, the console script of §8.2's
 repository-installable door, so a broken `pyproject.toml` fails at
 every setup rather than at an adopter's install. The script itself is
-*run* in one place, the floor CI job, which installs the package and
-calls it; nothing local executes it, so a `main` that grew a required
+*run* in CI, where every matrix row installs the package and calls it; nothing local executes it, so a `main` that grew a required
 argument would be caught there and by the `python3 -m frisk` tests, not
 by `just check`. Development needs a higher floor than the engine, and
 this is where: PEP 660 editable installs need pip 21.3, newer than the
@@ -154,11 +153,15 @@ above, mutating settings between runs. Worktree case:
 
 ## On the forge
 
-`.github/workflows/ci.yml` (step `005`) runs the same entry points as
-two jobs, plus the `floor` job added at `006` — `just test` on a bare
-3.9 with no `just setup`, no venv and no caches, which is possible only
-because the engine has no dependencies and the suite needs nothing
-installed. Three facts about it are the harness's business:
+`.github/workflows/ci.yml` (step `005`, restructured at `006`) runs the
+same entry points: a single-version `check` job, and a `test` job whose
+matrix is the interpreters the engine claims — the floor and this
+workstation's version at `006`. No matrix row runs `just setup` and none
+is cached: the engine has no dependencies and the suite needs nothing
+installed, so every row runs the way a bare `python3` would, and each
+then installs the package as an adopting project's CI would. `check` is
+therefore the only job proving a from-nothing `just setup`. Three facts
+about it are the harness's business:
 
 **Bumping a tool locally without bumping the workflow is the drift the
 pins exist to prevent.** `rust-just==1.45.0` tracks *this workstation*,
@@ -219,13 +222,14 @@ asserts instead of writing) and mypy (`mirrors-mypy v2.3.1`, `strict`,
 
 **The floor is spelled in four places and they move together.**
 `requires-python`, `[tool.ruff] target-version`, `[tool.mypy]
-python_version`, and `.github/workflows/ci.yml`'s `floor` job —
+python_version`, and the `test` matrix in
+`.github/workflows/ci.yml` —
 `tests/test_packaging.py` asserts all four against its own `FLOOR`
 constant, so moving one alone fails rather than silently leaving a
 checker judging code against a version the package no longer claims.
 A fifth constraint is not spelled as a version: `build-system.requires`
 must stay at a setuptools the floor can install (83 and later require
-3.10), which the floor job's `pip install .` is what proves. mypy is
+3.10), which each matrix row's `pip install .` is what proves. mypy is
 the tool that catches a standard-library name that arrived after 3.9 —
 `tomllib`, `str.removeprefix` — on a workstation running 3.14. The
 table of what each platform ships, its date and its sources are in

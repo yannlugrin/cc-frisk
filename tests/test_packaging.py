@@ -191,9 +191,15 @@ class MetadataTest(unittest.TestCase):
             f'target-version = "py{FLOOR[0]}{FLOOR[1]}"', self.pyproject_lines
         )
         self.assertIn(f'python_version = "{floor}"', self.pyproject_lines)
-        self.assertIn(
-            f'          python-version: "{floor}"', self.workflow_lines
-        )
+        # CI's fourth spelling is a matrix row rather than a whole line
+        # of its own, so this one is located before it is compared.
+        matrix = [
+            line
+            for line in self.workflow_lines
+            if line.strip().startswith("python: [")
+        ]
+        self.assertEqual(len(matrix), 1, "the test matrix moved")
+        self.assertIn(f'"{floor}"', matrix[0])
 
     def test_the_package_declares_no_dependencies(self) -> None:
         # The import scan above proves the engine takes none; this is

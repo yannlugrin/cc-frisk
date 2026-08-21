@@ -23,23 +23,21 @@ permissions:
   contents: read
 
 jobs:
-  verify:
-    name: ${{ matrix.target }}
+  # Is what is committed well-formed? One interpreter, because the
+  # toolchain is pinned to this workstation (D-027): running the hooks
+  # at the engine's floor would prove the *toolchain's* floor instead.
+  # This is also the only job that runs `just setup`, so it is where a
+  # from-nothing install of the pinned toolchain is proven.
+  check:
     runs-on: ubuntu-latest
-    strategy:
-      # Independent questions — is what is committed well-formed, is the
-      # implementation right — so neither waits on or cancels the other.
-      fail-fast: false
-      matrix:
-        target: [check, test]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         id: python
         with:
-          # This workstation's interpreter. The floor runs in its own
-          # job below; the full matrix arrives at PLAN.md 029.
+          # This workstation's interpreter. The engine's floor is a row
+          # of the test matrix below, not a property of this job.
           python-version: "3.14"
 
       # Keyed exactly, no restore-keys: a near-miss restores an
@@ -53,11 +51,8 @@ jobs:
             venv-${{ runner.os }}-py${{ steps.python.outputs.python-version
             }}-${{ hashFiles('requirements.txt') }}
 
-      # `check` only: `just test` never invokes pre-commit, so sharing
-      # this key would let the empty job win the race to save it.
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         name: Cache the pre-commit hook environments
-        if: matrix.target == 'check'
         with:
           path: ~/.cache/pre-commit
           key: >-
@@ -75,29 +70,32 @@ jobs:
       # Both guard gates key on refs/backups/bash-guard, which no clone
       # receives, so the guard-execution half reports absent by design
       # here. The governance half runs, and can fail.
-      - name: Run just ${{ matrix.target }}
-        run: just ${{ matrix.target }}
+      - name: Run just check
+        run: just check
 
-  # The interpreter floor, executed rather than asserted (D-029, D-030).
-  # ruff's target-version and mypy's python_version judge the code
-  # against 3.9 on the `check` job's 3.14; this job runs it there.
-  #
-  # No `just setup` and no caches: the engine has zero dependencies and
-  # the suite needs nothing installed, which is the whole reason a bare
-  # floor interpreter can run it. Installing the pinned toolchain here
-  # would prove the toolchain's floor instead of the engine's.
-  floor:
-    name: test on the interpreter floor (3.9)
+  # Is the implementation right? Once per interpreter, because a floor
+  # that nothing executes is a claim (D-029, D-030). The engine has zero
+  # dependencies and the suite needs nothing installed, so no `just
+  # setup`, no virtualenv and no cache: every row runs the way an
+  # operator's bare `python3` would.
+  test:
+    name: test (${{ matrix.python }})
     runs-on: ubuntu-latest
+    strategy:
+      # Independent verdicts; one failing row must not cancel the other,
+      # since which versions fail is the whole information.
+      fail-fast: false
+      matrix:
+        # The committed floor and this workstation's version — §11's
+        # minimum. Extending the list is adding a string; 029 decides
+        # whether a release wants more of the range covered.
+        python: ["3.9", "3.14"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          # The committed floor. Spelled here, in pyproject.toml's
-          # requires-python, and in its ruff and mypy sections — moving
-          # it means moving all four, plus the verification record.
-          python-version: "3.9"
+          python-version: ${{ matrix.python }}
 
       - name: Install just
         run: pipx install rust-just==1.45.0
@@ -105,11 +103,10 @@ jobs:
       - name: Run just test
         run: just test
 
-      # §8.2's repository-installable door, on the floor: a project's
-      # CI installs frisk exactly this way. It also holds the build
-      # backend honest — setuptools 83 and later require 3.10, so a
-      # pin that drifted above the floor would fail here rather than on
-      # an adopter's runner.
+      # §8.2's repository-installable door, on every version the engine
+      # claims. It also holds the build backend honest — setuptools 83
+      # and later require 3.10, so a pin that drifted above the floor
+      # would fail here rather than on an adopter's runner.
       - name: Install the engine the way a project's CI would
         run: |
           python3 -m pip install .

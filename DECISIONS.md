@@ -715,9 +715,12 @@ Detail in git history.
   `strict`, `python_version = "3.9"`, `pass_filenames: false` with
   `files = ["src", "tests"]`, so a change in one module is judged
   against every caller. Both are static, so the floor is also
-  **executed**: `.github/workflows/ci.yml` gains a third job running
-  `just test` on 3.9, and the suite is written to need nothing
-  installed. The suite carries a third, cheap half —
+  **executed**: `.github/workflows/ci.yml` splits into a single-version
+  `check` job and a `test` job whose matrix carries the floor and this
+  workstation's version (§11's minimum, extended at `029`), and the
+  suite is written to need nothing installed — so no matrix row runs
+  `just setup`, and each installs the package the way an adopting
+  project's CI would. The suite carries a third, cheap half —
   `ast.parse(..., feature_version=(3, 9))` over every module, which
   makes any interpreter refuse grammar the floor lacks, a `match`
   statement above all. `check-toml` joins from the collection already
@@ -749,19 +752,20 @@ Detail in git history.
 - **Decision:** `unittest`, discovered from `tests/` by
   `scripts/test.sh` as
   `PYTHONPATH=src python3 -m unittest discover`. No test dependency, no
-  installed package, no virtualenv: `PYTHON=python3.9 just test` and the
-  CI floor job are then the same command as the local one. `PYTHON`
+  installed package, no virtualenv: `PYTHON=python3.9 just test` and
+  every row of CI's test matrix are then the same command as the local
+  one. `PYTHON`
   defaults to `python3`, and `test.sh` prints which interpreter judged.
 - **Alternatives considered:** *pytest* — the ecosystem's default, and
   the better tool for fixtures and parametrisation, which is what the
   engine steps will want; rejected here because it would have to be
-  installed on every interpreter the floor job runs, turning a bare
-  runner into a pinned-environment build and putting a dependency in
-  front of the one suite that must run where nothing is installed. The
+  installed on every interpreter the matrix runs, turning a bare runner
+  into a pinned-environment build and putting a dependency in front of
+  the one suite that must run where nothing is installed. The
   choice is revisited if a later engine step needs what pytest gives —
   `unittest` fixtures and `subTest` cover what this step has.
   *Testing the installed console script instead of `src/`* — it would
-  make the suite depend on `just setup` having run, which the floor job
-  deliberately does not do.
+  make the suite depend on `just setup` having run, which no row of the
+  test matrix does.
 - **Approved by:** implementer (within latitude: a workflow choice the
   bootstrap instructions left open; rule 11's smallest-thing test).

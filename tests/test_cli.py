@@ -45,7 +45,7 @@ def run_out_of_process(*argv: str) -> subprocess.CompletedProcess[str]:
     Not an isolated environment: this interpreter may well have frisk
     installed, and PYTHONPATH merely wins over it. What this proves is
     that the module door works and carries the status out; that it
-    works where nothing is installed at all is the floor CI job's job.
+    works where nothing is installed at all is what CI's matrix shows.
     """
     return subprocess.run(
         [sys.executable, "-m", "frisk", *argv],
