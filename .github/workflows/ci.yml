@@ -1,0 +1,135 @@
+# CI runs this repository's own entry points — `just setup`, then the
+# two recipes a step passes before it is handed over — so what CI
+# enforces and what runs locally are the same commands by construction.
+# A check CI performs and `just check` does not would be a rule nobody
+# can run before pushing; a check `just check` performs and CI does not
+# would be a rule nothing enforces.
+#
+# `just` is a system tool here as it is on a workstation
+# (.claude/docs/harness.md), which on a bare runner means installing it
+# first. pipx rather than a third-party action: it is already on the
+# runner image, and the version is named here rather than left to
+# whatever an action or an apt repository resolves to — a runner
+# silently changing the program that decides what `just check` means is
+# exactly the drift a green CI should not be able to hide. It tracks the
+# workstation's version and is bumped by hand, like every other pin in
+# this repository.
+#
+# One gate is deliberately loud locally and inert here, by design.
+# .claude/hooks/bash_guard.py is machine-local and never tracked
+# (CLAUDE.md rule 1), and both gates that ask about it — the check-guard
+# hook and `just test` — key on refs/backups/bash-guard, a ref outside
+# refs/heads/ that no clone or default refspec carries. On this runner
+# they find no marker, report the guard absent by design and pass. That
+# is the one sanctioned divergence between the local runners and CI.
+#
+# Two parallel jobs rather than two steps of one, because they answer
+# independent questions: `check` whether what is committed is
+# well-formed, `test` whether the implementation is right. Neither
+# verdict tells you anything about the other, so neither should wait for
+# it, and fail-fast: false keeps one failing from cancelling the other —
+# the point is to see both verdicts in one run.
+#
+# The steps are identical across both targets. Today `just test` needs
+# nothing but `just` itself, so its setup is a few seconds of pip
+# confirming; from PLAN.md 006 the engine's suites need the same
+# toolchain `check` does, and a matrix that was special-cased now would
+# have to be un-special-cased then.
+#
+# No scheduled run: §11 asks for none, and a weekly cron here would be a
+# requirement invented rather than implemented (PLAN.md 005). What keeps
+# "a fresh setup still works" honest instead is that both cache keys are
+# hashes of the exact file deciding their contents and carry no
+# restore-keys — any dependency edit is a cold run — and that GitHub
+# evicts a cache unused for seven days, so a quiet week is a cold run
+# too. The residue, stated rather than hidden: through a busy week in
+# which neither file changes, a `just setup` that no longer works from
+# nothing would stay hidden. If that ever bites, a schedule joins as a
+# logged decision.
+#
+# The interpreter matrix §11 requires before a release, and packaging
+# validation, extend this workflow at PLAN.md 029, where there is a
+# package and a floor version for them to be about.
+---
+name: ci
+
+"on":
+  push:
+  pull_request:
+
+# One run per ref at a time. While work is in progress, pushing twice in
+# a minute makes the first run's verdict obsolete before it finishes,
+# and a queue of obsolete verdicts is what teaches people to stop
+# reading them — so the superseded run is cancelled.
+#
+# Never on main. Every commit there is an approved step, and its verdict
+# is a record: "this commit passed" cannot be read off a run that was
+# cancelled because a later commit arrived. Runs still queue one at a
+# time; none is discarded.
+#
+# Keyed by workflow and ref, so a push to one branch never cancels
+# another's — and a pull request, whose ref differs from its branch's,
+# keeps its own run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  verify:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [check, test]
+    steps:
+      - uses: actions/checkout@v4
+
+      # No `cache: pip` here. It would hold the wheels rather than the
+      # environment built from them, and it would be keyed on the same
+      # requirements.txt as the cache below — so it can only help in the
+      # window where that one was evicted while requirements stayed put,
+      # and the rest of the time it is a restore nothing reads.
+      #
+      # 3.14 is the workstation's interpreter, named rather than
+      # floated. The floor this project commits to is decided at
+      # PLAN.md 006, and the matrix proving it arrives at 029.
+      - uses: actions/setup-python@v5
+        id: python
+        with:
+          python-version: "3.14"
+
+      # Two caches, because `just setup` builds two things: the venv
+      # holding pre-commit and PyYAML, and — on first use — one isolated
+      # environment per pinned hook, shellcheck's binary among them,
+      # which is the larger of the two by far.
+      #
+      # Each is keyed on the exact file that decides its contents, with
+      # no restore-keys: a near-miss would hand back an environment
+      # holding a package that file no longer names — pip does not
+      # uninstall what left requirements.txt — and CI would pass on a
+      # tool a fresh clone does not have. Any edit is a cold run instead.
+      - name: Cache the Python environment
+        uses: actions/cache@v4
+        with:
+          path: .venv
+          key: >-
+            venv-${{ runner.os }}-py${{ steps.python.outputs.python-version
+            }}-${{ hashFiles('requirements.txt') }}
+
+      - name: Cache the pre-commit hook environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: >-
+            hooks-${{ runner.os }}-py${{ steps.python.outputs.python-version
+            }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Install just
+        run: pipx install rust-just==1.45.0
+
+      - name: Install the pinned toolchain
+        run: just setup
+
+      - name: Run just ${{ matrix.target }}
+        run: just ${{ matrix.target }}

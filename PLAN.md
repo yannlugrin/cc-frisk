@@ -207,7 +207,7 @@ does not count against this ordering.)
   shrink `D-002` had scheduled here. Detail in git history between tags
   `step-003` and `step-004`.
 
-### 005 — The same harness on the forge — `pending`
+### 005 — The same harness on the forge — `in progress`
 
 **Objective.** CI running the repository's own entry points, green, on
 GitHub. The step that finishes the bootstrap.
