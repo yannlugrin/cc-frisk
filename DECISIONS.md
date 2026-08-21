@@ -769,3 +769,45 @@ Detail in git history.
   test matrix does.
 - **Approved by:** implementer (within latitude: a workflow choice the
   bootstrap instructions left open; rule 11's smallest-thing test).
+
+### D-032 — Behaviour-bearing steps write their tests first, gated by the operator
+
+- **Date:** 2026-08-21
+- **Step:** — (doctrine, adopted before `006`'s close)
+- **Context:** the operator asked whether the project should work
+  test-first, with the cases committed, reviewed and approved before any
+  implementation. `006` is the argument for it: its suite was written
+  after the code and encoded the code's behaviour rather than the
+  contract — `run()` merged stdout and stderr, so every assertion about
+  `explain`'s output passed whichever stream carried it, and the defect
+  surfaced only because the operator read a terminal. A case written
+  from §9 first would have had to name the channel.
+- **Decision:** `CLAUDE.md` rule 2 gains a **test gate**. On steps that
+  implement §4 behaviour or ship policy content — `007`–`014`, `017`,
+  `023`, `030`–`035`, listed in `PLAN.md`'s reading rules — the cases
+  are written, committed and approved before the implementation exists,
+  transcribed from `SPECIFICATIONS.md` and
+  `.claude/refs/behavior-corpus.md`. The gate hands over a **red** suite
+  with `just check` green and the failing output quoted, so an import
+  error or a suite that never ran cannot pass for a case, and
+  `test-reviewer` judges the cases against spec and corpus rather than
+  against code. **Approved cases are frozen**: implementation that shows
+  a case wrong brings it back as a change, never a quiet edit — without
+  that, tests-first degrades into writing the tests twice. Every other
+  step keeps its single gate. `/handover-step` carries the phase and
+  `test-reviewer`'s brief carries the changed question.
+- **Alternatives considered:** *every step test-gated* — one uniform
+  rule, rejected because the cases are ceremony on a packaging step, a
+  measurement pass or a README, and a gate that gets rubber-stamped
+  teaches the next one to be. *Behaviour steps plus opt-in elsewhere* —
+  offered; not taken, since "is this test-gated?" then becomes a
+  question at the start of every step instead of a property of the plan.
+  *Leaving the workflow alone* — the `006` defect is the evidence
+  against it.
+- **What it cost.** `CLAUDE.md` was compressed from 380 to 350 lines to
+  make room, `D-024`'s handover figure being 15 lines away at the time;
+  the rule brought it to 361. Compression, not relocation: no operative
+  content left the file, and what went was duplication of the close
+  ritual, of `guard-record.md` and of `DECISIONS.md`'s own reasoning.
+- **Approved by:** operator, 2026-08-21, choosing the behaviour-bearing
+  scope and the trim-before-adding route.

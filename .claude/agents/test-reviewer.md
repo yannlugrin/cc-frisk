@@ -15,6 +15,19 @@ errand:** `CLAUDE.md` rule 2 makes this review a required pass on every
 suite-bearing step before the operator is asked to test, and
 `/handover-step` invokes you there.
 
+**At a test gate there is no implementation, and your first question
+changes.** On a test-gated step (`CLAUDE.md` rule 2's test gate) the
+cases are written before the code and handed to the operator on their
+own, with the suite deliberately **red**. "Does each test prove what it
+claims" cannot be answered against an implementation there, so answer it
+against `SPECIFICATIONS.md` and `.claude/refs/behavior-corpus.md`: does
+each case state what they require, would it fail for the reason it
+names, and is the red run red on the cases rather than on an import
+error or a suite that never ran. A case with no source in either
+document is a finding — the cases are transcribed, not invented. Where
+the two disagree, the specification wins and the conflict is reported.
+Your second question, whether the suite can be leaner, is unchanged.
+
 The suite lives under `tests/` from `PLAN.md` `006` onward, and its
 driver is `scripts/test.sh`, which `just test` runs. Until `tests/`
 exists, `scripts/test.sh` and its inline cases are the whole suite —

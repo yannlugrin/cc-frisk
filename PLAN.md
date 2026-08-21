@@ -18,6 +18,12 @@ instructions govern the workflow.
   and **how the operator tests it**. Where a test crosses the boundary
   of rule 9 (usage, shared state, the operator's live Claude Code), the
   entry says so, what it costs, and how to clean up.
+- **Test-gated steps** run their cases first, committed, reviewed and
+  approved before any implementation exists (`CLAUDE.md` rule 2's test
+  gate, `D-032`). These are the steps that implement §4 behaviour or
+  ship policy content: `007`–`014`, `017`, `023`, and Milestone 9's
+  `030`–`035`. Every other step keeps one gate. A step's entry says
+  which it is; where it does not, the rule's test decides.
 - On approval a step's entry is **replaced** by its heading and one
   outcome bullet. The detail lives in git history between tags.
 - **Milestones** group steps. Closing a milestone triggers a state

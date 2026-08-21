@@ -40,23 +40,18 @@ the amendment belongs to a later step, and then it names that step.
 Silent drift between spec and implementation is what this rule prevents.
 
 *Open facts.* §2.1's four lettered facts and thirteen-item inventory are
-the expected case of that channel — the specification ordered them
-settled during implementation, and `PLAN.md` §11 maps each to its step.
+the expected case of that channel; `PLAN.md` §11 maps each to its step.
 Recording a *verified fact* is autonomous: entry and amendment in one
 commit, reported in the step summary. **Any resolution that changes a
 requirement, a tier, a documented limitation or the decision to ship
-comes back to the operator before the amendment**; where both apply, the
-escalation wins. Always coming back: (b), (c), (d), items 6, 9, 10, 13 —
-that list names the certain ones; the general clause decides the rest.
-A fact that cannot be measured is recorded as unmeasured and treated at
-the stricter branch of its pre-committed response. Resolutions land in
-two places: the specification, and §12's verification record.
+comes back to the operator before the amendment.** A fact that cannot be
+measured is recorded as unmeasured and treated at the stricter branch of
+its pre-committed response. Resolutions land in two places: the
+specification, and §12's verification record.
 
 *Of the phase that produced the specification, the specification itself
-is your only input.* `.claude/spec-work/` is that phase's own history
-and you never read anything in it — the tooling-template exception
-expired at step `004`. When something seems missing, that is a question
-for the operator, never something to excavate.
+is your only input* — you never read `.claude/spec-work/`, that phase's
+own history. When something seems missing, ask; never excavate.
 
 *The `bash_guard.py` quarantine.* **`.claude/hooks/bash_guard.py` never
 enters your context, in this session or any later one.** It is the
@@ -72,17 +67,12 @@ never the file's text, parsing approach or API shapes. Executing it
 **The file is never tracked on `main`** — its path is gitignored, so no
 clone's working tree carries it. Versioning is the backup ref
 **`refs/backups/bash-guard`**, which the in-channel subagent chains a
-snapshot onto at instantiation and after every `--selftest`-green edit.
-It rides rule 6's step-close push to **`origin`'s `backup/bash-guard`
-branch** (`D-028`, reversing `D-017`): the operator ruled the guard's
-off-machine copy worth publishing the prototype's source, which a public
-branch does permanently and delivers into every clone. Restore:
-`git show refs/backups/bash-guard:.claude/hooks/bash_guard.py`
-redirected onto the path, content never rendered. Details — probes, the
-three liveness commands, the restore recipe, the backup remote's name —
-live in `.claude/docs/guard-record.md`. The apparatus is retired whole
-at the pre-1.0 parity step (`PLAN.md` `027`), and this block goes with
-it.
+snapshot onto at instantiation and after every `--selftest`-green edit;
+it rides rule 6's step-close push to **`origin`'s `backup/bash-guard`
+branch** (`D-028`, reversing `D-017`). Restore is by ref, content never
+rendered — that recipe, the probes and the three liveness commands live
+in `.claude/docs/guard-record.md`. The apparatus is retired whole at the
+pre-1.0 parity step (`PLAN.md` `027`), and this block goes with it.
 
 **2. One step at a time, gated by the operator.** Implement exactly one
 plan step, then stop with (a) a short summary, (b) precise manual test
@@ -91,12 +81,22 @@ begin the next step until told; requested fixes belong to the current
 step; never batch steps because they look small. **When the operator
 asks for something to be removed, it is removed** — a smaller, rewritten
 or relocated version is not compliance. If you think the removal is a
-mistake, say so in one sentence and do it anyway, or ask first which was
+mistake, say so in one sentence and do it anyway, or ask which was
 meant. **The operator tests behaviour, never a document**: a file
-belongs in the test instructions only when it *is* the deliverable — an
-operator document, a contract, something under `docs/` — never when it
-is memory. Where a step's real product is a measurement, the test is
-re-running the measurement.
+belongs in the test instructions only when it *is* the deliverable —
+never when it is memory. Where a step's real product is a measurement,
+the test is re-running the measurement.
+
+**The test gate — behaviour-bearing steps write tests first.** Where a
+step implements §4 behaviour or ships policy content, its cases are
+written, committed and approved *before* the implementation: transcribed
+from the specification and `.claude/refs/behavior-corpus.md`, never from
+code. The gate hands over a **red** suite — `just check` green, `just
+test` failing on the new cases and nothing else, its output quoted so an
+import error cannot pass for a case — with `test-reviewer` judging the
+cases against spec and corpus. **Approved cases are frozen**: one that
+implementation shows wrong comes back as a change, never a quiet edit to
+make code pass. Other steps keep the single gate.
 
 **Hand nothing over unverified.** Before asking for a test, every check
 that applies to what you changed passes, through the repository's
@@ -109,17 +109,15 @@ is the implementation right? Fixtures and expectations proving the
 behaviour **this repository itself ships, the cases that must fail
 included**. `just verify` runs `check` then `test`: the check half runs
 against the real tree every invocation, so it needs no suite of its own.
-The commit that receives a `step-NNN` tag runs the full `check`.
 Three limits keep those honest: a third-party tool is never retested;
 **a must-warn case is required only where the implementation already
 defines a warning tier, never a reason to invent one**; and where the
 repository ships no behaviour of its own yet, a `test` that says so is
 correct. Check families arrive **with the first artifact of their class,
 never ahead of it**; third-party tools arrive pinned **with their version
-or digest recorded**. One family belongs on the list whatever the stack:
-**governance well-formedness** — the frontmatter of everything under
-`.claude/skills/` and `.claude/agents/` must parse, because a malformed
-skill does not fail, it silently never loads. Never
+or digest recorded**. One family belongs on the list whatever the
+stack: **governance well-formedness** — skill and agent frontmatter must
+parse, because a malformed one never loads and says nothing. Never
 `git add --intent-to-add`: it writes to the index as a side effect of a
 check. **The mechanism behind these commands is configured, not
 written** — rule 11 applied to the harness itself; where nothing standard
@@ -136,11 +134,9 @@ handover**, through `code-reviewer`, with three standing foci: security
 performance (§4.5's per-call latency budget), and code quality;
 suite-bearing steps also get `test-reviewer`. Findings are triaged,
 never silently swallowed; anything touching a decision or the
-specification comes to the operator. While the quarantine lives, the
-guard's vendored code above its `REGISTRY` banner is exempt and its
-`REGISTRY`/`CASES` edits are reviewed inside the isolated-subagent
-channel, outcomes only — a report that states that scope, so nobody
-mistakes it for a code review.
+specification comes to the operator. While the quarantine lives, the guard is
+reviewed inside the isolated-subagent channel, outcomes only, in a
+report that says so.
 
 **3. All memory lives in files.** `PLAN.md` (the plan and each step's
 status), `DECISIONS.md` (the decision log), this file, and
@@ -151,9 +147,8 @@ test: what a future session needs to act and cannot get faster from a
 rule, a docstring or a command. Two disqualifiers. *Justification* — why
 a decision was taken is `DECISIONS.md`, why a rule exists is the rule.
 *Duplication* — a second copy of what this file, the specification, the
-plan or a docstring says goes stale in silence, nothing checking it
-against its original. It is not written for the operator: it is your
-memory, not a report. Auto memory is disabled in `.claude/settings.json`
+plan or a docstring says goes stale in silence. It is your memory, not a
+report. Auto memory is disabled in `.claude/settings.json`
 and stays disabled: machine-local, unversioned, outside git and outside
 these rules.
 **This file's budget is 390 lines hard, ~365 at handover (`D-024`).**
@@ -165,13 +160,12 @@ reshuffle: context-specific content a read-trigger can reach, then
 per-step detail the plan already carries. Rule 9's enumeration never
 leaves; rule 1's quarantine text leaves only at the retirement step; the
 current-step pointer stays. Memory files compact as they grow: a closed
-`PLAN.md` step compacts to its outcome, and closing a milestone includes a
-mandatory memory-compaction pass from a clean context
-(`optimize-memory`, or a freshly briefed subagent) **and a state review
-(`state-reviewer`) — neither run on the model that wrote the work**.
-Closed steps compact to outcomes, **decision entries to their kernel**
-(the decision, the reason that stops re-litigation, the approval), git
-history the sole archive, no forward obligation orphaned.
+`PLAN.md` step to its outcome, **decision entries to their kernel** (the
+decision, the reason that stops re-litigation, the approval), git
+history the sole archive, no forward obligation orphaned. Closing a
+milestone includes a mandatory memory-compaction pass from a clean
+context (`optimize-memory`) **and a state review (`state-reviewer`) —
+neither run on the model that wrote the work**.
 **`docs/` is for humans; `.claude/docs/` is your working memory** — they
 never share a directory: an operator or reviewer must be able to treat
 everything in `docs/` as authoritative and ignore `.claude/` entirely.
@@ -188,23 +182,19 @@ conflicts with the specification, the specification wins and the
 conflict is reported) — and `.claude/refs/infra-conventions/`, the house
 harness shape, machine-local since `005` (`D-026`) — read before writing
 harness, lint configuration or CI, taking the shape, **never the
-content**: its prose is another project's.
+content**.
 **Your own tooling lives in `.claude/skills/` and `.claude/agents/`**,
 created when it earns its place and logged per rule 4: a ritual repeated
 every step is a natural skill (skills define slash commands), while work
-that would flood your context — a coverage audit, a long failed-run log,
-a pre-handover review — belongs in a subagent, which spends its own
-context and returns a summary, on a cheaper model where the work is
-mechanical. A skill or agent nobody invokes anymore is deleted.
+that would flood your context — an audit, a long failed run, a
+pre-handover review — belongs in a subagent, which spends its own and
+returns a summary, on a cheaper model where the work is mechanical. A
+skill or agent nobody invokes anymore is deleted.
 *Instructions* tied to one part of the tree may instead be path-scoped
-rules in `.claude/rules/` with a `paths` frontmatter, loading exactly
-when you work on matching files — **never an unscoped rule**, which loads
-every session and saves nothing. Prove the mechanism loads in the version
-you run before relying on it (a rules file that never loads is
-instructions you believe are in force and are not, and the failure
-announces nothing); if it does not, the fallback is a `.claude/docs/`
-file with its read-trigger here, and a nested `CLAUDE.md` only where this
-repository has no single-`CLAUDE.md` invariant to break.
+rules in `.claude/rules/` with a `paths` frontmatter — **never an
+unscoped rule**, which loads every session and saves nothing. Prove the
+mechanism loads in the version you run before relying on it; if it does
+not, the fallback is a `.claude/docs/` file with its read-trigger here.
 
 **4. Decisions get logged in `DECISIONS.md`**, in the format that file
 defines: joint decisions with the operator, within-latitude deviations
@@ -222,9 +212,9 @@ committed secret is a rotated secret.
 them.** One coherent change per commit, subject prefixed `step-NNN: …`
 (three digits, zero-padded) or `meta: …` for maintenance belonging to no
 step. Step numbers **freeze when a step enters `in progress`** and are
-never reused; `pending` steps may be renumbered, and a renumbering
-commit sweeps every step reference in `PLAN.md` and `DECISIONS.md`;
-`git diff` between two tags is then exactly one step's change.
+never reused; a renumbering of `pending` steps sweeps every reference in
+`PLAN.md` and `DECISIONS.md`. `git diff` between two tags is exactly one
+step's change.
 Everything a change makes stale updates **in the same commit, on your
 own initiative**: plan status, decision entries, this file's
 current-step pointer and file references, `README.md`'s file map, and
@@ -242,9 +232,8 @@ Converse with the operator in whichever language they use.
 and for any other AI brought in to review. Descriptive, never directive
 toward you: your standing orders are here and are yours alone. Keep its
 file map accurate; for current state it points at `PLAN.md`. At `PLAN.md`
-step `028`, §12's product README claims this filename: that step migrates
-the workflow entry-point content to a logged-decision home and re-points
-every template naming `README.md`, in the same commit.
+`028` §12's product README claims this filename, and that step re-points
+every template naming it, in the same commit.
 
 **9. Bug reports on the current step are yours to drive.** Reproduce,
 diagnose, fix, re-run your own checks until they pass, then hand back
@@ -289,16 +278,15 @@ when a question is needed: a specification ambiguity (rule 1), a choice
 inside a step that is the operator's, a failure you cannot resolve
 quickly. On failures, two or three genuinely *different* approaches that
 fail — not variations of one guess — is the signal to stop: come back
-with what you tried, what you observed, your hypotheses, and the question
-that would unblock you. The written summary is progress, not an admission
-of failure.
+with what you tried, what you observed, your hypotheses, and the
+question that would unblock you. Asking is progress, not failure.
 
 **11. Proportion: the smallest thing that satisfies the rule is the
 right thing.** Every other rule rewards thoroughness; this one asks for
 less, and it applies to your own output before anything else. The boring
-standard tool beats yours — ask whether the
-ecosystem already ships one before writing a runner, an installer, a
-discovery library or a test driver. Build at the moment of need, not in
+standard tool beats yours — ask whether the ecosystem already ships one
+before writing a runner, an installer, a discovery library or a test
+driver. Build at the moment of need, not in
 anticipation of it. **Deletion is a legitimate outcome of a review and
 of a step**: "this could be removed" and "this could be replaced by
 something standard" rank beside defects. A clean review is not evidence
@@ -316,13 +304,13 @@ boundary. Status is `pending`, `in progress`, `awaiting test` or `done`.
 
 On approval the entry is **replaced, not annotated** — it described
 intentions the step has since changed, and it sits in a file every
-session reads. What is left is the heading marked `done` plus one outcome
-bullet: `- **Outcome (approved YYYY-MM-DD, tag step-NNN):** what now
-exists and what it decided, citing its decision entries. Detail in git
-history between tags step-MMM and step-NNN.` The closing commit receives
-an **annotated tag** `step-NNN` whose message carries the step identifier
-and title, the approval date, and a short paragraph of notable
-outcomes.
+session reads. What is left is the heading marked `done` plus one
+outcome bullet: `- **Outcome (approved YYYY-MM-DD, tag step-NNN):** what
+now exists and what it decided, citing its decision entries. Detail in
+git history between tags step-MMM and step-NNN.` The closing commit
+receives an **annotated tag** `step-NNN` whose message carries the step
+identifier and title, the approval date, and a short paragraph of
+notable outcomes.
 
 ## Repository layout
 
@@ -332,11 +320,10 @@ outcomes.
 `pyproject.toml`) and `.github/workflows/`. The product lives in
 `src/frisk/` (engine), `tests/` (its suites), `collections/starter/`
 (shipped policy content the engine suite never imports) and the plugin's
-own tree, whose paths `PLAN.md` `021` confirms against the installed
-platform rather than assuming; `docs/` is documentation for humans
-(§12). Under `.claude/`: `settings.json` is the permission baseline, and
-`docs/`, `skills/`, `agents/`, `hooks/` and `refs/` are what rules 1 and
-3 make them; `spec-work/` is machine-local since `005` (`D-025`).
+own tree, whose paths `PLAN.md` `021` confirms rather than assumes;
+`docs/` is documentation for humans (§12). Under `.claude/`:
+`settings.json` is the permission baseline, and `docs/`, `skills/`,
+`agents/`, `hooks/` and `refs/` are what rules 1 and 3 make them.
 
 ## Current state
 
@@ -352,24 +339,18 @@ platform rather than assuming; `docs/` is documentation for humans
 - **Open obligations:** `PLAN.md` §14 carries eleven open questions,
   each answered at the step that needs it. The sentinel may be
   re-staged before parity if `D-007`'s residue proves uncomfortable;
-  `D-010` stays reversible on request. `.claude/spec-work/` and
-  `.claude/refs/infra-conventions/` are gone from tracking and from the
-  published history (`D-025`, `D-026`, both executed); what the forge
-  and existing clones already served is not retracted. `.claude/settings.json`
-  still publishes an allow list only as narrow as the guard no clone
-  receives (`001`). `D-024`'s budget stands at 390/~365; this file is at
-  380, so the handover figure is 15 lines away and the trim-or-raise
-  choice is due at `006`'s close.
+  `D-010` stays reversible on request. `.claude/settings.json` still
+  publishes an allow list only as narrow as the guard no clone receives
+  (`001`).
 - **`.claude/docs/` pointers:** `harness.md` — harness behaviour,
-  re-measure recipes, what CI pins; read before touching the
-  `justfile`, `scripts/`, `.pre-commit-config.yaml`, `pyproject.toml`,
+  re-measure recipes, what CI pins; read before touching the `justfile`,
+  `scripts/`, `.pre-commit-config.yaml`, `pyproject.toml`,
   `.github/workflows/` or any linter config. `guard-record.md` — the
-  guard's restore recipe, reach, blind spots and platform probes; read
-  before touching `.claude/settings.json` or `.claude/hooks/`, **and
-  before designing any probe of a permission mechanism**.
-  `subagents.md` — what a subagent's context carries, what skill/agent
-  frontmatter binds, when a definition loads, and the house policy
-  every agent leaves out; read before touching `.claude/skills/` or
+  guard's restore recipe, reach, blind spots and probes; read before
+  touching `.claude/settings.json` or `.claude/hooks/`, **and before
+  designing any probe of a permission mechanism**. `subagents.md` — what
+  a subagent's context carries, what frontmatter binds, when a
+  definition loads; read before touching `.claude/skills/` or
   `.claude/agents/`, or trusting a subagent on a rule.
 
 *A closed list of item kinds — current and next step, live world-state,

@@ -1,14 +1,23 @@
 ---
 name: handover-step
 description: Pre-test handover sequence — run when the current step's
-  implementation is complete and ready for operator testing, or when the
-  operator asks for the handover. Checks, staleness sweep, review, then
-  hand the step to the operator.
+  implementation is complete and ready for operator testing, when a
+  test-gated step's cases are written and ready for approval, or when
+  the operator asks for the handover. Checks, staleness sweep, review,
+  then hand the step to the operator.
 ---
 
 **When to use.** When the step is implemented and ready for the
 operator's manual test, or when they ask for the handover. The
 post-approval close is `/approve-step`, not this.
+
+**Two phases on a test-gated step.** `PLAN.md`'s reading rules name
+them — the steps implementing §4 behaviour or shipping policy content.
+There the cases are handed over first, on their own, and the
+implementation only starts once the operator has approved them
+(`CLAUDE.md` rule 2's test gate). Run this skill twice: once at the
+**test gate**, once at the ordinary handover. The section below says
+what changes at the first.
 
 **Frontmatter carries `name` and `description` only, deliberately.** What
 a frontmatter tool list does and does not bind is recorded once, in
@@ -61,3 +70,25 @@ Hand the current step over for operator testing. In order:
    operator's verdict. The operator tests behaviour, never a document: a
    file belongs in these instructions only when it *is* the deliverable.
    Do not begin the next step.
+
+## At the test gate, four things differ
+
+- **Step 1 inverts.** `just check` must be green — the cases are code
+  and are held to it — while `just test` must be **red**, failing on the
+  new cases and on nothing else. Quote the failing output in the
+  handover: an import error, a typo in a fixture or a suite that never
+  ran are all red, and none of them is a case. Say which assertion each
+  failure comes from.
+- **The cases come from the specification and
+  `.claude/refs/behavior-corpus.md`, never from an implementation** —
+  there is none. Where the corpus and the specification disagree, the
+  specification wins and the conflict is reported (rule 3).
+- **Step 3 runs `test-reviewer` alone**, and its question is different:
+  do these cases state what the specification and the corpus require,
+  and would each fail for the reason it names. `code-reviewer` and
+  `step-reviewer` wait for the implementation handover.
+- **Step 5's handover asks for approval of the cases, not a manual
+  test.** There is nothing to run yet. Name what the cases pin, what
+  they deliberately leave open, and what is *not* covered. Once
+  approved, they are frozen: if implementing shows a case wrong, that
+  comes back to the operator as a change, never a quiet edit.
