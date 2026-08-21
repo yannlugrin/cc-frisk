@@ -33,8 +33,18 @@ else
     echo "test: no $MARKER here — the development guard is absent by design (skipped)."
 fi
 
-# Beyond that guard, this repository ships no behaviour of its own yet.
-# Saying so is the correct state of this command, not a gap to fill: the
-# engine and its suites join at the steps that create them (PLAN.md 006
-# onward).
-echo "test: no product behaviour to prove yet — the engine's suites join at PLAN.md 006."
+# The engine's own suite. Run with the interpreter on PATH rather than
+# .venv's, and with src/ on PYTHONPATH rather than an installed copy,
+# because both are how the floor gets exercised: CI runs this same
+# command on an interpreter at the version floor, where nothing is
+# installed and no virtualenv exists. `PYTHON=python3.9 just test` does
+# the same on a workstation that has one.
+#
+# The engine has zero dependencies (SPECIFICATIONS.md §3.1), so the
+# suite needs nothing installed to run — which is what makes that
+# possible.
+PYTHON="${PYTHON:-python3}"
+
+echo "test: the engine's suite on $("$PYTHON" -V 2>&1)"
+PYTHONPATH=src "$PYTHON" -m unittest discover \
+    --start-directory tests --top-level-directory tests

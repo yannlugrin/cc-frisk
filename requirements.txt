@@ -17,3 +17,12 @@ pre-commit==4.4.0
 # because `.venv` is guaranteed wherever the checks run — pre-commit
 # itself lives there.
 PyYAML==6.0.3
+
+# setuptools, the build backend pyproject.toml names. Pinned and
+# installed here so that `pip install --no-build-isolation -e .` in
+# scripts/setup.sh builds the package from what this file pins, rather
+# than fetching an unpinned backend from the network on every setup.
+# The engine itself still has zero dependencies (§3.1): this is a
+# build-time tool for the repository-installable door, and nothing the
+# plugin needs — that door is build-free by requirement (§2.2).
+setuptools==84.0.0

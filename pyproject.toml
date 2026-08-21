@@ -1,0 +1,51 @@
+# The repository-installable door (§11: one codebase, two doors).
+#
+# This file describes the engine as a Python package: `pip install .`
+# gives a project's CI the same code the hook runs, plus a `frisk`
+# console script (§8.2). It is *not* how frisk reaches a machine where
+# the plugin is installed — §2.2 forbids the plugin from requiring an
+# installation step, so the plugin-side invocation is build-free and is
+# decided at PLAN.md 021. Until then, `python3 -m frisk` is that door.
+
+[build-system]
+requires = ["setuptools>=84"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "frisk"
+description = "A parsing-based guard for Claude Code's Bash tool."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+authors = [{ name = "Yann Lugrin" }]
+keywords = ["claude-code", "permissions", "hook", "bash", "security"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3 :: Only",
+  "Topic :: Security",
+]
+
+# Zero dependencies is a requirement, not an accident (§3.1): the audit
+# surface of code in the permission path must equal the repository, and
+# the install must stay build-free. tests/test_packaging.py fails if an
+# import ever escapes the standard library.
+dependencies = []
+
+dynamic = ["version"]
+
+[project.scripts]
+frisk = "frisk.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/yannlugrin/cc-frisk"
+Source = "https://github.com/yannlugrin/cc-frisk"
+
+[tool.setuptools.dynamic]
+# One source for the version, and it is the code — the CLI reports it
+# without the package being installed, which the plugin door needs.
+version = { attr = "frisk.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
