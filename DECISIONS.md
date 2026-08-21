@@ -965,3 +965,56 @@ Detail in git history.
 - **Approved by:** implementer (within latitude: §9's JSON is a
   *should*, and rule 4 asks that a within-latitude deviation be logged),
   reported with the step.
+
+### D-037 — Cross-form path matching asks what the working directory could make true, superseding `D-035`'s fourth ruling
+
+- **Date:** 2026-08-21
+- **Step:** `007`
+- **Context:** §3.2 fixed cross-form path semantics on **form**: one side
+  absolute, one relative, therefore unproven. Reviewing the cases at
+  the test gate, the operator observed that the rule is coarser than
+  its own reasoning. `tmp/x` against `/tmp` is genuinely undecidable —
+  a working directory of `/` puts it inside. `/etc/passwd` against
+  `.scratch` is not: for the value to sit inside `<cwd>/.scratch` it
+  would have to contain a `.scratch` component, and it contains none,
+  so the answer is no for every working directory that exists.
+  Reporting "cannot decide" there says something false about the world,
+  and §3.2's own vocabulary has a word for what it is instead.
+- **Decision:** the cross-form rule is keyed on decidability rather
+  than on form, and §3.2 is amended to say so. Relative against
+  relative and absolute against absolute compare textually, as before —
+  the first because both hang off the *same* unknown base. A relative
+  value against an absolute boundary is always unproven. An absolute
+  value against a relative boundary is never satisfied — the working
+  directory can never be proven right — and splits: **unsatisfied**
+  where the boundary's components appear nowhere in the value,
+  unproven where they do (`./etc` against `/etc/passwd`, true when the
+  working directory is `/`). This supersedes `D-035`'s fourth ruling in
+  one respect: a mixed-form boundary set *can* now answer no, so the
+  property that entry recorded — and the case pinning it — go away. The
+  combination rule itself (`any_of` over boundaries, unknowns winning)
+  stands unchanged.
+- **Alternatives considered:** *keeping the form rule* — what the
+  specification said, and what I recommended: the cost today is zero,
+  since the corpus's only mixed-form boundary set is a grant where
+  unproven and unsatisfied both fail to release, and the change is a
+  *relaxation* on the permission path (unproven fires a deny rule at
+  ask strength; unsatisfied fires nothing), which is the direction
+  deserving the most suspicion. The operator overruled it on the
+  ground that matters more: this is engine semantics, and moving it
+  after adoption changes verdicts in projects that already trust them,
+  so the comfortable reading is the one to take while nothing depends
+  on it. *Component-aware reasoning as an implementation refinement* —
+  rejected by rule 1: it changes observable verdicts, so it is an
+  amendment or it is nothing. *Deferring to §10's surprise loop* —
+  rejected with the same argument: the loop is for policy that turned
+  out wrong in use, not for semantics known to be wrong now.
+- **What it buys beyond the case that prompted it.** The rule explains
+  the `cd` poisoning instead of sitting beside it: relative against
+  relative is decidable *because both share one unknown base*, and an
+  in-line `cd` is exactly what stops them sharing it. One principle,
+  one less special case. No corpus ruling moves — the four that touch
+  these boundaries are grant conditions and keep their adjudicated
+  verdicts. Soundness is textual, consistent with §4.4's standing
+  symlink blind spot.
+- **Approved by:** operator, 2026-08-21, wording included.

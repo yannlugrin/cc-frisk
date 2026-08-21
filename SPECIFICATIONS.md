@@ -483,11 +483,20 @@ section's summary and that table could be read apart.
   matcher forms apply: patterns for values where the raw string is what
   matters, path matchers that resolve traversals (`..`, `~`) *before*
   comparing so that a boundary cannot be escaped textually — with fixed
-  cross-form semantics: a relative value matches a relative boundary
-  (textually, after resolution) and an absolute value an absolute one,
-  while a relative value never satisfies an absolute boundary nor the
-  reverse (no resolution base is invented; the mismatch is unproven,
-  the stricter outcome), and a directory change earlier in the judged
+  cross-form semantics, keyed on what the unknown working directory
+  could make true rather than on form alone: a relative value and a
+  relative boundary hang off the same unknown base and so compare
+  textually after resolution, as two absolute paths do; a relative
+  value never satisfies an absolute boundary and is unproven against
+  it, since some working directory would place it inside and none can
+  be read off the line; an absolute value never satisfies a relative
+  boundary either, and is **unsatisfied** where no working directory
+  could place it inside — the boundary's components appearing nowhere
+  in the value, as `.scratch` does not appear in `/etc/passwd` — and
+  unproven only where one could, as `./etc` against `/etc/passwd` with
+  the working directory at `/`. No resolution base is ever invented;
+  what cannot be ruled out is unproven, the stricter outcome. And a
+  directory change earlier in the judged
   line (`cd /elsewhere && tool ./x`) makes every later relative *path*
   match unproven — path matchers only; pattern and predicate matchers
   are untouched, and the poisoning is deliberately **lexical, not
