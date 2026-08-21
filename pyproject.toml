@@ -49,3 +49,28 @@ version = { attr = "frisk.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff]
+line-length = 79
+# The interpreter floor, so a construct the floor cannot run is a lint
+# failure here rather than a parse error on an operator's machine
+# (§3.1, D-029).
+target-version = "py39"
+# pre-commit passes filenames explicitly, and ruff honours `exclude` for
+# those only when this is set.
+force-exclude = true
+
+[tool.ruff.lint]
+# Defaults (E4/E7/E9, F) plus: full pycodestyle, isort, bugbear,
+# pyupgrade and flake8-simplify.
+select = ["E", "W", "F", "I", "B", "UP", "SIM"]
+
+[tool.mypy]
+# The other half of the floor check: mypy judges the code against 3.9's
+# standard library, so a name that arrived in 3.10 is caught here even
+# though this workstation runs 3.14.
+python_version = "3.9"
+files = ["src", "tests"]
+mypy_path = "src"
+strict = true
+warn_unreachable = true

@@ -1,9 +1,10 @@
-"""The package's two promises: zero dependencies, and a working door.
+"""The package's promises: zero dependencies, a floor, a working door.
 
-Both are silent when broken. A third-party import only fails on a
-machine that lacks the package — never on the one that added it — and a
-console-script target that no longer resolves fails at install time on
-somebody else's CI.
+All three are silent when broken. A third-party import only fails on a
+machine that lacks the package — never on the one that added it; syntax
+from a newer Python only fails on an interpreter older than this one,
+where it makes the hook fail *open*; and a console-script target that no
+longer resolves fails at install time on somebody else's CI.
 """
 
 from __future__ import annotations
@@ -24,6 +25,9 @@ PYPROJECT = REPOSITORY / "pyproject.toml"
 #: environment sysconfig's "stdlib" path names a directory that does not
 #: exist.
 STDLIB = Path(os.__file__).resolve().parent
+
+#: The committed interpreter floor (D-029), as `ast.parse` wants it.
+FLOOR = (3, 9)
 
 
 def imported_roots(source: str) -> set[str]:
@@ -88,6 +92,32 @@ class ZeroDependenciesTest(unittest.TestCase):
 
     def test_relative_imports_are_not_mistaken_for_dependencies(self) -> None:
         self.assertEqual(imported_roots("from . import __version__\n"), set())
+
+
+class FloorTest(unittest.TestCase):
+    """Syntax, judged against the floor rather than this interpreter.
+
+    A cheap local half of the floor check (D-030): `feature_version`
+    makes this interpreter refuse grammar the floor does not have — a
+    `match` statement above all, which is exactly what a parsing engine
+    invites. It is partial by construction, so CI runs the suite on a
+    real floor interpreter as well.
+    """
+
+    def test_every_module_parses_as_the_floor_would_parse_it(self) -> None:
+        for module in modules() + sorted(Path(__file__).parent.glob("*.py")):
+            with self.subTest(module=module.name):
+                ast.parse(
+                    module.read_text(),
+                    filename=str(module),
+                    feature_version=FLOOR,
+                )
+
+    def test_the_check_would_catch_syntax_the_floor_lacks(self) -> None:
+        newer = "match command:\n    case []:\n        pass\n"
+        ast.parse(newer)  # this interpreter is happy with it
+        with self.assertRaises(SyntaxError):
+            ast.parse(newer, feature_version=FLOOR)
 
 
 class MetadataTest(unittest.TestCase):

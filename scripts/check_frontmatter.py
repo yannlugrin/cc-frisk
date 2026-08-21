@@ -40,40 +40,48 @@ def check(path, expected_name):
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
-        problems.append("%s: cannot be read as UTF-8: %s" % (path, exc))
+        problems.append(f"{path}: cannot be read as UTF-8: {exc}")
         return
     block = FRONTMATTER.match(text)
     if block is None:
-        problems.append(
-            "%s: no frontmatter fenced by exact `---` lines" % path
-        )
+        problems.append(f"{path}: no frontmatter fenced by exact `---` lines")
         return
     try:
         meta = yaml.safe_load(block.group(1))
     except yaml.YAMLError as exc:
-        problems.append("%s: frontmatter does not parse: %s" % (path, exc))
+        problems.append(f"{path}: frontmatter does not parse: {exc}")
         return
     if not isinstance(meta, dict):
-        problems.append("%s: frontmatter is not a mapping" % path)
+        problems.append(f"{path}: frontmatter is not a mapping")
         return
     if meta.get("name") != expected_name:
-        problems.append("%s: declares name %r but loads as %r" % (path, meta.get("name"), expected_name))
+        problems.append(
+            f"{path}: declares name {meta.get('name')!r} "
+            f"but loads as {expected_name!r}"
+        )
     description = meta.get("description")
     if not isinstance(description, str) or not description.strip():
-        problems.append("%s: no description — it is what routes invocations" % path)
+        problems.append(
+            f"{path}: no description — it is what routes invocations"
+        )
 
 
-for pattern, name_of in (("skills/*/SKILL.md", lambda p: p.parent.name),
-                         ("agents/*.md", lambda p: p.stem)):
+for pattern, name_of in (
+    ("skills/*/SKILL.md", lambda p: p.parent.name),
+    ("agents/*.md", lambda p: p.stem),
+):
     found = sorted((ROOT / ".claude").glob(pattern))
     if not found:
         # A moved or renamed directory would otherwise exit 0 having
         # checked nothing — the silent non-loading this file exists to
         # catch, one level up.
-        problems.append(".claude/%s: matches nothing — has the tree moved?" % pattern)
+        problems.append(
+            f".claude/{pattern}: matches nothing — has the tree moved?"
+        )
     for entry in found:
         check(entry, name_of(entry))
 
 for problem in problems:
-    print("governance: %s" % problem.replace(str(ROOT) + "/", ""), file=sys.stderr)
+    trimmed = problem.replace(str(ROOT) + "/", "")
+    print(f"governance: {trimmed}", file=sys.stderr)
 sys.exit(1 if problems else 0)

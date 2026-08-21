@@ -695,3 +695,73 @@ Detail in git history.
   authorised.
 - **Approved by:** operator, 2026-08-21, both for the lookups and for
   the floor-plus-limitation shape of the amendment.
+
+### D-030 — Python's check family is ruff and mypy, both pinned to the floor
+
+- **Date:** 2026-08-21
+- **Step:** `006`
+- **Context:** rule 2 requires a check family to arrive with the first
+  artifact of its class, and `006` is where a body of Python arrives.
+  The floor (`D-029`) has to be *checked* rather than asserted: this
+  workstation has only 3.14, and an engine the operator's shipped
+  interpreter cannot parse makes the hook fail open.
+- **Decision:** two pinned pre-commit hooks, configured in
+  `pyproject.toml` beside the packaging metadata.
+  **ruff `v0.16.4`** — `ruff-check` with the house selection
+  (`E`, `W`, `F`, `I`, `B`, `UP`, `SIM`), and `ruff-format --check`,
+  which asserts the formatting instead of writing it, so the family
+  behaves like every other check here rather than like the three fixer
+  hooks. `target-version = "py39"`. **mypy, `mirrors-mypy v2.3.1`** —
+  `strict`, `python_version = "3.9"`, `pass_filenames: false` with
+  `files = ["src", "tests"]`, so a change in one module is judged
+  against every caller. Both are static, so the floor is also
+  **executed**: `.github/workflows/ci.yml` gains a third job running
+  `just test` on 3.9, and the suite is written to need nothing
+  installed. The suite carries a third, cheap half —
+  `ast.parse(..., feature_version=(3, 9))` over every module, which
+  makes any interpreter refuse grammar the floor lacks, a `match`
+  statement above all. `check-toml` joins from the collection already
+  pinned.
+- **What is deliberately not covered.** mypy sees `src/` and `tests/`,
+  not `scripts/`: the harness scripts are glue with no callers, and
+  annotating them would buy a type error nobody could have.
+- **Alternatives considered:** *the floor checked statically only*,
+  leaving execution to `029`'s release matrix — rejected by the
+  operator: between `006` and `029` the floor would be a checkers'
+  claim, and the failure it guards against is silent. *Installing a
+  floor interpreter on this workstation* — a gated system install, and
+  a lasting change to a machine, for what a runner does free.
+  *flake8 + black + isort* — three pins and three configurations where
+  ruff is one. *No type checker* — it is the only tool that reads
+  `python_version` and so the only one that catches a 3.10 standard
+  library name on a 3.14 machine.
+- **Approved by:** operator, 2026-08-21, for the static-plus-CI-floor
+  shape; implementer for the tool choices (within latitude: rule 2's
+  check-family clause, a workflow choice the bootstrap left open).
+
+### D-031 — The engine's suite is stdlib `unittest`, run against `src/`
+
+- **Date:** 2026-08-21
+- **Step:** `006`
+- **Context:** §8.1's gate one needs a suite from this step onward, and
+  the same suite is what proves the interpreter floor on a runner where
+  nothing is installed.
+- **Decision:** `unittest`, discovered from `tests/` by
+  `scripts/test.sh` as
+  `PYTHONPATH=src python3 -m unittest discover`. No test dependency, no
+  installed package, no virtualenv: `PYTHON=python3.9 just test` and the
+  CI floor job are then the same command as the local one. `PYTHON`
+  defaults to `python3`, and `test.sh` prints which interpreter judged.
+- **Alternatives considered:** *pytest* — the ecosystem's default, and
+  the better tool for fixtures and parametrisation, which is what the
+  engine steps will want; rejected here because it would have to be
+  installed on every interpreter the floor job runs, turning a bare
+  runner into a pinned-environment build and putting a dependency in
+  front of the one suite that must run where nothing is installed. The
+  choice is revisited if a later engine step needs what pytest gives —
+  `unittest` fixtures and `subTest` cover what this step has.
+  *Testing the installed console script instead of `src/`* — it would
+  make the suite depend on `just setup` having run, which the floor job
+  deliberately does not do.
+- **Approved by:** implementer (within latitude: a workflow choice the
+  bootstrap instructions left open; rule 11's smallest-thing test).

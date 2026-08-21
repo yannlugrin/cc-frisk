@@ -12,9 +12,11 @@
 # step 003 with the first skill, and brought with it the first `.py`
 # file this repository ships, so Python *well-formedness* joined in the
 # same breath — it parses, and it carries no debugger left behind.
-# Python style and TOML still join at step 006 with the engine, where
-# there is a body of code for a style to be about. Workflow
-# well-formedness joined at step 005 with the first workflow.
+# Workflow well-formedness joined at step 005 with the first workflow.
+# Python style and typing, and TOML's parse check, joined at step 006
+# with the engine and pyproject.toml — and both Python tools are pinned
+# to the interpreter floor, so that a construct the floor cannot run
+# fails here rather than on an operator's machine (D-029).
 ---
 # .claude/refs/ is supplied material whose authority lives at its source
 # (CLAUDE.md rule 3), so nothing here lints it. Only behavior-corpus.md
@@ -72,6 +74,11 @@ repos:
       # yamllint --strict below already fails on a parse error.
       - id: check-json
 
+      # TOML parse, arriving with pyproject.toml at step 006. The
+      # packaging metadata is the repository-installable door; a
+      # malformed one fails at somebody else's install, not here.
+      - id: check-toml
+
   # YAML lint. The hook runner's own configuration is the first artifact
   # of this class.
   - repo: https://github.com/adrienverge/yamllint
@@ -108,6 +115,33 @@ repos:
     hooks:
       - id: check-github-workflows
       - id: check-dependabot
+
+  # Python style, arriving at step 006 with the engine (D-030). ruff is
+  # lint and format in one pinned tool: `ruff-format` asserts the
+  # formatting rather than writing it, so this family behaves like every
+  # other check here and unlike the fixer hooks above. Its configuration
+  # lives in pyproject.toml beside the packaging metadata, `target-version`
+  # set to the interpreter floor.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.4
+    hooks:
+      - id: ruff-check
+      - id: ruff-format
+        args: [--check]
+
+  # Types, the second half of the floor check (D-030). `python_version`
+  # in pyproject.toml is 3.9, so a standard-library name that arrived in
+  # 3.10 fails here even though this workstation runs 3.14 — the failure
+  # that would otherwise appear as a fail-open hook on an operator's
+  # machine. pass_filenames is false because the configuration names what
+  # to check: whole packages, so that a change in one module is judged
+  # against every caller of it.
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v2.3.1
+    hooks:
+      - id: mypy
+        pass_filenames: false
+        args: [--config-file=pyproject.toml]
 
   # Two local scripts, two hooks, one subject: the things that break
   # silently. Nothing standard asks what a Claude Code settings file must

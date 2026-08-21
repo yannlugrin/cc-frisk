@@ -38,8 +38,8 @@ jobs:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         id: python
         with:
-          # This workstation's interpreter. The committed floor is
-          # decided at PLAN.md 006, its matrix at 029.
+          # This workstation's interpreter. The floor runs in its own
+          # job below; the full matrix arrives at PLAN.md 029.
           python-version: "3.14"
 
       # Keyed exactly, no restore-keys: a near-miss restores an
@@ -77,3 +77,30 @@ jobs:
       # here. The governance half runs, and can fail.
       - name: Run just ${{ matrix.target }}
         run: just ${{ matrix.target }}
+
+  # The interpreter floor, executed rather than asserted (D-029, D-030).
+  # ruff's target-version and mypy's python_version judge the code
+  # against 3.9 on the `check` job's 3.14; this job runs it there.
+  #
+  # No `just setup` and no caches: the engine has zero dependencies and
+  # the suite needs nothing installed, which is the whole reason a bare
+  # floor interpreter can run it. Installing the pinned toolchain here
+  # would prove the toolchain's floor instead of the engine's.
+  floor:
+    name: test on the interpreter floor (3.9)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          # The committed floor. Spelled here, in pyproject.toml's
+          # requires-python, and in its ruff and mypy sections — moving
+          # it means moving all four, plus the verification record.
+          python-version: "3.9"
+
+      - name: Install just
+        run: pipx install rust-just==1.45.0
+
+      - name: Run just test
+        run: just test
