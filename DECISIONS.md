@@ -863,7 +863,15 @@ Detail in git history.
   (`bare`, `takes_value`, `may_take_value`) so a thirty-flag closed
   world reads as three lines; on a gated tool that same declaration
   *is* the accounted set, and `closed_world=True` says so without a
-  grant. Shadowing is `tool()` again to replace and `amend()` to
+  grant. A tool is named once, and the name says which of §4.2's two
+  forms it is the way a shell already does: no separator is a
+  basename, a separator is a project-relative path, and a script at the
+  project root takes the `./` a shell needs there too. An absolute path
+  is refused — the configuration is committed and travels with the
+  project, where `/usr/bin/git` is `/opt/homebrew/bin/git` on the next
+  machine, and accepting it would register something that reads like a
+  gate on git and would not match `git push`.
+  Shadowing is `tool()` again to replace and `amend()` to
   update, `amend` dropping rules and grants by label — declared, or
   derived as `<name>:<verdict>:<subcommand>` and printed by
   `frisk registry`, so what is dropped is what was read. Secure mode
@@ -873,7 +881,12 @@ Detail in git history.
   `git = tool("git"); git.deny(…)`; rejected because it puts
   composition order in the operator's hands one call at a time where
   §3.4 wants it in one declared order, and because it reads as a
-  program rather than a declaration. *A data-literal config (TOML,
+  program rather than a declaration. *A separate `path=` keyword* — the
+  first draft, and explicit about which machinery matches; dropped
+  because a basename can never contain a separator and a
+  project-relative path always does, so the keyword restated what the
+  value already said, at the cost of two validation errors nobody
+  should have to meet. *A data-literal config (TOML,
   YAML)* — the most legible surface of all, and the one §5.1 rules out:
   the configuration is trusted *code* the hook executes, and predicates
   and matcher composition have no literal form. *Separate `rules=` and

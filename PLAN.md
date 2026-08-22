@@ -285,11 +285,13 @@ quantifiers), §9 (the effective registry must be inspectable).
   `023` and `024` write starter ones; it is created here.
 - Matchers: patterns, path matchers resolving `..` and `~` **before**
   comparing with §3.2's fixed cross-form semantics and its lexical `cd`
-  poisoning, predicates, and operand quantifiers where "every operand"
-  requires at least one. **Three-valued evaluation** — satisfied,
+  poisoning, and predicates. **Three-valued evaluation** — satisfied,
   unsatisfied, unproven — with unproven moving stricter by role: failing
   a grant condition, firing a deny/ask rule's condition at ask strength,
-  never reading as a plain false.
+  never reading as a plain false. The operand quantifiers are *declared*
+  here and answer at `009`: a condition evaluates against an invocation,
+  and giving one kind an evaluation of its own ahead of that shaped the
+  API around what could be tested early rather than around the model.
 - Per-name shadowing with both override forms. The engine's default
   layers as declarations like any other: **shell wrappers and walked
   interpreters** — enumerated, shadowable, and carrying no rules and no
@@ -370,7 +372,10 @@ citations), §3.3.
 
 **Deliverables.** Rules checked existentially, grants checked universally
 and closed-world, per-tool default verdicts, the gated/registered/
-rule-bearing distinction, and the environment-assignment closed world for
+rule-bearing distinction, condition evaluation for every kind `007`
+declared — including the operand quantifiers, where "every operand"
+requires at least one and an empty operand list is unsatisfied rather
+than unproven, and the environment-assignment closed world for
 **every** registered tool with the universal benign list as a shadowable
 default layer. Each invocation judged alone: a safe command never vouches
 for its neighbour. The strict ranking deny > ask > allow > silence, and

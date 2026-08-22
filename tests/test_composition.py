@@ -36,7 +36,13 @@ from frisk.declare import (
     wrapper,
 )
 from frisk.errors import ConfigurationError
-from frisk.registry import ENGINE_LAYER, PROJECT_LAYER, Registry, collecting
+from frisk.registry import (
+    ENGINE_LAYER,
+    PROJECT_LAYER,
+    Kind,
+    Registry,
+    collecting,
+)
 
 STARTER = """
 from frisk.declare import ask, deny, takes_value, tool
@@ -122,7 +128,7 @@ class CollectionFixture(unittest.TestCase):
         base: Path | None = None,
     ) -> Registry:
         with collecting(
-            base_dir=str(base or self.base), with_defaults=with_defaults
+            base_dir=base or self.base, with_defaults=with_defaults
         ) as declared:
             declare()
         return declared.registry()
@@ -142,7 +148,7 @@ class EngineDefaultTests(CollectionFixture):
             with self.subTest(name=name):
                 entry = self.registry.lookup(name)
                 assert entry is not None
-                self.assertEqual(entry.kind, "wrapper")
+                self.assertEqual(entry.kind, Kind.WRAPPER)
 
     def test_a_wrapper_that_keeps_an_operand_says_so(self) -> None:
         # Corpus: `timeout 30 stubtool wipe` → deny, which needs the
@@ -173,7 +179,7 @@ class EngineDefaultTests(CollectionFixture):
             with self.subTest(name=name):
                 entry = self.registry.lookup(name)
                 assert entry is not None
-                self.assertEqual(entry.kind, "wrapper")
+                self.assertEqual(entry.kind, Kind.WRAPPER)
                 self.assertEqual(entry.keeps_operands, keeps)
                 self.assertEqual(
                     sorted(
@@ -201,7 +207,7 @@ class EngineDefaultTests(CollectionFixture):
         # unrecognizable token.
         entry = self.registry.lookup("eval")
         assert entry is not None
-        self.assertEqual(entry.kind, "shell")
+        self.assertEqual(entry.kind, Kind.SHELL)
         self.assertTrue(entry.joins_operands)
 
     def test_the_benign_assignment_layer_is_declared(self) -> None:
@@ -221,10 +227,10 @@ class EngineDefaultTests(CollectionFixture):
             with self.subTest(name=name):
                 entry = self.registry.lookup(name)
                 assert entry is not None
-                self.assertEqual(entry.kind, "shell")
+                self.assertEqual(entry.kind, Kind.SHELL)
         python = self.registry.lookup("python3")
         assert python is not None
-        self.assertEqual(python.kind, "interpreter")
+        self.assertEqual(python.kind, Kind.INTERPRETER)
 
     def test_the_default_layers_carry_no_rules_and_no_grants(
         self,
@@ -304,7 +310,7 @@ class ShadowingTests(CollectionFixture):
 
         entry = self.compose(declare, with_defaults=True).lookup("sudo")
         assert entry is not None
-        self.assertEqual(entry.kind, "tool")
+        self.assertEqual(entry.kind, Kind.TOOL)
         self.assertEqual(entry.flags, {})
         self.assertEqual(entry.source.layer, PROJECT_LAYER)
 
@@ -314,7 +320,7 @@ class ShadowingTests(CollectionFixture):
 
         entry = self.compose(declare, with_defaults=True).lookup("sudo")
         assert entry is not None
-        self.assertEqual(entry.kind, "wrapper")
+        self.assertEqual(entry.kind, Kind.WRAPPER)
         self.assertEqual(entry.flags["-u"], Arity.VALUE)
         self.assertEqual(entry.flags["--prompt-file"], Arity.VALUE)
 
@@ -405,7 +411,7 @@ class ShadowingTests(CollectionFixture):
         entry = self.compose(declare).lookup("myrunner")
         assert entry is not None
         assert entry.default is not None
-        self.assertEqual(entry.kind, "wrapper")
+        self.assertEqual(entry.kind, Kind.WRAPPER)
 
     def test_amending_a_name_nothing_declared_is_refused(self) -> None:
         # An amendment that silently does nothing is a boundary the
@@ -422,7 +428,7 @@ class ShadowingTests(CollectionFixture):
 
         entry = self.compose(declare, with_defaults=True).lookup("time")
         assert entry is not None
-        self.assertEqual(entry.kind, "tool")
+        self.assertEqual(entry.kind, Kind.TOOL)
 
 
 class BenignAssignmentTests(CollectionFixture):
@@ -516,6 +522,19 @@ class CollectionOrderTests(CollectionFixture):
     def test_a_collection_that_is_not_there_is_refused(self) -> None:
         with self.assertRaises(ConfigurationError):
             self.compose(lambda: use("absent"))
+
+    def test_a_relative_base_directory_is_refused(self) -> None:
+        # Which file `use()` executes must not depend on where the
+        # process was started: §9 requires the CLI and the hook to
+        # resolve the same configuration, and §5.1 lets the engine
+        # execute the project's own config and what sits beside it —
+        # both of which a relative base makes a per-invocation
+        # question.
+        with (
+            self.assertRaises(ConfigurationError),
+            collecting(base_dir=Path("collections"), with_defaults=False),
+        ):
+            use("starter")
 
     def test_adopting_a_collection_with_nowhere_to_look_is_refused(
         self,

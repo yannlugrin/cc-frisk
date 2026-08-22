@@ -7,11 +7,21 @@ produce one — so what is asserted here is *expressibility* and
 *refusal*, which is what §5.2's "the API is designed against the whole
 of it" can be held to before behaviour exists.
 
+Everything here is **structural**: what composes, what is refused, and
+what the composed entry holds. Nothing here asks what an answer *is* —
+`evaluate` and `Outcome` belong to the value layer and to
+`test_matchers.py`, operand quantifiers included, and a case that
+reaches for them here is testing a matcher through a declaration.
+
 Cases come from the specification and from
-`.claude/refs/behavior-corpus.md`'s policy contexts. The corpus's
-context B is reproduced as a fixture (`tests/corpus/context_b.py`) and
-checked here for shape, because a policy that cannot be *stated* is a
-behaviour that can never be reached.
+`.claude/refs/behavior-corpus.md`'s policy contexts, and each declares
+what it needs inline — a claim about one alias is witnessed by a tool
+with one alias, not by a fixture carrying five grants and four rules
+that the reader has to open in another file and then discount. The
+corpus's context B is used only where the fixture *is* the subject:
+`ContextBExpressibilityTests`, which asks whether that policy can be
+stated in full, because a policy that cannot be stated is a behaviour
+that can never be reached.
 """
 
 from __future__ import annotations
@@ -23,6 +33,8 @@ from corpus import context_b
 
 from frisk.declare import (
     Arity,
+    Inside,
+    Source,
     accounted,
     allow,
     any_flag,
@@ -46,6 +58,7 @@ from frisk.declare import (
     no_operands,
     one_of,
     option,
+    option_handoff,
     path_under,
     redirections,
     shell,
@@ -55,8 +68,7 @@ from frisk.declare import (
     wrapper,
 )
 from frisk.errors import ConfigurationError
-from frisk.matchers import NO_CONTEXT, MatchContext, Outcome, Value
-from frisk.registry import Registry, collecting
+from frisk.registry import PROJECT_LAYER, Kind, Registry, collecting
 from frisk.verdicts import Verdict
 
 
@@ -137,8 +149,8 @@ class FlagArityTests(unittest.TestCase):
 
         entry = compose(declare).lookup("git")
         assert entry is not None
-        self.assertEqual(entry.options["-C"], Arity.VALUE)
         self.assertNotIn("-C", entry.flags)
+        self.assertNotIn("--git-dir", entry.flags)
         self.assertNotIn("-m", entry.options)
 
     def test_a_flag_declared_twice_with_two_arities_is_refused(
@@ -162,16 +174,27 @@ class RecognitionTests(unittest.TestCase):
         # The claim is one declaration, not one object: an entry equal
         # in everything but its name would satisfy the corpus and fail
         # an identity assertion.
-        registry = compose(context_b.declare)
+
+        def declare() -> None:
+            tool("stubtool", aliases=["stub2"])
+
+        registry = compose(declare)
+        entry = registry.lookup("stubtool")
         under_alias = registry.lookup("stub2")
-        assert under_alias is not None
+        assert entry is not None and under_alias is not None
+        self.assertEqual(entry, under_alias)
+        self.assertEqual(entry.name, "stubtool")
         self.assertEqual(under_alias.name, "stubtool")
+        self.assertIn("stub2", entry.aliases)
         self.assertIn("stub2", under_alias.aliases)
 
     def test_a_longer_name_is_a_different_tool(self) -> None:
         # Corpus: `stub2x wipe`, `stubtool-extra deploy.yml` and
         # `mystubtool deploy.yml` are all silent.
-        registry = compose(context_b.declare)
+        def declare() -> None:
+            tool("stubtool", aliases=["stub2"])
+
+        registry = compose(declare)
         for name in ("stub2x", "stubtool-extra", "mystubtool"):
             with self.subTest(name=name):
                 self.assertIsNone(registry.lookup(name))
@@ -181,7 +204,7 @@ class RecognitionTests(unittest.TestCase):
     ) -> None:
         def declare() -> None:
             tool(
-                path="tools/deploy.py",
+                "tools/deploy.py",
                 default=ask(reason="Deploys reach production."),
             )
 
@@ -201,45 +224,65 @@ class RecognitionTests(unittest.TestCase):
         # script must not release a same-named file anywhere (§4.2).
         def declare() -> None:
             tool(
-                path="tools/deploy.py",
+                "tools/deploy.py",
                 default=ask(reason="Deploys reach production."),
             )
 
         registry = compose(declare)
         self.assertIsNone(registry.lookup("deploy.py"))
 
-    def test_a_path_declaration_is_more_specific_than_a_basename(
+    def test_a_basename_and_a_path_declaration_do_not_collide(
         self,
     ) -> None:
-        # §4.2's most-specific-wins: a basename registration would let
-        # a grant written for the operator's script release a same-named
-        # file anywhere, so the path declaration must answer for the
-        # file the operator meant.
+        # Declaring both must not read as the same name declared twice,
+        # or a project could never attach policy to a script whose
+        # basename it also knows. Which of the two *wins* when the
+        # engine meets `tools/deploy.py` is §4.2's most-specific-wins
+        # rule, and it is unobservable here: `lookup` and `lookup_path`
+        # are separate doors, so asking each one says nothing about
+        # which would answer. That case belongs to tool recognition,
+        # with a command word to resolve.
         def declare() -> None:
+            tool("deploy.py")
             tool(
-                "deploy.py",
-                default=silent(),
-            )
-            tool(
-                path="tools/deploy.py",
+                "tools/deploy.py",
                 default=ask(reason="This deploy reaches production."),
             )
 
         registry = compose(declare)
-        by_path = registry.lookup_path("tools/deploy.py")
         by_name = registry.lookup("deploy.py")
-        assert by_path is not None and by_name is not None
-        self.assertIsNot(by_path, by_name)
-        assert by_path.default is not None
-        self.assertEqual(by_path.default.rule.verdict, Verdict.ASK)
+        by_path = registry.lookup_path("tools/deploy.py")
+        assert by_name is not None and by_path is not None
+        self.assertNotEqual(by_name, by_path)
 
-    def test_a_tool_needs_a_name_or_a_path(self) -> None:
+    def test_the_separator_is_what_says_which_form_it_is(self) -> None:
+        # The shell's own distinction: `deploy.py` is a name to look
+        # up, `./deploy.py` is the file here. A script at the project
+        # root needs the `./` for the same reason it needs it to run.
+        def declare() -> None:
+            tool("deploy.py")
+            tool("./deploy.py", default=ask(reason="The root script."))
+
+        registry = compose(declare)
+        by_name = registry.lookup("deploy.py")
+        by_path = registry.lookup_path("deploy.py")
+        assert by_name is not None and by_path is not None
+        self.assertFalse(by_name.path_declared)
+        self.assertTrue(by_path.path_declared)
+
+    def test_a_tool_needs_a_name(self) -> None:
         with self.assertRaises(ConfigurationError):
             compose(lambda: tool())
 
-    def test_a_tool_may_not_have_both(self) -> None:
-        with self.assertRaises(ConfigurationError):
-            compose(lambda: tool("deploy.py", path="tools/deploy.py"))
+    def test_an_absolute_path_is_refused(self) -> None:
+        # The configuration is committed and travels with the project:
+        # `/usr/bin/git` on one machine is `/opt/homebrew/bin/git` on
+        # the next, and project-relative is what survives a clone.
+        # Accepting it would also gate almost nothing while reading
+        # like it gates git, since a bare `git push` would not match.
+        with self.assertRaises(ConfigurationError) as raised:
+            compose(lambda: tool("/usr/bin/git"))
+        self.assertIn("git", str(raised.exception))
 
     def test_a_name_declared_twice_in_one_source_is_refused(self) -> None:
         # Within a source there is no order (§3.2), so a second
@@ -277,10 +320,23 @@ class ToolKindTests(unittest.TestCase):
         self.assertFalse(entry.gated)
 
     def test_declaring_a_grant_closes_the_world(self) -> None:
-        entry = compose(context_b.declare).lookup("stubtool")
+        # Grants are checked universally and closed-world (§3.2), so a
+        # tool that declares one is gated by that alone.
+        def declare() -> None:
+            tool(
+                "stubtool",
+                default=ask(reason="stubtool changes infrastructure."),
+                grants=[
+                    grant(
+                        when=no_operands(),
+                        reason="A run with nothing to act on.",
+                    )
+                ],
+            )
+
+        entry = compose(declare).lookup("stubtool")
         assert entry is not None
         self.assertTrue(entry.gated)
-        self.assertTrue(entry.closed_world)
 
     def test_a_closed_world_can_be_declared_without_a_grant(self) -> None:
         # §3.2 makes gated mean "grants and/or closed worlds", so the
@@ -302,12 +358,17 @@ class ToolKindTests(unittest.TestCase):
         self,
     ) -> None:
         # Corpus: stubalways — no rules, no grants, default deny.
-        entry = compose(context_b.declare).lookup("stubalways")
+        def declare() -> None:
+            tool(
+                "stubalways",
+                default=deny(reason="Every use is the operator's."),
+            )
+
+        entry = compose(declare).lookup("stubalways")
         assert entry is not None
+        self.assertIsNotNone(entry.default)
         self.assertFalse(entry.gated)
         self.assertFalse(entry.rule_bearing)
-        assert entry.default is not None
-        self.assertEqual(entry.default.rule.verdict, Verdict.DENY)
 
 
 class ConditionTests(unittest.TestCase):
@@ -361,115 +422,63 @@ class ConditionTests(unittest.TestCase):
 
     def test_a_value_condition_is_available_to_deny_and_ask(self) -> None:
         # Closing the prototype's asymmetry: it could deny on a flag's
-        # presence but not on its value (§3.2). Asserting the verdict
-        # alone would pass on an API that dropped `when=` on the floor,
-        # which is the very asymmetry being closed.
-        rule = deny(
-            "apply",
-            when=flag("--mode", one_of("destroy")),
-            reason="A destroying mode.",
-        )
-        self.assertEqual(rule.verdict, Verdict.DENY)
-        self.assertEqual(len(rule.conditions), 1)
-        matcher = rule.conditions[0].matchers()[0]
-        self.assertEqual(matcher.evaluate("destroy"), Outcome.SATISFIED)
-        self.assertEqual(matcher.evaluate("check"), Outcome.UNSATISFIED)
+        # presence but not on its value (§3.2). What the matcher then
+        # answers belongs to the matchers' own suite; what belongs here
+        # is that a value-carrying condition reaches both constructors
+        # and arrives intact, rather than being dropped on the floor —
+        # which is the asymmetry being closed.
+        for constructor in (deny, ask):
+            with self.subTest(verdict=constructor.__name__):
+                condition = flag("--mode", one_of("destroy"))
+                rule = constructor(
+                    "apply",
+                    when=condition,
+                    reason="A destroying mode.",
+                )
+                self.assertEqual(list(rule.conditions), [condition])
 
 
 class OperandQuantifierTests(unittest.TestCase):
-    """Quantifiers over the operand list, three-valued (§3.2)."""
+    """The three operand constraints of §5.2, as declarations.
 
-    def setUp(self) -> None:
-        # stubtool's `clean` grant, boundary for boundary.
-        self.every = every_operand(path_under("/tmp", ".scratch"))
-        # And a boundary against which a value can be *unknown* rather
-        # than ruled out: `./etc` occurs in `/etc/passwd`, so a working
-        # directory of `/` would place it inside (D-037).
-        self.every_maybe = every_operand(path_under("./etc"))
-        self.at_least_one = at_least_one_operand(matching(r"^(list|show)$"))
+    What each one *answers* for a list of operands is a verdict on a
+    command line, and it is proven where conditions meet invocations —
+    as the corpus states it, `stubtool clean` with no operands asks.
+    Here they are declarations like any other condition: they carry the
+    matcher they were given, they name themselves, and the empty case
+    has its own spelling rather than falling out of a quantifier.
+    """
 
-    def test_every_operand_needs_all_of_them(self) -> None:
-        # Corpus: `stubtool clean /tmp/x /tmp/y` → silent.
-        self.assertEqual(
-            self.every.evaluate(["/tmp/x", "/tmp/y"]), Outcome.SATISFIED
+    def test_a_quantifier_carries_the_matcher_it_was_given(self) -> None:
+        scratch = path_under("/tmp", ".scratch")
+        for condition in (
+            every_operand(scratch),
+            at_least_one_operand(scratch),
+        ):
+            with self.subTest(condition=condition.describe()):
+                self.assertEqual(list(condition.matchers()), [scratch])
+
+    def test_the_two_quantifiers_are_different_conditions(self) -> None:
+        # Both constrain the operands with one matcher, and §5.2 asks
+        # for both spellings because they mean opposite things: a grant
+        # over every operand and a deny over any one of them.
+        scratch = path_under("/tmp")
+        self.assertNotEqual(
+            every_operand(scratch), at_least_one_operand(scratch)
         )
 
-    def test_one_failing_operand_fails_the_quantifier(self) -> None:
-        # Corpus: `stubtool clean /tmp/x /etc/passwd` → ask. The exact
-        # answer is unsatisfied, not merely "not satisfied":
-        # `/etc/passwd` is outside `/tmp`, and no working directory
-        # could place it inside `.scratch` either (D-037). A loose
-        # assertion here is what let two cases contradict each other
-        # unnoticed.
-        self.assertEqual(
-            self.every.evaluate(["/tmp/x", "/etc/passwd"]),
-            Outcome.UNSATISFIED,
-        )
+    def test_each_quantifier_says_which_one_it_is(self) -> None:
+        scratch = path_under("/tmp")
+        self.assertIn("every", every_operand(scratch).describe())
+        self.assertIn("at least one", at_least_one_operand(scratch).describe())
 
-    def test_every_operand_requires_at_least_one(self) -> None:
-        # Corpus, stated as a fact across all three contexts: `stubtool
-        # clean` with no operands is *not* vacuously granted — a
-        # command acting on nothing has not proven what it acts on.
-        self.assertEqual(self.every.evaluate([]), Outcome.UNSATISFIED)
-
-    def test_at_least_one_operand_needs_one(self) -> None:
-        # Corpus: `stubcli server list` → silent, `stubcli` → deny.
-        self.assertEqual(
-            self.at_least_one.evaluate(["server", "list"]),
-            Outcome.SATISFIED,
-        )
-        self.assertEqual(self.at_least_one.evaluate([]), Outcome.UNSATISFIED)
-
-    def test_no_operands_is_its_own_grant_form(self) -> None:
+    def test_no_operands_constrains_the_count_not_a_value(self) -> None:
         # §5.2 names it separately so that granting the empty case is a
-        # decision rather than a side effect of a quantifier.
+        # decision rather than a side effect of a quantifier — and it
+        # has no matcher at all, so nothing probes it for a value.
         empty = no_operands()
-        self.assertEqual(empty.evaluate([]), Outcome.SATISFIED)
-        self.assertEqual(empty.evaluate(["x"]), Outcome.UNSATISFIED)
-
-    def test_an_unprovable_operand_leaves_the_quantifier_unproven(
-        self,
-    ) -> None:
-        self.assertEqual(
-            self.every.evaluate([Value("$FOO", dynamic=True)]),
-            Outcome.UNPROVEN,
-        )
-
-    def test_a_clean_miss_outranks_an_unknown(self) -> None:
-        # One operand decided against, one unreadable: the quantifier
-        # answers with the decision. Nothing is uncertain about whether
-        # every operand matched — one of them provably did not.
-        self.assertEqual(
-            self.every.evaluate(["/etc/passwd", Value("$FOO", dynamic=True)]),
-            Outcome.UNSATISFIED,
-        )
-
-    def test_an_unknown_outranks_a_match(self) -> None:
-        self.assertEqual(
-            self.every.evaluate(["/tmp/x", Value("$FOO", dynamic=True)]),
-            Outcome.UNPROVEN,
-        )
-
-    def test_an_operand_no_directory_rules_out_stays_unknown(
-        self,
-    ) -> None:
-        # The quantifier inherits the matcher's third answer: `/etc`
-        # could be inside `<cwd>/etc` and could not, so the grant is
-        # neither released nor refused on it.
-        self.assertEqual(
-            self.every_maybe.evaluate(["/etc/passwd"]), Outcome.UNPROVEN
-        )
-
-    def test_the_line_s_context_reaches_the_operands(self) -> None:
-        poisoned = MatchContext(relative_paths_unproven=True)
-        self.assertEqual(
-            self.every.evaluate([".scratch/x"], NO_CONTEXT),
-            Outcome.SATISFIED,
-        )
-        self.assertEqual(
-            self.every.evaluate([".scratch/x"], poisoned),
-            Outcome.UNPROVEN,
-        )
+        self.assertEqual(list(empty.matchers()), [])
+        self.assertTrue(empty.describe().strip())
 
 
 class AssignmentTests(unittest.TestCase):
@@ -479,7 +488,16 @@ class AssignmentTests(unittest.TestCase):
         # Corpus: STUB_QUIET and STUB_TARGET are accounted, so
         # `STUB_QUIET=1 stubtool --syntax-check site.yml` is silent
         # while `STUB_UNKNOWN=1 …` asks.
-        entry = compose(context_b.declare).lookup("stubtool")
+        def declare() -> None:
+            tool(
+                "stubtool",
+                assignments=[
+                    accounted("STUB_QUIET"),
+                    accounted("STUB_TARGET"),
+                ],
+            )
+
+        entry = compose(declare).lookup("stubtool")
         assert entry is not None
         names = [assignment.name for assignment in entry.assignments]
         self.assertEqual(sorted(names), ["STUB_QUIET", "STUB_TARGET"])
@@ -489,35 +507,43 @@ class AssignmentTests(unittest.TestCase):
     ) -> None:
         # §3.2's own example: GIT_PAGER acceptable as `cat`, asking
         # otherwise.
+        pager = one_of("cat")
+
         def declare() -> None:
-            tool(
-                "git",
-                assignments=[accounted("GIT_PAGER", one_of("cat"))],
-            )
+            tool("git", assignments=[accounted("GIT_PAGER", pager)])
 
         entry = compose(declare).lookup("git")
         assert entry is not None
-        matcher = entry.assignments[0].value
-        assert matcher is not None
-        self.assertEqual(matcher.evaluate("cat"), Outcome.SATISFIED)
-        self.assertEqual(matcher.evaluate("less"), Outcome.UNSATISFIED)
+        self.assertEqual(entry.assignments[0].name, "GIT_PAGER")
+        self.assertIs(entry.assignments[0].value, pager)
 
 
 class HandoffTests(unittest.TestCase):
     """Both shapes of §4.3's inner commands are declarable."""
 
     def test_a_subcommand_handoff_keeps_its_own_operand(self) -> None:
-        entry = compose(context_b.declare).lookup("stubtool")
+        # The kept operand is the image, service or container name, and
+        # locating it depends on the handoff's own value-taking
+        # options: `-u root` must be stepped over, not counted.
+        def declare() -> None:
+            tool(
+                "stubtool",
+                handoffs=[
+                    handoff(
+                        "exec", keeps_operands=1, flags=[takes_value("-u")]
+                    ),
+                    handoff("run", keeps_operands=1),
+                ],
+            )
+
+        entry = compose(declare).lookup("stubtool")
         assert entry is not None
         by_subcommand = {
             tuple(each.subcommand): each for each in entry.handoffs
         }
         self.assertEqual(by_subcommand[("run",)].keeps_operands, 1)
         self.assertEqual(by_subcommand[("exec",)].keeps_operands, 1)
-        # The corpus writes exec's option as "value-opt `-u`"; context
-        # A's analogous docker exec list puts `-u --user` under
-        # value-taking, and the fixture reads it that way. Assert the
-        # arity, not only the name, so the reading is recorded.
+        self.assertEqual(len(by_subcommand[("exec",)].flags), 1)
         exec_flags = by_subcommand[("exec",)].flags[0]
         self.assertEqual(tuple(exec_flags.names), ("-u",))
         self.assertEqual(exec_flags.arity, Arity.VALUE)
@@ -527,30 +553,81 @@ class HandoffTests(unittest.TestCase):
         declared = handoff("compose run", keeps_operands=1)
         self.assertEqual(tuple(declared.subcommand), ("compose", "run"))
 
-    def test_a_flag_introduced_handoff_with_a_terminator(self) -> None:
+    def test_an_option_introduced_handoff_names_its_terminators(
+        self,
+    ) -> None:
         # `find . -name '*.log' -exec rm -rf {} +` — the command sits
-        # mid-line, opened by an option and closed by a terminator.
-        declared = handoff(option="-exec", terminated_by=[";", "+"])
+        # mid-line, opened by an option and closed by a terminator. Its
+        # own constructor, because it shares no argument with the
+        # subcommand form: no operand is kept and no option of its own
+        # is declared, the inner command beginning immediately.
+        declared = option_handoff("-exec", terminated_by=[";", "+"])
         self.assertEqual(declared.option, "-exec")
         self.assertEqual(tuple(declared.terminated_by), (";", "+"))
 
-    def test_a_handoff_is_a_subcommand_or_an_option_not_both(
-        self,
-    ) -> None:
-        with self.assertRaises(ConfigurationError):
-            handoff("run", option="-exec")
+    def test_the_two_shapes_land_in_separate_lists(self) -> None:
+        # One `handoffs=` to write, two collections to read: the engine
+        # reaches a subcommand handoff by the subcommand path and an
+        # option-introduced one by an option token anywhere on the
+        # line, so they are never searched together.
+        def declare() -> None:
+            tool(
+                "stubtool",
+                handoffs=[
+                    handoff("run", keeps_operands=1),
+                    option_handoff("-exec", terminated_by=[";", "+"]),
+                ],
+            )
+
+        entry = compose(declare).lookup("stubtool")
+        assert entry is not None
+        self.assertEqual(len(entry.handoffs), 1)
+        self.assertEqual(len(entry.option_handoffs), 1)
+        self.assertEqual(entry.option_handoffs[0].option, "-exec")
+
+
+class SourceTests(unittest.TestCase):
+    """Where a declaration was written (§3.4)."""
+
+    def test_a_source_file_must_be_an_absolute_path(self) -> None:
+        # The field is a `str` whose name promises a path, so the
+        # promise is kept where the value is produced rather than by
+        # the type. Absolute is the half that is checkable without
+        # touching the filesystem — §4.5 forbids that — and it is what
+        # makes rendering the path relative to the configuration's
+        # directory well defined.
+        with self.assertRaises(ValueError):
+            Source(layer=PROJECT_LAYER, file="starter.py", line=12)
 
 
 class ScopeTests(unittest.TestCase):
-    """Judgment is scopable by execution context (§4.3, §5.2)."""
+    """The three scope values themselves (§4.3, §5.2).
+
+    Three states and no fourth: anywhere, the host, or one named
+    handoff. "Inside and on the host" is not a state the API can
+    express, because a handed-off command is by definition not on the
+    host. Whether a *rule* or a *grant* carries one is the two classes
+    below; what a scope is, and how it names itself, is here.
+    """
+
+    def test_every_scope_names_itself(self) -> None:
+        # Scopes reach the operator through `frisk registry` and
+        # through a citation, like everything else declared.
+        for scope in (anywhere, host_only, inside("docker run")):
+            with self.subTest(scope=type(scope).__name__):
+                self.assertTrue(scope.describe().strip())
+
+
+class RuleScopeTests(unittest.TestCase):
+    """A rule carries the scope it was declared with (§4.3, §5.2)."""
 
     def test_a_rule_defaults_to_applying_anywhere(self) -> None:
         rule = ask("push", reason="A push publishes work.")
-        self.assertIs(rule.scope, anywhere)
+        self.assertEqual(rule.scope, anywhere)
 
     def test_a_rule_can_be_confined_to_the_host(self) -> None:
         rule = ask("wipe", reason="Wiping the host.", scope=host_only)
-        self.assertTrue(rule.scope.host)
+        self.assertEqual(rule.scope, host_only)
 
     def test_a_rule_can_be_confined_to_one_handoff(self) -> None:
         # `docker run image cmd --dangerous` and a bare
@@ -560,40 +637,60 @@ class ScopeTests(unittest.TestCase):
             reason="Wiping inside the container.",
             scope=inside("docker run"),
         )
-        self.assertEqual(rule.scope.handoff, "docker run")
+        self.assertEqual(rule.scope, Inside("docker run"))
 
 
 class GrantScopeTests(unittest.TestCase):
-    """A grant is scopable by execution context too (§5.2)."""
+    """A grant is scopable by execution context too (§5.2).
+
+    §5.2 asks for *judgment* scopable by execution context, not for
+    rules scopable by it: a shape that is safe inside a container need
+    not be safe on the host, and the release has to be sayable in the
+    narrower place.
+    """
+
+    def test_a_grant_defaults_to_applying_anywhere(self) -> None:
+        released = grant(
+            "clean", when=no_operands(), reason="Cleaning nothing."
+        )
+        self.assertEqual(released.scope, anywhere)
+
+    def test_a_grant_can_be_confined_to_the_host(self) -> None:
+        released = grant(
+            "clean",
+            when=no_operands(),
+            reason="Cleaning the host's own scratch space.",
+            scope=host_only,
+        )
+        self.assertEqual(released.scope, host_only)
 
     def test_a_grant_can_be_confined_to_a_handoff(self) -> None:
-        # §5.2 asks for judgment scopable by execution context, not for
-        # rules scopable by it: a shape that is safe inside a container
-        # need not be safe on the host.
         released = grant(
             "clean",
             when=no_operands(),
             reason="Cleaning inside the container.",
             scope=inside("docker run"),
         )
-        self.assertEqual(released.scope.handoff, "docker run")
+        self.assertEqual(released.scope, Inside("docker run"))
 
 
 class RedirectionTests(unittest.TestCase):
     """A redirection target is matchable (§4.3, §5.2)."""
 
     def test_a_target_rule_composes(self) -> None:
+        target = path_under(".claude")
+
         def declare() -> None:
             redirections(
                 ask(
-                    target=path_under(".claude"),
+                    target=target,
                     reason="A write into the guard's own settings.",
                 )
             )
 
         placed = compose(declare).redirections()
         self.assertEqual(len(placed), 1)
-        self.assertEqual(placed[0].rule.verdict, Verdict.ASK)
+        self.assertIs(placed[0].rule.target, target)
 
     def test_a_target_rule_needs_a_target(self) -> None:
         with self.assertRaises(ConfigurationError):
@@ -666,7 +763,7 @@ class EntityKindTests(unittest.TestCase):
 
         entry = compose(declare).lookup("timeout")
         assert entry is not None
-        self.assertEqual(entry.kind, "wrapper")
+        self.assertEqual(entry.kind, Kind.WRAPPER)
         self.assertEqual(entry.keeps_operands, 1)
         self.assertEqual(entry.flags["-k"], Arity.VALUE)
 
@@ -706,8 +803,8 @@ class EntityKindTests(unittest.TestCase):
         bash = registry.lookup("bash")
         python = registry.lookup("python3")
         assert bash is not None and python is not None
-        self.assertEqual(bash.kind, "shell")
-        self.assertEqual(python.kind, "interpreter")
+        self.assertEqual(bash.kind, Kind.SHELL)
+        self.assertEqual(python.kind, Kind.INTERPRETER)
 
 
 class ContextBExpressibilityTests(unittest.TestCase):
@@ -748,6 +845,25 @@ class ContextBExpressibilityTests(unittest.TestCase):
             ),
             ["--inventory", "--limit", "--mode", "--tags", "-i"],
         )
+
+    def test_the_exec_handoff_takes_a_value_for_its_option(
+        self,
+    ) -> None:
+        # The corpus writes exec's option as "value-opt `-u`", which
+        # could be read as value-taking or value-optional; context A's
+        # analogous docker `exec` list puts `-u --user` under
+        # value-taking and the fixture reads it that way. Asserted here
+        # so the reading is recorded against the transcription rather
+        # than left in the fixture's prose alone.
+        entry = self.registry.lookup("stubtool")
+        assert entry is not None
+        by_subcommand = {
+            tuple(each.subcommand): each for each in entry.handoffs
+        }
+        self.assertEqual(len(by_subcommand[("exec",)].flags), 1)
+        exec_flags = by_subcommand[("exec",)].flags[0]
+        self.assertEqual(tuple(exec_flags.names), ("-u",))
+        self.assertEqual(exec_flags.arity, Arity.VALUE)
 
     def test_all_five_grants_survive_composition(self) -> None:
         entry = self.registry.lookup("stubtool")

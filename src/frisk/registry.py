@@ -30,24 +30,48 @@ uses to drop it — and `frisk registry` is its door.
 
 from __future__ import annotations
 
+import enum
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from .declare import (
     Arity,
     Assignment,
     Case,
     Grant,
-    Handoff,
+    OptionHandoff,
     Rule,
     Source,
+    SubcommandHandoff,
 )
 
 #: The layer names that appear in a `Source` and in the inspection
 #: output. A collection's layer is `collection:<name>`.
 ENGINE_LAYER = "engine"
 PROJECT_LAYER = "project"
+
+
+class Kind(enum.Enum):
+    """What a registered name is, and how the walk treats it (§3.4).
+
+    A closed set, because each member is a different behaviour rather
+    than a label: a **tool** is judged, a **wrapper** is stepped
+    through to what it runs, a **shell**'s `-c` payload is re-analysed
+    as a command line, and an **interpreter** is walked to the file it
+    runs so that `python3 tools/deploy.py` is judged as
+    `tools/deploy.py`'s registration.
+
+    The value is also what `frisk registry` prints as the first token
+    of an entry's header — `tool git`, `wrapper sudo` — so the printed
+    form is derived from the kind rather than being it.
+    """
+
+    TOOL = "tool"
+    WRAPPER = "wrapper"
+    SHELL = "shell"
+    INTERPRETER = "interpreter"
 
 
 @dataclass(frozen=True)
@@ -80,27 +104,51 @@ class Entry:
     mode on registered, and the closed world on gated.
     """
 
-    kind: str
+    kind: Kind
     name: str
     source: Source
     aliases: Sequence[str] = ()
-    path: str = ""
     default: PlacedRule | None = None
     flags: Mapping[str, Arity] = field(default_factory=dict)
     options: Mapping[str, Arity] = field(default_factory=dict)
     assignments: Sequence[Assignment] = ()
     rules: Sequence[PlacedRule] = ()
     grants: Sequence[PlacedGrant] = ()
-    handoffs: Sequence[Handoff] = ()
+    handoffs: Sequence[SubcommandHandoff] = ()
+    option_handoffs: Sequence[OptionHandoff] = ()
     cases: Sequence[Case] = ()
-    closed_world: bool = False
     keeps_operands: int = 0
     operands_from_stdin: bool = False
     joins_operands: bool = False
 
     @property
+    def path_declared(self) -> bool:
+        """Whether the name is a project-relative path (§4.2).
+
+        Derived from the name as the operator wrote it rather than
+        stored beside it, because the two could then disagree — and
+        because the written form is what carries the distinction:
+        `./deploy.py` is a path and `deploy.py` is a basename, and
+        resolution would erase exactly that difference.
+        """
+        raise NotImplementedError
+
+    @property
     def gated(self) -> bool:
-        """Declares grants or a closed world (§3.2)."""
+        """Declares grants or a closed world (§3.2).
+
+        The one question the engine asks about a tool's flags: does an
+        undeclared one leave the invocation unproven? On a rules-only
+        tool the same `flags=` declaration is arity and nothing more,
+        and git meeting a flag nobody wrote down is not a problem.
+
+        There is no separate `closed_world` here, though the
+        configuration has that word: grants are checked "universally
+        and closed-world" (§3.2), so declaring one closes the world,
+        and a field for it would always equal this property. The
+        keyword stays config-side, where it is how an operator closes a
+        world without writing a grant.
+        """
         raise NotImplementedError
 
     @property
@@ -121,7 +169,7 @@ class Registry:
         raise NotImplementedError
 
     def lookup_path(self, path: str) -> Entry | None:
-        """The entry declared for a project-relative path (§4.2).
+        """The entry whose name is this project-relative path (§4.2).
 
         More specific than a basename declaration, which is what stops
         a grant written for the operator's script from releasing a
@@ -212,13 +260,21 @@ class Collection:
 def collecting(
     layer: str = PROJECT_LAYER,
     *,
-    base_dir: str | None = None,
+    base_dir: Path | None = None,
     with_defaults: bool = True,
 ) -> Iterator[Collection]:
     """Record every declaration made inside this block.
 
     `base_dir` is where `use()` looks for a collection file; without
-    one, adopting a collection is an error rather than a search. The
+    one, adopting a collection is an error rather than a search. It
+    must be **absolute**, and unlike `Source.file` it is a `Path`
+    because it is worked with rather than printed — joined with a
+    collection's name, and compared against to refuse one that sits
+    outside it. A relative base would resolve collections against
+    whatever directory the process happens to be in, which is the
+    ambiguity §9's same-configuration requirement exists to stop and
+    would let §5.1's "the project's own config and what sits beside
+    it" mean something different per invocation. The
     engine's default layers are included unless `with_defaults` is
     off, which exists for the suites that examine one declaration and
     would otherwise read the whole shell-wrapper layer.

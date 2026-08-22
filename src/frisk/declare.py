@@ -42,11 +42,7 @@ from typing import Union
 
 from .errors import ConfigurationError
 from .matchers import (
-    NO_CONTEXT,
-    Matchable,
-    MatchContext,
     Matcher,
-    Outcome,
     all_of,
     any_of,
     matching,
@@ -81,7 +77,6 @@ __all__ = [
     "every_operand",
     "at_least_one_operand",
     "no_operands",
-    "OperandCondition",
     # Verdicts, as declarations and as case expectations.
     "deny",
     "ask",
@@ -98,6 +93,7 @@ __all__ = [
     "shell",
     "interpreter",
     "handoff",
+    "option_handoff",
     "accounted",
     "benign_assignments",
     "redirections",
@@ -248,25 +244,7 @@ def option(name: str, value: Matcher | None = None) -> Condition:
     raise NotImplementedError
 
 
-class OperandCondition(Condition):
-    """A condition over the operand list, evaluable on its own.
-
-    Operand quantification is pure value logic — a list of values and a
-    matcher — so unlike the flag, option and assignment conditions it
-    needs no parsed invocation to answer, and it answers here. The
-    other kinds gain their evaluation with the invocation model they
-    read.
-    """
-
-    def evaluate(
-        self,
-        operands: Sequence[Matchable],
-        context: MatchContext = NO_CONTEXT,
-    ) -> Outcome:
-        raise NotImplementedError
-
-
-def every_operand(value: Matcher) -> OperandCondition:
+def every_operand(value: Matcher) -> Condition:
     """Every operand satisfies this matcher — and there is at least one.
 
     Empty operands are never vacuously granted (§3.2): a command acting
@@ -280,17 +258,19 @@ def every_operand(value: Matcher) -> OperandCondition:
     two readings agree (neither releases); on a deny rule stated over
     every operand they do not, and firing an ask about a command whose
     operands are known to be absent would be a prompt bought with a
-    fiction.
+    fiction. That rule is *stated* here and *proven* where conditions
+    meet real invocations, as the corpus states it: `stubtool clean`
+    with no operands asks.
     """
     raise NotImplementedError
 
 
-def at_least_one_operand(value: Matcher) -> OperandCondition:
+def at_least_one_operand(value: Matcher) -> Condition:
     """At least one operand satisfies this matcher."""
     raise NotImplementedError
 
 
-def no_operands() -> OperandCondition:
+def no_operands() -> Condition:
     """The invocation carries no operands at all."""
     raise NotImplementedError
 
@@ -306,6 +286,24 @@ class Source:
     Both halves are needed by §3.4's inspection requirement: the layer
     is what decided a conflict, the file and line are what an operator
     opens to change it.
+
+    `file` is a string rather than a `Path`, and the invariant its name
+    promises is kept by its producer rather than by its type. Nothing
+    here ever manipulates the path — the two consumers both render it,
+    `frisk registry` printing `starter.py:12` and §6.2's citation
+    naming where a rule was written — while a `Source` is built for
+    every declaration on every config load, which is the hook's hot
+    path (§4.5). Paying a `Path` parse per declaration to store
+    something only ever printed is loss with nothing on the other side
+    to earn it back.
+
+    So the guarantee is structural: `Source` has exactly one producer,
+    the composition machinery, which takes the value from the
+    interpreter's own record of the file it is executing. It is never
+    constructed by a configuration, and `__post_init__` holds the one
+    property that makes it a path rather than a string: absolute, so
+    that rendering it relative to the configuration's directory is
+    well defined without consulting the filesystem, which §4.5 forbids.
     """
 
     layer: str
@@ -318,27 +316,51 @@ class Source:
 
 
 @dataclass(frozen=True)
-class Scope:
-    """Where a rule or grant applies: the host, or inside a handoff.
+class Anywhere:
+    """Wherever the invocation is found. The default."""
 
-    A handed-off command runs in a different world than the host's, and
-    policy may legitimately differ — `docker run image cmd --dangerous`
-    and a bare `cmd --dangerous` need not share a verdict.
-    """
+    def describe(self) -> str:
+        raise NotImplementedError
 
-    description: str
-    handoff: str | None = None
-    host: bool = False
 
+@dataclass(frozen=True)
+class HostOnly:
+    """Outside every handoff."""
+
+    def describe(self) -> str:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class Inside:
+    """Inside one named handoff, and nowhere else."""
+
+    handoff: str
+
+    def describe(self) -> str:
+        raise NotImplementedError
+
+
+#: Where a rule or grant applies (§4.3, §5.2). A handed-off command
+#: runs in a different world than the host's, and policy may
+#: legitimately differ — `docker run image cmd --dangerous` and a bare
+#: `cmd --dangerous` need not share a verdict.
+#:
+#: Three states and no fourth: §5.2 names the host and a named handoff,
+#: and a handed-off command is by definition not on the host. Three
+#: types rather than one carrying a name *and* a host flag, so "inside
+#: and on the host" cannot be written down, and so the handoff's name
+#: is reachable only where there is one.
+Scope = Union[Anywhere, HostOnly, Inside]
 
 #: The default: the rule applies wherever the invocation is found.
-anywhere = Scope("anywhere")
+anywhere = Anywhere()
 
 #: Only outside any handoff.
-host_only = Scope("on the host", host=True)
+host_only = HostOnly()
 
 
-def inside(handoff_name: str) -> Scope:
+def inside(handoff_name: str) -> Inside:
     """Only inside the named handoff — `inside("docker run")`."""
     raise NotImplementedError
 
@@ -515,34 +537,64 @@ def benign_assignments(
 
 
 @dataclass(frozen=True)
-class Handoff:
-    """A position where a tool stops describing itself and runs a program."""
+class SubcommandHandoff:
+    """`docker run IMAGE cmd` — the tool's own subcommand hands over."""
 
     subcommand: Sequence[str] = ()
-    option: str | None = None
-    terminated_by: Sequence[str] = ()
     keeps_operands: int = 0
     flags: Sequence[FlagSet] = field(default_factory=tuple)
 
 
+@dataclass(frozen=True)
+class OptionHandoff:
+    """`find . -exec rm {} +` — an option opens it, a terminator ends it."""
+
+    option: str = ""
+    terminated_by: Sequence[str] = ()
+
+
+#: What `tool(handoffs=…)` accepts. §4.3 asks for two shapes, and they
+#: share nothing but the sentence that names them: a subcommand handoff
+#: keeps operands of its own and declares the options it takes values
+#: for, while an option-introduced one begins immediately and ends at a
+#: terminator. Two constructors rather than one with a mode, so neither
+#: carries an argument the other's shape makes meaningless — and no
+#: common base, since the engine reaches them by different keys: one by
+#: the subcommand path, the other by an option token anywhere on the
+#: line.
+Handoff = Union[SubcommandHandoff, OptionHandoff]
+
+
 def handoff(
-    subcommand: str = "",
+    subcommand: str,
     *,
-    option: str | None = None,
-    terminated_by: Sequence[str] = (),
     keeps_operands: int = 0,
     flags: Sequence[FlagSet] = (),
-) -> Handoff:
-    """Declare where the inner command begins.
+) -> SubcommandHandoff:
+    """Declare a subcommand where the inner command begins.
 
-    Two shapes, both required by §4.3. The ordinary one is a
-    subcommand: `handoff("run", keeps_operands=1, flags=[…])` — the
-    kept operand is the image, service or container name and is never
-    read as a program, and the handoff's own value-taking options must
-    be declared because locating the kept operand depends on them. The
-    other is a flag-introduced inner command closed by a terminator:
-    `handoff(option="-exec", terminated_by=[";", "+"])`, which is where
-    `find . -exec rm -rf {} +` hides its command.
+    `handoff("run", keeps_operands=1, flags=[…])`. The kept operand is
+    the image, service or container name and is never read as a
+    program, however it is named — judging `docker run org/rm -rf` as
+    an `rm` on the host would be guesswork in the wrong direction. The
+    handoff's own value-taking options must be declared, because
+    locating that kept operand depends on knowing which tokens were
+    swallowed as values.
+    """
+    raise NotImplementedError
+
+
+def option_handoff(
+    option: str, *, terminated_by: Sequence[str]
+) -> OptionHandoff:
+    """Declare a flag-introduced inner command, closed by a terminator.
+
+    `option_handoff("-exec", terminated_by=[";", "+"])`, which is where
+    `find . -name '*.log' -exec rm -rf {} +` hides its command: it sits
+    mid-line, opened by an option and closed by a terminator, and the
+    wrapper model does not fit it (§4.3). The terminator is required —
+    without one there is nothing to say where the inner command stops
+    and the outer tool's own operands resume.
     """
     raise NotImplementedError
 
@@ -587,7 +639,6 @@ def cases(*declared: Case) -> None:
 def tool(
     name: str = "",
     *,
-    path: str = "",
     aliases: Sequence[str] = (),
     default: Rule | None = None,
     flags: Sequence[FlagSet] = (),
@@ -601,14 +652,25 @@ def tool(
 ) -> None:
     """Register a tool: what it is called, what it takes, what it may do.
 
-    A tool is recognized by the basename of its command word, on the
-    whole name only — `git` and `/usr/bin/git` are the same tool,
-    `git-crypt` is not git. `aliases` are fully equivalent names for
-    this same declaration (drop-in replacements). `path` registers the
-    tool by project-relative path instead — `tool(path="tools/deploy.py")`
-    — matched with the path machinery of §3.2 and more specific than a
-    basename declaration, which is what keeps a grant written for the
-    operator's script from releasing a same-named file anywhere.
+    The name says which of §4.2's two forms this is, the way a shell
+    already does: without a separator it is a **basename**, matched on
+    the whole name only — `git` and `/usr/bin/git` are the same tool,
+    `git-crypt` is not git — and with one it is a **project-relative
+    path**, matched with the path machinery of §3.2 and more specific
+    than a basename declaration, which is what keeps a grant written
+    for the operator's script from releasing a same-named file
+    anywhere. `tool("git")` and `tool("tools/deploy.py")` are the two,
+    and a script at the project root is `tool("./deploy.py")` — the
+    same `./` a shell needs there, and for the same reason.
+
+    An **absolute** path is refused. The configuration is committed and
+    travels with the project, and `/usr/bin/git` on one machine is
+    `/opt/homebrew/bin/git` on the next; project-relative is what
+    survives a clone. Declaring the basename is what an operator
+    reaching for one almost always means, and the refusal says so.
+
+    `aliases` are fully equivalent names for this same declaration
+    (drop-in replacements).
 
     `flags` declares arities. On a gated tool the same declaration is
     also the closed world; on a rules-only tool it is arity and nothing
@@ -714,7 +776,6 @@ def redirections(*rules: Rule) -> None:
 def amend(
     name: str = "",
     *,
-    path: str = "",
     aliases: Sequence[str] = (),
     default: Rule | None = None,
     flags: Sequence[FlagSet] = (),
