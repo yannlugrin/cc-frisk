@@ -172,11 +172,15 @@ def path_under(*boundaries: str) -> Matcher:
     `/home/*/scratch` accepts `/home/me/scratch/build` and rejects
     `/home/a/b/scratch`.
 
-    Several boundaries mean *any of them*. Mixing absolute and relative
-    boundaries is fine, but note that a relative one only ever matches a
-    relative value: nothing on a command line says what directory it
-    would be relative to, so the answer is "cannot tell" rather than a
-    match, and the verdict moves to the stricter side.
+    Several boundaries mean *any of them*, and mixing absolute and
+    relative ones is fine. A relative boundary never *matches* an
+    absolute value — nothing on a command line says which directory it
+    would be relative to — but it can still rule one out: `.scratch`
+    refuses `/etc/passwd`, because no working directory could put that
+    path inside a `.scratch`. Where one could, the answer is "cannot
+    tell" instead, and the verdict moves to the stricter side: `./etc`
+    against `/etc/passwd` is undecided, since the working directory
+    might be `/`.
     """
     raise NotImplementedError
 

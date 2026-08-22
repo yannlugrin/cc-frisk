@@ -888,8 +888,9 @@ Detail in git history.
   gate on git and would not match `git push`.
   Shadowing is `tool()` again to replace and `amend()` to
   update, `amend` dropping by label — declared, or derived as
-  `<name>:<verdict>:<subcommand>` and printed by `frisk registry`, so
-  what is dropped is what was read. Removals travel inside the list
+  `<name>:<verdict>:<subcommand>`, with `grant` in the verdict slot for
+  a grant and a numeric suffix where two would collide, and printed by
+  `frisk registry`, so what is dropped is what was read. Removals travel inside the list
   they act on, as `drop(…)`, so the list itself says whether a name is
   a flag, a label, an alias, a variable or a handoff position, and
   `tool()` accepting no `Drop` makes "remove from what does not exist

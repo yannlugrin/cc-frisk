@@ -906,6 +906,17 @@ class ContextBExpressibilityTests(unittest.TestCase):
         assert entry is not None
         self.assertEqual(len(entry.grants), 5)
 
+    def test_colliding_derived_labels_are_still_distinct(self) -> None:
+        # Context B is the collision: two of its grants carry no
+        # subcommand and two more are both on `apply`, so the derived
+        # form alone would name two things twice — and `drop` would
+        # reach whichever the implementation happened to find first,
+        # removing a grant nobody meant to lose.
+        entry = self.registry.lookup("stubtool")
+        assert entry is not None
+        labels = [placed.label for placed in entry.grants]
+        self.assertEqual(len(set(labels)), len(labels))
+
     def test_a_subcommand_carries_two_rules_of_different_strength(
         self,
     ) -> None:

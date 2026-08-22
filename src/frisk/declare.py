@@ -913,8 +913,12 @@ def drop(*names: str) -> Drop:
     Rules and grants are named by **label**. Give one when you declare
     them, or use the one frisk derives — `git:ask:commit`,
     `stubtool:grant:clean`, `sudo:ask` for a rule about the tool
-    itself. `frisk registry` prints whichever it is, so what you drop
-    is what you read there.
+    itself, with a numeric suffix where two would collide. `frisk
+    registry` prints whichever it is, so what you drop is what you read
+    there — and if you are about to drop something from a collection
+    you did not write, read it there first: a derived label counts from
+    the top of its declaration, so editing the file above it moves it.
+    Give your own label to anything you mean to keep referring to.
 
     Dropping and adding the same name in one `amend` is refused: it
     says two things at once. To change a flag's arity or a matcher,

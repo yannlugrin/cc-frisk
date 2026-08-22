@@ -390,6 +390,10 @@ class BenignAssignmentDefaultTests(unittest.TestCase):
         # `GIT_SSH_COMMAND=… git fetch` runs an arbitrary program, and
         # git alone has dozens of siblings. An addition to the benign
         # layer is a decision to stop reading a variable at all.
+        # `LANGUAGE` is the odd one and is here on purpose: it cannot
+        # direct execution, so it would be defensible on the layer —
+        # what it catches is a `LANG` declaration that matches by
+        # prefix instead of by name.
         for name in (
             "GIT_SSH_COMMAND",
             "GIT_PAGER",
