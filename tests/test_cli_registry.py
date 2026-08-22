@@ -82,13 +82,6 @@ class RegistryCommandTests(unittest.TestCase):
         self.assertIn("wipe denies", out)
         self.assertEqual(err, "")
 
-    def test_it_says_which_configuration_answered(self) -> None:
-        # §9 requires the CLI to state what it answered from; a printed
-        # registry with no path is an answer about an unknown project.
-        self.write(CONFIG)
-        _, out, _ = run("registry", "--project", str(self.root))
-        self.assertIn(str(config_path(self.root)), out)
-
     def test_the_header_is_three_lines_in_a_fixed_order(self) -> None:
         # Engine, configuration, generation — which engine answered,
         # from which file, against which contract. §9 asks for the

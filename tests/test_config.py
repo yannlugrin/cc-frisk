@@ -130,6 +130,12 @@ class GenerationTests(ProjectFixture):
         )
         self.assertEqual(registry.generation(), CURRENT_GENERATION)
         self.assertIsNotNone(registry.lookup("git"))
+        # And the engine's own layers came with it. Composing a real
+        # configuration without them is silent by construction — the
+        # first symptom would be a walk through `sudo` reaching nothing
+        # — and every other case that proves the layers exist builds
+        # its registry by hand rather than by loading a file.
+        self.assertIsNotNone(registry.lookup("sudo"))
 
     def test_a_generation_the_engine_does_not_speak_is_refused(
         self,

@@ -1061,3 +1061,40 @@ Detail in git history.
   verdicts. Soundness is textual, consistent with §4.4's standing
   symlink blind spot.
 - **Approved by:** operator, 2026-08-21, wording included.
+
+### D-038 — The walked shells and interpreters: the corpus is the floor, not the ceiling
+
+- **Date:** 2026-08-22
+- **Step:** `007`
+- **Context:** §4.3 requires shells whose `-c` payload is re-analyzed
+  and §4.2 requires interpreters walked to the file they run, and both
+  say only that the set is "an engine default layer like the wrappers".
+  The corpus adjudicates four programs — `sh`, `bash`, `eval`,
+  `python3` — and nothing about the rest. The wrapper layer needed no
+  decision because the corpus states it as an exact table; this layer
+  is the implementation's to choose, so the choice belongs in the log
+  rather than only in the cases that pin it.
+- **Decision:** ship `sh`, `bash` and `eval` as shells, and `python3`,
+  `node`, `ruby` and `perl` as interpreters. Each declares **the
+  value-taking options that would shift the walk** and nothing else:
+  `-c` and `-o` for the shells; `-c -m -W -X --check-hash-based-pycs`
+  for python3; `-e --eval -p --print -r --require` for node; `-e -r -I
+  -C -E -F` for ruby; `-e -E -I` for perl. Options whose argument is
+  attached (`perl -Mstrict`) or optional (`ruby -i`) are deliberately
+  absent: declaring them value-taking would swallow the token after
+  them, and this layer declares only value-taking options because §4.3
+  presumes an undeclared one bare. The corpus is the floor: an engine
+  that walked only the four programs it adjudicates would leave `node
+  tools/deploy.js` unwalked, and the ruling that a registered tool run
+  through an interpreter is still that tool would hold for one language.
+- **Alternatives considered:** *narrow the layer to the four the corpus
+  names* — rule 11's build-at-the-moment-of-need, and the need is
+  visible now rather than anticipated: a JavaScript or Ruby project
+  registering a script by path gets nothing from a layer that walks
+  only Python. *Declare each program's full option set* — rejected in
+  the other direction: over-declaring swallows an operand, while
+  under-declaring loses the walk and a lost walk asks (§4.3), so the
+  conservative set errs toward the prompt and the surprise loop grows
+  it.
+- **Approved by:** operator, 2026-08-22 — "corpus is an example, and a
+  floor, not a ceiling".

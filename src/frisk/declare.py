@@ -751,6 +751,15 @@ def shell(
     what gets re-analyzed. Stepping over it instead would leave a
     quoted payload as one unrecognizable token, and `eval "git push
     --force"` would say nothing.
+
+    It also settles what an empty one means. §4.3 makes a shell with no
+    `-c` payload and no file operand **ask**, because `curl url | sh`
+    is running a program the line cannot show — but a joining shell
+    with no operands is not hiding a program, it is running none, and
+    the corpus rules bare `eval` silent. The distinction is the
+    declaration's, not an exception to be remembered at judgment time:
+    where the payload *is* the operands, their absence is the absence
+    of a command.
     """
     raise NotImplementedError
 
@@ -809,7 +818,13 @@ def drop(*names: str) -> Drop:
 
     Rules and grants are named by their **label**: the one given at
     declaration, or one derived as `<name>:<verdict>:<subcommand>` —
-    `git:ask:commit`, with a numeric suffix where that collides.
+    `git:ask:commit`, with a numeric suffix where that collides. A
+    grant has no verdict, so `grant` fills that slot
+    (`stubtool:grant:clean`), and a declaration with no subcommand
+    stops after the verdict (`sudo:ask`). Every rule and grant has a
+    label whether or not it was given one, because a collection that
+    shipped unlabelled grants would otherwise be a collection nobody
+    could trim — and §3.4 requires narrowing an adopted grant.
     `frisk registry` prints whichever it is, so what an operator drops
     is what they read.
 

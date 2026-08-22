@@ -732,6 +732,12 @@ structurally valid, reasons are non-empty, a hook payload comes back as a
 well-formed verdict, plus the boundary-nullifying shapes — an
 unconditional allow on a tool with no grants, a grant with no conditions,
 and a declaration shadowing a wrapper without re-declaring its handoff.
+A fourth joins them from `007`: a rule or grant scoped to a handoff no
+declaration provides (`inside("docker runn")`) never fires, which is the
+same shape — structurally valid, semantically fatal. It cannot be a load
+error, because declarations are unordered and a scope may name a handoff
+declared later or in another layer; it is answerable only once
+composition is complete, which is where liveness asks it.
 No behaviour cases: it stays lint-fast, because it runs before every
 commit. **Selftest**: liveness, then the project's cases, then
 **coverage** — every rule and grant in the *effective* registry reached

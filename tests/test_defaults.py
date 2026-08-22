@@ -35,6 +35,7 @@ import unittest
 from collections.abc import Sequence
 
 from frisk.declare import Arity
+from frisk.matchers import Outcome
 from frisk.registry import ENGINE_LAYER, Entry, Kind, Registry, collecting
 
 
@@ -119,6 +120,40 @@ class WrapperDefaultTests(unittest.TestCase):
             dict.fromkeys(values, Arity.VALUE),
         )
         return entry
+
+    def test_the_layer_holds_exactly_the_corpus_s_wrappers(self) -> None:
+        # Each program's contract is exact below; this is the other
+        # half — an eighteenth wrapper nobody named, with any
+        # `keeps_operands` it likes, moves where every walk through it
+        # lands and no other case would see it.
+        self.assertEqual(
+            sorted(
+                entry.name
+                for entry in self.registry.entries()
+                if entry.kind is Kind.WRAPPER
+            ),
+            sorted(
+                [
+                    "builtin",
+                    "chrt",
+                    "command",
+                    "doas",
+                    "env",
+                    "exec",
+                    "flock",
+                    "ionice",
+                    "nice",
+                    "nohup",
+                    "setsid",
+                    "stdbuf",
+                    "sudo",
+                    "taskset",
+                    "time",
+                    "timeout",
+                    "xargs",
+                ]
+            ),
+        )
 
     def test_sudo(self) -> None:
         # `--prompt-file` is deliberately absent, and the corpus
@@ -322,27 +357,45 @@ class BenignAssignmentDefaultTests(unittest.TestCase):
     def setUp(self) -> None:
         self.registry = engine_defaults()
 
-    def test_the_display_and_locale_class_is_declared(self) -> None:
+    def covers(self, variable: str) -> bool:
+        """Whether the benign layer excuses this variable by name.
+
+        Asked, not read: `accounted` takes a name *or* a matcher — its
+        own docstring gives `matching(r"^LC_[A-Z_]+$")` as the spelling
+        for a family — so comparing the declarations as text answers a
+        different question. A layer declaring
+        `matching(r"^(LC_.*|GIT_.*)$")` contains the string `"LC_"`
+        nowhere and excuses `GIT_SSH_COMMAND`, which is the one thing
+        this class exists to catch.
+        """
+        for assignment in self.registry.benign_assignments():
+            name = assignment.name
+            if isinstance(name, str):
+                if name == variable:
+                    return True
+            elif name.evaluate(variable) is Outcome.SATISFIED:
+                return True
+        return False
+
+    def test_the_display_and_locale_class_is_excused(self) -> None:
         # Variables that cannot direct execution. Without this layer
         # `LC_ALL=C git status` is an unaccounted assignment on a
         # registered tool, and therefore an ask, in every project.
-        declared = " ".join(
-            str(assignment.name)
-            for assignment in self.registry.benign_assignments()
-        )
-        for expected in ("LC_", "LANG", "TZ", "NO_COLOR"):
-            with self.subTest(name=expected):
-                self.assertIn(expected, declared)
+        for name in ("LC_ALL", "LC_TIME", "LANG", "TZ", "NO_COLOR"):
+            with self.subTest(name=name):
+                self.assertTrue(self.covers(name))
 
-    def test_execution_directing_variables_are_not_on_it(self) -> None:
+    def test_execution_directing_variables_are_not_excused(self) -> None:
         # The closed world of §3.2 exists for exactly these:
         # `GIT_SSH_COMMAND=… git fetch` runs an arbitrary program, and
         # git alone has dozens of siblings. An addition to the benign
         # layer is a decision to stop reading a variable at all.
-        declared = {
-            str(assignment.name)
-            for assignment in self.registry.benign_assignments()
-        }
-        for name in ("GIT_SSH_COMMAND", "GIT_PAGER", "LD_PRELOAD", "PATH"):
+        for name in (
+            "GIT_SSH_COMMAND",
+            "GIT_PAGER",
+            "LD_PRELOAD",
+            "PATH",
+            "LANGUAGE",
+        ):
             with self.subTest(name=name):
-                self.assertNotIn(name, declared)
+                self.assertFalse(self.covers(name))

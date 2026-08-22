@@ -294,7 +294,11 @@ class Registry:
         declarations around them.
 
         `wrap` breaks a long reason onto continuation lines indented
-        past its key. It is on for a reader and off for a parser: a
+        eight spaces — a depth reserved for continuations, so that a
+        line's indent alone says whether it opens a record or continues
+        one, and so a future field can be added at two, four or six
+        without colliding with a wrapped reason. It is on for a reader
+        and off for a parser: a
         tool reading this output plainly wants one record per line, and
         that stays true whether or not §9's machine-readable option
         ever ships.

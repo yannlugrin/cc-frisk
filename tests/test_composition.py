@@ -126,6 +126,32 @@ tool(
 )
 """
 
+UNLABELLED = """
+from frisk.declare import ask, grant, no_operands, tool
+
+tool(
+    "stubtool",
+    default=ask(reason="stubtool changes infrastructure."),
+    grants=[
+        grant(
+            "clean",
+            when=no_operands(),
+            reason="Cleaning nothing in particular.",
+        )
+    ],
+)
+"""
+
+RUNNERS = """
+from frisk.declare import ask, takes_value, wrapper
+
+wrapper(
+    "sudo",
+    flags=[takes_value("-u", "--user", "--prompt-file")],
+    default=ask(reason="Everything sudo runs is elevated."),
+)
+"""
+
 ASSIGNED = """
 from frisk.declare import accounted, ask, tool
 
@@ -287,6 +313,40 @@ class ShadowingTests(CollectionFixture):
         entry = self.compose(declare).lookup("stubtool")
         assert entry is not None
         self.assertEqual(entry.grants, ())
+
+    def test_an_unlabelled_grant_is_dropped_by_its_derived_label(
+        self,
+    ) -> None:
+        # §3.4 requires narrowing an adopted collection's grants, and a
+        # collection that shipped unlabelled ones would otherwise be
+        # untrimmable — `tests/corpus/context_b.py` declares five. A
+        # grant has no verdict, so `grant` fills that slot.
+        self.write_collection("unlabelled", UNLABELLED)
+
+        def declare() -> None:
+            use("unlabelled")
+            amend("stubtool", grants=[drop("stubtool:grant:clean")])
+
+        entry = self.compose(declare).lookup("stubtool")
+        assert entry is not None
+        self.assertEqual(entry.grants, ())
+
+    def test_a_declaration_with_no_subcommand_stops_at_the_verdict(
+        self,
+    ) -> None:
+        # `sudo` carries a rule about the tool itself, so there is no
+        # subcommand to end the label with.
+        def declare() -> None:
+            wrapper(
+                "sudo",
+                rules=[ask(reason="Running as another user.")],
+            )
+
+        entry = self.compose(declare).lookup("sudo")
+        assert entry is not None
+        self.assertEqual(
+            [placed.label for placed in entry.rules], ["sudo:ask"]
+        )
 
     def test_an_amendment_can_remove_an_alias_and_a_handoff(
         self,
@@ -623,6 +683,45 @@ class CollectionOrderTests(CollectionFixture):
         assert entry.default is not None
         self.assertEqual(entry.default.rule.verdict, Verdict.DENY)
 
+    def test_a_collection_shadows_an_engine_wrapper(self) -> None:
+        # §3.4: replace and update apply to a collection's entries
+        # "exactly as to the engine's wrapper defaults — wrapper
+        # declarations included, since collections carry tools of every
+        # kind". The three-layer stack is where composition would hide
+        # a rule, and every other ordering case has the engine's
+        # wrappers sitting untouched beneath tools.
+        self.write_collection("runners", RUNNERS)
+
+        def declare() -> None:
+            use("runners")
+
+        entry = self.compose(declare, with_defaults=True).lookup("sudo")
+        assert entry is not None
+        self.assertEqual(entry.source.layer, "collection:runners")
+        self.assertEqual(entry.kind, Kind.WRAPPER)
+        self.assertIsNotNone(entry.default)
+        # The collection replaced the engine's declaration rather than
+        # landing beside it: `--prompt-file` is the corpus's deliberate
+        # omission, and here a collection has taken it on.
+        self.assertEqual(entry.flags["--prompt-file"], Arity.VALUE)
+        self.assertNotIn("-g", entry.flags)
+
+    def test_the_project_amends_what_a_collection_shadowed(
+        self,
+    ) -> None:
+        # And the project sits above both, amending the collection's
+        # declaration rather than the engine's.
+        self.write_collection("runners", RUNNERS)
+
+        def declare() -> None:
+            use("runners")
+            amend("sudo", flags=[drop("--prompt-file")])
+
+        entry = self.compose(declare, with_defaults=True).lookup("sudo")
+        assert entry is not None
+        self.assertNotIn("--prompt-file", entry.flags)
+        self.assertEqual(entry.flags["-u"], Arity.VALUE)
+
     def test_the_same_collection_twice_is_refused(self) -> None:
         def declare() -> None:
             use("starter")
@@ -716,7 +815,11 @@ class RegistryLayoutTests(CollectionFixture):
         self.assertIn("tool(adeploy)", self.lines)
 
     def test_entry_blocks_are_separated_by_blank_lines(self) -> None:
-        self.assertIn("", self.lines[self.lines.index("tool(git)") + 1 :])
+        # The blank line that ends *this* block: asserting one exists
+        # somewhere below is true of any output with two entries.
+        start = self.lines.index("tool(git)")
+        block = self.block_for("tool(git)")
+        self.assertEqual(self.lines[start + 1 + len(block)], "")
 
     def test_entries_are_ordered_by_name(self) -> None:
         # Two runs of one configuration must compare line by line.
@@ -725,11 +828,15 @@ class RegistryLayoutTests(CollectionFixture):
             self.lines.index("tool(git)"),
         )
 
-    def test_an_entry_s_fields_are_indented_two_spaces(self) -> None:
-        for line in self.block_for("tool(git)"):
-            with self.subTest(line=line):
-                self.assertTrue(line.startswith("  "))
-                self.assertFalse(line.startswith("     "))
+    def test_an_entry_uses_three_indents_and_no_others(self) -> None:
+        # Two for the entry's own fields, four for a group's members,
+        # six for their fields. A stray depth is what makes two runs of
+        # one configuration stop comparing line by line.
+        depths = {
+            len(line) - len(line.lstrip(" "))
+            for line in self.block_for("tool(git)")
+        }
+        self.assertLessEqual(depths, {2, 4, 6})
 
     def test_the_source_field_names_layer_file_and_line(self) -> None:
         self.assertRegex(
@@ -980,20 +1087,21 @@ class InspectionTests(CollectionFixture):
         self.assertRegex(
             self.text, r"\n  source: collection:starter starter\.py:\d+"
         )
-        self.assertRegex(self.text, rf"\n  source: {ENGINE_LAYER} \S+:\d+")
-        self.assertRegex(self.text, rf"\n    source: {PROJECT_LAYER} \S+:\d+")
-
-    def test_it_prints_the_label_an_amendment_would_drop(self) -> None:
-        # In the position `drop` reads them from, so a label printed
-        # inside a reason could not satisfy this.
-        self.assertIn("    deny(push) - forced push", self.lines)
-        self.assertIn("    ask(push) - any push", self.lines)
-
-    def test_it_carries_the_reason_of_every_rule(self) -> None:
-        self.assertIn(
-            "      reason: A forced push rewrites remote history.",
-            self.lines,
+        # Bare filenames for every layer, not an absolute path for
+        # the engine's and a relative one for the config's: one column
+        # that reads two ways is a column nobody can scan.
+        self.assertRegex(
+            self.text, rf"\n  source: {ENGINE_LAYER} [^/\s]+\.py:\d+"
         )
+        self.assertRegex(
+            self.text, rf"\n      source: {PROJECT_LAYER} \S+:\d+"
+        )
+
+    def test_it_prints_a_label_an_amendment_added(self) -> None:
+        # The layout class pins the collection's label; this one pins
+        # that a rule arriving by amendment is printed the same way,
+        # which is the composition claim rather than the layout one.
+        self.assertIn("    ask(push) - any push", self.lines)
 
     def test_a_value_annotates_every_matcher_with_its_outcome(
         self,

@@ -423,6 +423,10 @@ class ConditionTests(unittest.TestCase):
         # on `checkout` with `--` (pathspec) and not on plain checkout,
         # so the starter rules of `023` are written against this
         # spelling.
+        # What this proves is the floor available at this layer: the
+        # constructor accepts `--` as a flag name like any other, so a
+        # rule can key on it. That the *parser* recognizes it as the
+        # end-of-options marker is `008`'s, with a line to read.
         marker = flag("--")
         self.assertTrue(marker.describe().strip())
 
