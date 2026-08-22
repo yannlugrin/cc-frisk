@@ -41,3 +41,6 @@ CLAUDE.local.md
 # Ignored here so neither can return to the index by accident.
 .claude/spec-work/
 .claude/refs/infra-conventions/
+
+# Editor configuration: machine-local, like the virtualenv.
+.vscode/
