@@ -1131,3 +1131,36 @@ Detail in git history.
   so it is declared with the tool.
 - **Approved by:** operator, 2026-08-22, whose question defined the
   requirement.
+
+### D-040 — The test tree is rooted at the repository, and `tests` is a package
+
+- **Date:** 2026-08-22
+- **Step:** `007`
+- **Context:** `D-031` chose `unittest discover --start-directory tests
+  --top-level-directory tests`, which makes each module a top-level one
+  and needs no `__init__.py`. An editor's test explorer cannot run
+  that: the Python extension sets `PROJECT_ROOT_PATH` from the project
+  and then overrides `top_level_dir` with it unconditionally, so it
+  always asks `unittest` to root the tree at the repository — and
+  `unittest` refuses unless the start directory is importable. There is
+  no setting for it; the code path was read to be sure.
+- **Decision:** `tests/__init__.py` exists and the runner passes
+  `--top-level-directory .`, so the tree is rooted at the repository in
+  every context. Modules import each other by full path
+  (`from tests.corpus import context_b`). `D-031`'s decision is
+  untouched — stdlib `unittest`, no test dependency, nothing installed,
+  `PYTHONPATH=src` — only where discovery starts counting.
+- **Alternatives considered:** *leave it and use `just test`* — no repo
+  change at all, and the honest fallback if this ever costs something;
+  rejected because a suite the operator cannot run from their editor is
+  a suite they run less often. *Relative imports inside the package* —
+  equivalent, and it breaks the moment someone runs a module directly.
+  *Making the extension behave* — there is no setting, and pinning an
+  editor's version is not a thing this repository should do.
+- **What it costs.** The repository root joins `sys.path` during a test
+  run, where before only `tests/` and `src/` were on it. Nothing at the
+  root shadows a standard-library or engine module today, and a name
+  that did would be a name worth renaming anyway.
+- **Approved by:** implementer (within latitude: a workflow choice, and
+  `D-031`'s own note that the runner is revisited when a real need
+  appears), reported with the step.

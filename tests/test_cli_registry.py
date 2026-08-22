@@ -21,11 +21,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from test_cli import run
-
 from frisk import __version__
 from frisk.cli import EXIT_CONFIG_ERROR, EXIT_NO_CONFIG
 from frisk.config import CURRENT_GENERATION, config_path
+from tests.test_cli import run
 
 CONFIG = f"""
 from frisk.declare import (

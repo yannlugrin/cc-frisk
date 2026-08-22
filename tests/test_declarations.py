@@ -29,8 +29,6 @@ from __future__ import annotations
 import unittest
 from typing import Callable
 
-from corpus import context_b
-
 from frisk.declare import (
     Arity,
     Inside,
@@ -70,6 +68,7 @@ from frisk.declare import (
 from frisk.errors import ConfigurationError
 from frisk.registry import PROJECT_LAYER, Kind, Registry, collecting
 from frisk.verdicts import Verdict
+from tests.corpus import context_b
 
 
 def compose(declare: Callable[[], None]) -> Registry:

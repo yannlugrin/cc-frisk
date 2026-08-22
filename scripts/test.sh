@@ -46,5 +46,9 @@ fi
 PYTHON="${PYTHON:-python3}"
 
 echo "test: the engine's suite on $("$PYTHON" -V 2>&1)"
+# The test tree is rooted at the repository, not at tests/, so that
+# `tests` is an importable package and discovery works the same way
+# here, in CI and in an editor's test explorer — which roots the tree
+# at the project and offers no way to say otherwise.
 PYTHONPATH=src "$PYTHON" -m unittest discover \
-    --start-directory tests --top-level-directory tests
+    --start-directory tests --top-level-directory .
