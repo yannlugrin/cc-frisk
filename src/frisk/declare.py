@@ -123,13 +123,15 @@ __all__ = [
 def api_generation(generation: int) -> None:
     """Which generation of this API the configuration was written for.
 
-    The scaffold writes it and every configuration carries it. Outside
-    the range the engine speaks, loading fails closed with a message
-    pointing at the skill's migration assistance — never a best guess,
-    because misreading a configuration is silent where refusing is
-    loud. A configuration that declares no generation at all fails the
-    same way: the declaration is how a config says which contract it
-    expects, and its absence is not a version.
+        api_generation(1)
+
+    Put it at the top of your configuration; the scaffold writes it for
+    you. It tells the engine which version of this vocabulary the file
+    was written against, so an update that changes the vocabulary can
+    keep reading your file — or refuse it and point you at the
+    migration, rather than guess and quietly misread your boundary.
+
+    A configuration without it does not load.
     """
     raise NotImplementedError
 
@@ -155,18 +157,26 @@ class FlagSet:
 
 
 def bare(*names: str) -> FlagSet:
-    """Switches: these flags take nothing with them."""
+    """Declare flags that take no value.
+
+        flags=[bare("--force", "--dry-run")]
+
+    Only needed on a gated tool, where every flag must be declared. A
+    flag you never mention is assumed to take nothing anyway.
+    """
     raise NotImplementedError
 
 
 def takes_value(*names: str) -> FlagSet:
     """These flags take a value, as `--flag=v` or in the next token.
 
-    On a gated tool this must be declared completely: a value-taking
-    flag read as bare lets its value look like a flag of the
-    invocation, and when that value is a safe marker
-    (`deploy.yml -i --syntax-check`) a real deploy passes as a
-    parse-only run — the one direction §4.2 calls the worst.
+        flags=[takes_value("-i", "--inventory", "--tags")]
+
+    Declare **every** one of these. A value-taking flag frisk does not
+    know about lets its value look like a flag of the command, and
+    `deploy.yml -i --syntax-check` then reads as a parse-only run when
+    it is a real deploy — the one direction that fails toward letting
+    something through.
     """
     raise NotImplementedError
 
@@ -174,9 +184,12 @@ def takes_value(*names: str) -> FlagSet:
 def may_take_value(*names: str) -> FlagSet:
     """These flags take a value unless the next token looks like a flag.
 
-    Hand-rolled CLIs accept both `--argument custom` and
-    `--argument --check`; reading such a flag as value-required
-    swallows the very token that decides the verdict.
+        flags=[may_take_value("--argument")]
+
+    For a flag that takes a value only when the next token is not
+    itself a flag — some hand-rolled tools accept both
+    `--argument custom` and a bare `--argument`. Reading one as always
+    taking a value swallows the very token that decides the verdict.
     """
     raise NotImplementedError
 
@@ -215,36 +228,48 @@ When = Union[Condition, Sequence[Condition], None]
 def flag(name: str, value: Matcher | None = None) -> Condition:
     """This flag is operative on the invocation, optionally with a value.
 
-    *Operative* means the parser saw the token as a flag of this
-    invocation (§5.2): a token swallowed as another flag's value is not
-    one, which is what makes `deploy.yml -i --syntax-check` a real
-    deploy. Value conditions are available here and not only on grants
-    — prototyping could deny on a flag's presence but not on its value,
-    and closing that asymmetry is one reason this API is fresh (§3.2).
+        deny("push", when=flag("--force"), reason=…)
+        ask("apply", when=flag("--mode", one_of("prod")), reason=…)
+
+    The flag must be *operative* — a real flag of this command, not a
+    token that another flag swallowed as its value. This is what makes
+    `deploy.yml -i --syntax-check` a real deploy: `--syntax-check` is
+    `-i`'s inventory string there, so a rule about it does not fire.
     """
     raise NotImplementedError
 
 
 def any_flag(*names: str) -> Condition:
-    """At least one of these flags is operative on the invocation."""
+    """True when at least one of these flags is used.
+
+    deny("push", when=any_flag("-f", "--force", "--mirror"), reason=…)
+    """
     raise NotImplementedError
 
 
 def env(name: str, value: Matcher | None = None) -> Condition:
-    """This environment assignment binds the invocation (§4.2).
+    """True when this variable is set in front of the command.
 
-    Names are the shell's, so matching is case-sensitive and a
-    lower-case name is an assignment too.
+        deny(when=env("GIT_SSH_COMMAND"), reason=…)
+        ask("apply", when=env("TARGET", one_of("prod")), reason=…)
+
+    Matches `NAME=value cmd …`, the shape that can change what a
+    command does without appearing in its flags. Names are the shell's,
+    so matching is case-sensitive and a lower-case name is a variable
+    too.
     """
     raise NotImplementedError
 
 
 def option(name: str, value: Matcher | None = None) -> Condition:
-    """This pre-subcommand option was used, optionally with a value.
+    """True when an option *before* the subcommand was used.
 
-    Which pre-subcommand options were used and with what values is
-    remembered (§4.2), so "pushing is fine only for repositories under
-    this directory" is a rule on `-C`'s value.
+        ask("push", when=option("-C", path_under("/srv")), reason=…)
+
+    For the options a tool takes ahead of its subcommand — `git -C dir
+    push` — which the tool must declare in `options=`. This is how
+    "pushing is fine, but only for repositories under this directory"
+    is said.
     """
     raise NotImplementedError
 
@@ -252,31 +277,35 @@ def option(name: str, value: Matcher | None = None) -> Condition:
 def every_operand(value: Matcher) -> Condition:
     """Every operand satisfies this matcher — and there is at least one.
 
-    Empty operands are never vacuously granted (§3.2): a command acting
-    on nothing has not proven what it acts on. The empty case has its
-    own spelling, `no_operands()`, so that granting it is a decision
-    rather than a side effect.
+        grant("clean", when=every_operand(path_under("/tmp")), reason=…)
 
-    An empty operand list is **unsatisfied**, not unproven. Nothing is
-    uncertain about it — the list is known and it is empty — and §3.3's
-    stricter direction is for what cannot be decided. On a grant the
-    two readings agree (neither releases); on a deny rule stated over
-    every operand they do not, and firing an ask about a command whose
-    operands are known to be absent would be a prompt bought with a
-    fiction. That rule is *stated* here and *proven* where conditions
-    meet real invocations, as the corpus states it: `stubtool clean`
-    with no operands asks.
+    Operands are what is left after the subcommand and the flags — the
+    files and names a command acts on.
+
+    **A command with no operands does not satisfy this.** `clean` with
+    nothing after it has not shown what it would clean, so the grant
+    does not release it. If you mean to allow that, say so with
+    `no_operands()`.
     """
     raise NotImplementedError
 
 
 def at_least_one_operand(value: Matcher) -> Condition:
-    """At least one operand satisfies this matcher."""
+    """True when at least one operand matches.
+
+    deny(when=at_least_one_operand(matching(r"^delete$")), reason=…)
+    """
     raise NotImplementedError
 
 
 def no_operands() -> Condition:
-    """The invocation carries no operands at all."""
+    """True when the command has no operands at all.
+
+        grant("status", when=no_operands(), reason=…)
+
+    The deliberate spelling for the empty case, which `every_operand`
+    refuses.
+    """
     raise NotImplementedError
 
 
@@ -366,7 +395,14 @@ host_only = HostOnly()
 
 
 def inside(handoff_name: str) -> Inside:
-    """Only inside the named handoff — `inside("docker run")`."""
+    """Confine a rule or grant to one handoff.
+
+        ask("wipe", reason=…, scope=inside("docker run"))
+
+    A command inside a container runs in a different world than the
+    same command on the host, and may deserve a different answer. Use
+    `host_only` for the other side.
+    """
     raise NotImplementedError
 
 
@@ -409,10 +445,15 @@ def deny(
 ) -> Rule:
     """Refuse: an act with no authorized use.
 
-    The subcommand is a path, written as it is typed —
-    `deny("stash drop")`, `deny("buildx imagetools create")`. Omitted,
-    the rule is about the tool itself. `reason` is required, and
-    `target` belongs only to a rule inside `redirections()`.
+        deny("stash drop", reason="Dropping a stash cannot be undone.")
+
+    The subcommand is written as it is typed, spaces and all —
+    `deny("buildx imagetools create")`. Leave it out and the rule is
+    about every use of the tool.
+
+    `reason` is required and is shown to whoever meets the refusal, so
+    write the objection *and* the way forward. `label` names the rule
+    for `amend`; `scope` confines it to the host or to one handoff.
     """
     raise NotImplementedError
 
@@ -426,7 +467,14 @@ def ask(
     scope: Scope = anywhere,
     target: Matcher | None = None,
 ) -> Rule:
-    """Put it to the operator: an outward write, or destroyed work."""
+    """Ask: stop and let the user decide.
+
+        ask("push", reason="A push publishes work to a shared remote.")
+
+    For acts that are legitimate but should not happen unnoticed —
+    anything that reaches outside the machine, or destroys work.
+    Arguments are `deny`'s.
+    """
     raise NotImplementedError
 
 
@@ -439,7 +487,14 @@ def allow(
     scope: Scope = anywhere,
     target: Matcher | None = None,
 ) -> Rule:
-    """Grant the call outright — exceptional, and hedged (§6.3)."""
+    """Allow: let it run without asking.
+
+    Exceptional, and hedged: an allow anywhere in a command line is
+    withheld if anything else in that line asks or denies. Use it for a
+    shape you have proven safe and meet constantly; prefer a `grant` on
+    a gated tool, which says the same thing without waiving anything.
+    Arguments are `deny`'s.
+    """
     raise NotImplementedError
 
 
@@ -453,10 +508,12 @@ def silent(
 ) -> Rule:
     """No opinion: hand the call to the permission rules and mode.
 
-    The only verdict whose reason is optional — nothing is being
-    refused — and the only one worth declaring explicitly, since a
-    declared silence survives secure mode where an implicit one does
-    not (§3.2).
+        tool("git", default=silent())
+
+    frisk says nothing and your normal permission rules decide. This is
+    what happens anyway where no rule matches, so declare it only when
+    you mean it — a stated silence is deliberate where an absent rule
+    is merely absent. The one verdict that needs no reason.
     """
     raise NotImplementedError
 
@@ -471,11 +528,21 @@ def grant(
 ) -> Grant:
     """A shape proven safe, on a tool that is dangerous by default.
 
-    Declaring any grant closes the tool's world: from then on every
-    flag it may carry must be declared, and an invocation matching no
-    grant gets the tool's default verdict. That is the load-bearing
-    property of §3.2 — a flag or a value nobody considered can only
-    move a verdict toward the stricter outcome.
+        grant(when=any_flag("--check", "--dry-run"), reason=…)
+        grant("clean", when=every_operand(path_under("/tmp")), reason=…)
+
+    For a tool that is dangerous by default: instead of listing what to
+    refuse, you list the shapes you can prove are safe, and everything
+    else gets the tool's default verdict.
+
+    Declaring a grant **closes the tool's flag list**: from then on
+    every flag it may carry has to appear in `flags=`, and a command
+    carrying one you did not declare is unprovable rather than
+    granted. That is the point — a flag nobody thought about can only
+    make the answer stricter, never looser.
+
+    A rule still wins over a grant. `deny` on a subcommand refuses it
+    even where a grant would have released it.
     """
     raise NotImplementedError
 
@@ -504,15 +571,15 @@ class Assignment:
 def accounted(name: str | Matcher, value: Matcher | None = None) -> Assignment:
     """This assignment is expected, optionally only with a value.
 
-    Assignments are closed-world for every registered tool, not only
-    gated ones (§3.2): one that is neither on the engine's benign list
-    nor accounted for here is an explicit ask citing the assignment.
-    `accounted("GIT_PAGER", one_of("cat"))` accepts the pager and asks
-    about every other value.
+        tool("git", assignments=[accounted("GIT_PAGER", one_of("cat"))])
 
-    The name may itself be a matcher, which is what a family of
-    variables needs — `accounted(matching(r"^LC_[A-Z_]+$"))` — and it
-    is why the benign layer below needs no vocabulary of its own.
+    Environment variables in front of a command can change what it
+    does without showing up in its flags, so for every tool you
+    register, one you have not accounted for **asks**. List the ones
+    your project sets, with a matcher where only some values are fine.
+
+    The name can be a matcher too, for a family:
+    `accounted(matching(r"^LC_[A-Z_]+$"))`.
     """
     raise NotImplementedError
 
@@ -520,20 +587,17 @@ def accounted(name: str | Matcher, value: Matcher | None = None) -> Assignment:
 def benign_assignments(*declared: Assignment | Drop) -> None:
     """The assignments no registered tool has to account for (§3.2).
 
-    The display/locale class — `LC_*`, `LANG`, `TZ`, `NO_COLOR` and kin
-    — variables that cannot direct execution. It is an engine default
-    layer like the wrappers: enumerated, reviewable, and shadowable, so
-    a configuration adds to it and drops from it by name. Without this
-    layer `LC_ALL=C git status` would be an unaccounted assignment on a
-    registered tool, and therefore an ask.
+        benign_assignments(accounted("PROJECT_LOCALE"), drop("TZ"))
 
-    Additions and removals travel together, as they do in `amend()`:
-    `benign_assignments(accounted("PROJECT_LOCALE"), drop("TZ"))`.
+    Variables no tool has to account for. frisk ships the display and
+    locale ones — `LC_*`, `LANG`, `TZ`, `NO_COLOR` — so that
+    `LC_ALL=C git status` does not ask in every project. Add your own,
+    or drop one you would rather see.
 
-    What belongs here is exactly what cannot change what runs.
-    `GIT_SSH_COMMAND` and its dozens of siblings are the reason the
-    closed world exists (§3.2); an addition here is a decision to stop
-    reading a variable at all.
+    **Adding to this list is a decision to stop reading a variable at
+    all**, everywhere. Keep it to variables that cannot change what
+    runs: `GIT_SSH_COMMAND` and its many siblings are exactly what the
+    accounting exists to catch.
     """
     raise NotImplementedError
 
@@ -579,12 +643,18 @@ def handoff(
 ) -> SubcommandHandoff:
     """Declare a subcommand where the inner command begins.
 
-    `handoff("run", keeps_operands=1, flags=[…])`. The kept operand is
-    the image, service or container name and is never read as a
-    program, however it is named — judging `docker run org/rm -rf` as
-    an `rm` on the host would be guesswork in the wrong direction. The
-    handoff's own value-taking options must be declared, because
-    locating that kept operand depends on knowing which tokens were
+        tool("docker", handoffs=[handoff("run", keeps_operands=1)])
+
+    Some subcommands stop describing the tool and run something else:
+    after `docker run alpine`, what follows is a command in its own
+    right and is judged as one. Declare where that happens.
+
+    `keeps_operands` is how many operands belong to the tool first —
+    one for the image, service or container name. That name is never
+    read as a program, however it is spelled.
+
+    Declare the handoff's own value-taking options in `flags=`: finding
+    where the inner command starts depends on knowing which tokens were
     swallowed as values.
     """
     raise NotImplementedError
@@ -595,12 +665,15 @@ def option_handoff(
 ) -> OptionHandoff:
     """Declare a flag-introduced inner command, closed by a terminator.
 
-    `option_handoff("-exec", terminated_by=[";", "+"])`, which is where
-    `find . -name '*.log' -exec rm -rf {} +` hides its command: it sits
-    mid-line, opened by an option and closed by a terminator, and the
-    wrapper model does not fit it (§4.3). The terminator is required —
-    without one there is nothing to say where the inner command stops
-    and the outer tool's own operands resume.
+        tool("find", handoffs=[
+            option_handoff("-exec", terminated_by=[";", "+"]),
+        ])
+
+    For the shape `find . -name '*.log' -exec rm -rf {} +`, where the
+    inner command sits in the middle of the line, opened by an option
+    and closed by a terminator. The terminator is required: without it
+    nothing says where the inner command ends and the tool's own
+    operands resume.
     """
     raise NotImplementedError
 
@@ -611,7 +684,7 @@ def option_handoff(
 
 @dataclass(frozen=True)
 class Case:
-    """A command line and the verdict the guard must return for it."""
+    """A command line, and the verdict frisk must return for it."""
 
     command: str
     expect: Verdict
@@ -620,10 +693,15 @@ class Case:
 def case(command: str, expect: Verdict) -> Case:
     """A project's own test case, sited beside the rule it proves.
 
-    Cases live in the tool they are about — `tool("git", rules=[…],
-    cases=[…])` — because a rule and its proof drifting into separate
-    files is how the coverage gate of §8.2 becomes paperwork. They can
-    also stand alone at the top level for a case about no single tool.
+        tool("git", rules=[…], cases=[case("git push --force", DENY)])
+
+    Your own tests: a command line, and what frisk must answer for it.
+    `frisk selftest` runs them, and requires every rule and grant you
+    declared to be reached by at least one — a rule no case reaches is
+    either dead or untested, and from outside those look the same.
+
+    Write them beside the rule they prove. Use `cases(…)` at the top
+    level for one that belongs to no single tool.
     """
     raise NotImplementedError
 
@@ -631,9 +709,10 @@ def case(command: str, expect: Verdict) -> Case:
 def cases(*declared: Case) -> None:
     """Declare cases that belong to no single tool.
 
-    A case about a whole line — a wrapper walk, a substitution, the
-    combination of two invocations — has no tool to sit beside, and
-    forcing it into one would file it where nobody looks for it.
+        cases(case("sudo git push --force", DENY))
+
+    For a case about a whole line — a wrapper walk, a substitution,
+    two commands combining — where no single tool is the subject.
     """
     raise NotImplementedError
 
@@ -658,45 +737,38 @@ def tool(
 ) -> None:
     """Register a tool: what it is called, what it takes, what it may do.
 
-    The name says which of §4.2's two forms this is, the way a shell
-    already does: without a separator it is a **basename**, matched on
-    the whole name only — `git` and `/usr/bin/git` are the same tool,
-    `git-crypt` is not git — and with one it is a **project-relative
-    path**, matched with the path machinery of §3.2 and more specific
-    than a basename declaration, which is what keeps a grant written
-    for the operator's script from releasing a same-named file
-    anywhere. `tool("git")` and `tool("tools/deploy.py")` are the two,
-    and a script at the project root is `tool("./deploy.py")` — the
-    same `./` a shell needs there, and for the same reason.
+        tool("git", rules=[deny("push", …)])
+        tool("tools/deploy.py", default=ask(reason=…))
 
-    An **absolute** path is refused. The configuration is committed and
-    travels with the project, and `/usr/bin/git` on one machine is
-    `/opt/homebrew/bin/git` on the next; project-relative is what
-    survives a clone. Declaring the basename is what an operator
-    reaching for one almost always means, and the refusal says so.
+    **The name says which kind it is, the way a shell does.** No
+    separator means a command name, matched whole: `git` also matches
+    `/usr/bin/git`, and never matches `git-crypt`. A separator means a
+    file in your project: `tools/deploy.py`, matched however it is
+    spelled, and `./deploy.py` for a script at the project root — the
+    same `./` you would need to run it.
 
-    `aliases` are fully equivalent names for this same declaration
-    (drop-in replacements).
+    An absolute path is refused: your configuration is committed and
+    travels with the project, and `/usr/bin/git` here is
+    `/opt/homebrew/bin/git` on someone else's machine. Declare the
+    command name instead.
 
-    `flags` declares arities. On a gated tool the same declaration is
-    also the closed world; on a rules-only tool it is arity and nothing
-    more, which is why `closed_world` exists as its own word: declaring
-    grants closes the world implicitly, and a tool that needs a closed
-    world without a grant says so.
+    `aliases` are other names for the same tool — drop-in replacements
+    such as `podman` for `docker`.
 
-    `closed_world` is three-valued rather than a flag. Left unset it
-    means *closed exactly when grants are declared*, which is the
-    reading §3.2 gives — grants are checked "universally and
-    closed-world", so declaring one closes the world by existing. `True`
-    closes it without a grant. `False` is refused where any grant
-    stands: a grant that could be escaped by an undeclared flag is not
-    a proof of anything, so opening a granted tool's world is a
-    contradiction rather than a preference.
+    `flags` tells the parser which flags take a value, so that a value
+    is never mistaken for a flag. On a gated tool it does more: it
+    becomes the complete list of flags the tool may carry, and anything
+    outside it makes the command unprovable.
 
-    `options` are the options that precede a subcommand and are
-    stripped so the subcommand lands where rules expect it —
-    undeclared, `git -C dir push` parses as operands and no push rule
-    matches.
+    `options` are the options a tool takes *before* its subcommand.
+    Without them `git -C dir push` reads as a `git` with two operands
+    and no push rule fires.
+
+    `closed_world` closes the tool's flag list without granting
+    anything. You rarely need it: declaring any grant closes the world
+    already. Leave it unset unless you mean to say so explicitly — and
+    note that it cannot be set to `False` while a grant stands, since a
+    grant an unknown flag could escape proves nothing.
     """
     raise NotImplementedError
 
@@ -714,21 +786,24 @@ def wrapper(
 ) -> None:
     """A program whose job is to run another program (§3.4, §4.3).
 
-    The walk steps over the wrapper's declared value-taking options and
-    its kept positional operands — `timeout 30 cmd` keeps one — and
-    judges what it reaches. Undeclared options are presumed bare, so a
-    wrapper declaration is a best effort by construction and its
-    failure direction is the strict one: when the position the walk
-    lands on resolves to nothing, the thread is lost and §4.3 decides.
+        wrapper("timeout", flags=[takes_value("-s")], keeps_operands=1)
 
-    `operands_from_stdin` is the `… | xargs -0 rm` shape: the inner
-    command word is visible but its operands arrive on stdin and are
-    invisible, so operand-requiring conditions on it are unprovable.
+    A program whose job is to run another one. frisk steps over it and
+    judges what it runs, so `sudo git push --force` is a denied push.
 
-    A wrapper may carry rules and a default of its own — `sudo git
-    push --force` is a sudo *and* a denied push — which is also how an
-    operator gates everything a runner runs, by shadowing it into a
-    tool with an ask default rather than by heuristic.
+    Declare the options that take a value, and `keeps_operands` for
+    operands the wrapper takes for itself — `timeout 30 cmd` keeps the
+    duration. Options you do not declare are assumed to take nothing;
+    get that wrong and frisk may lose track of the inner command, which
+    makes it ask rather than stay quiet.
+
+    `operands_from_stdin` is the `… | xargs -0 rm` shape: the command
+    is visible but what it acts on arrives on stdin, so no rule about
+    its operands can be proven.
+
+    A wrapper can carry rules and a default of its own. That is how you
+    gate everything an unknown runner runs: declare it with an `ask`
+    default.
     """
     raise NotImplementedError
 
@@ -742,24 +817,21 @@ def shell(
 ) -> None:
     """A shell: its `-c` payload is a command line and is re-analyzed.
 
-    Combined spellings (`-lc`, `-ec`) are the same payload. A shell
-    reached with no `-c` payload and no file operand — `curl url | sh`
-    — is running a program the line cannot show, and asks (§4.3).
+        shell("bash")
+        shell("eval", joins_operands=True)
 
-    `joins_operands` is `eval`, which has no payload flag at all: it
-    joins its arguments and runs the result, so the joined string is
-    what gets re-analyzed. Stepping over it instead would leave a
-    quoted payload as one unrecognizable token, and `eval "git push
-    --force"` would say nothing.
+    A shell's `-c` argument is a command line, so it is read as one and
+    everything inside it is judged — combined spellings such as `-lc`
+    included. `bash -c 'git push --force'` denies exactly as the bare
+    command would.
 
-    It also settles what an empty one means. §4.3 makes a shell with no
-    `-c` payload and no file operand **ask**, because `curl url | sh`
-    is running a program the line cannot show — but a joining shell
-    with no operands is not hiding a program, it is running none, and
-    the corpus rules bare `eval` silent. The distinction is the
-    declaration's, not an exception to be remembered at judgment time:
-    where the payload *is* the operands, their absence is the absence
-    of a command.
+    A shell reached with no payload and no script file — `curl url |
+    sh` — is running something the line cannot show, and asks.
+
+    `joins_operands` is for `eval`, which has no payload flag: it joins
+    its arguments and runs the result. With nothing to join it is
+    running nothing at all, so a bare `eval` says nothing rather than
+    asking.
     """
     raise NotImplementedError
 
@@ -772,11 +844,16 @@ def interpreter(
 ) -> None:
     """An interpreter walked to the file it runs (§4.2).
 
-    `python3 tools/deploy.py` is judged as `deploy.py`'s registration
-    if one exists. Program text in another language is never read as
-    shell — guessing another grammar produces false refusals — so an
-    interpreter's `-c`/`-e` payload is opaque, and an interpreter with
-    no payload and no file operand asks like the bare piped shell.
+        interpreter("python3", flags=[takes_value("-c", "-m")])
+
+    A tool run through an interpreter is still that tool: if you have
+    registered `tools/deploy.py`, then `python3 tools/deploy.py` is
+    judged by that registration.
+
+    Program text in another language is never read as shell — guessing
+    at another grammar produces false refusals — so a `-c` or `-e`
+    payload is left alone. Declare whatever takes a value, or the walk
+    will mistake that value for the script.
     """
     raise NotImplementedError
 
@@ -784,11 +861,17 @@ def interpreter(
 def redirections(*rules: Rule) -> None:
     """Rules on where a command's output lands (§4.3).
 
-    A redirection target can destroy by truncation or write where
-    nothing else in the line writes, so targets are matchable:
-    `redirections(ask(target=path_under(".claude"), reason=…))`. Their
-    default is silence — redirections are ubiquitous and only rules
-    give them meaning.
+        redirections(
+            ask(target=path_under(".claude"), reason="…"),
+        )
+
+    `> file` can destroy a file by truncating it, or write somewhere
+    nothing else on the line writes — `echo x > .claude/settings.json`
+    carries all its danger in the redirection. These rules match the
+    target rather than the command.
+
+    Redirections say nothing by default: `2>/dev/null` is everywhere,
+    and only your rules give any of them meaning.
     """
     raise NotImplementedError
 
@@ -807,30 +890,22 @@ class Drop:
 def drop(*names: str) -> Drop:
     """Remove these from the list this appears in (§3.4).
 
-    An `amend()` list holds what is added and what is taken away
-    together, so the two read side by side and the list itself says
-    what a name refers to: a flag in `flags`, a label in `rules` and
-    `grants`, an alias in `aliases`, a handoff's position in
-    `handoffs`, a variable in `assignments`.
-
         amend("sudo", flags=[drop("-u"), takes_value("--prompt-file")])
         amend("git", rules=[drop("forced push")])
 
-    Rules and grants are named by their **label**: the one given at
-    declaration, or one derived as `<name>:<verdict>:<subcommand>` —
-    `git:ask:commit`, with a numeric suffix where that collides. A
-    grant has no verdict, so `grant` fills that slot
-    (`stubtool:grant:clean`), and a declaration with no subcommand
-    stops after the verdict (`sudo:ask`). Every rule and grant has a
-    label whether or not it was given one, because a collection that
-    shipped unlabelled grants would otherwise be a collection nobody
-    could trim — and §3.4 requires narrowing an adopted grant.
-    `frisk registry` prints whichever it is, so what an operator drops
-    is what they read.
+    Put it in the list you are taking something out of: a flag name in
+    `flags`, a label in `rules` and `grants`, an alias in `aliases`, a
+    handoff's position in `handoffs`, a variable in `assignments`.
 
-    Dropping and adding the same name in one amendment is refused:
-    §3.2 makes order within a source meaningless, so the pair has no
-    defined reading. Replace it with the declaration you meant.
+    Rules and grants are named by **label**. Give one when you declare
+    them, or use the one frisk derives — `git:ask:commit`,
+    `stubtool:grant:clean`, `sudo:ask` for a rule about the tool
+    itself. `frisk registry` prints whichever it is, so what you drop
+    is what you read there.
+
+    Dropping and adding the same name in one `amend` is refused: it
+    says two things at once. To change a flag's arity or a matcher,
+    just declare it again — the new one replaces the old.
     """
     raise NotImplementedError
 
@@ -857,32 +932,26 @@ def amend(
     a rule, narrow a grant — because adopting a collection and then
     trimming it is what makes collections adoptable at all.
 
-    Removals travel inside the list they act on, as `drop(…)`, rather
-    than in keywords of their own: the list says what the name refers
-    to, and a trim reads beside the addition that replaces it. `tool()`
-    takes no `Drop`, which is what makes "remove something from a
-    declaration that does not exist yet" a type error rather than a
-    runtime one.
+        amend("git", rules=[ask("push", reason=…)])
+        amend("sudo", flags=[drop("-u"), takes_value("--prompt-file")])
 
-    `closed_world` behaves here as it does on `tool()`: unset is
-    *derived*, and derived is evaluated on the state the amendment
-    leaves behind — closed exactly when grants are declared. So
-    dropping the last grant re-opens a world nobody closed on purpose,
-    while a world set explicitly with `True` survives a trim made for
-    another reason. That is what the third state is for; a plain flag
-    could say neither.
+    Use this to adjust something already declared — an engine default,
+    or a tool a collection you adopted brought with it — without
+    rewriting it. `tool()` with the same name is the other choice: it
+    **replaces** the declaration entirely.
 
-    Dropping the last grant is not a tool losing its guard: what stays
-    is the default verdict, declared and unchanged, which is the shape
-    a gated tool has anyway once nothing releases it. The amendment
-    says *no shape bypasses the default here*. Removing the granted
-    behaviour itself is a `tool()` redeclaration, which replaces rather
-    than amends.
+    Anything you list is added. To take something away, put `drop(…)`
+    in the list it belongs to. To change a flag's arity or a
+    matcher, just declare it again: the new one replaces the old.
 
-    There is no way to drop a `default=`, deliberately: a default
-    verdict is replaced by declaring another, and a tool with no
-    default at all is a different thing from one whose default was
-    removed.
+    `closed_world` left unset means "closed exactly when grants are
+    declared", so dropping a tool's last grant re-opens its flag list.
+    That is not the tool losing its guard: its default verdict stays,
+    and what you have said is that no shape bypasses that default any
+    more. A world you closed on purpose with `True` survives a trim you
+    made for another reason.
+
+    You cannot drop a `default=`. Declare another one instead.
     """
     raise NotImplementedError
 
@@ -897,11 +966,16 @@ def use(collection: str) -> None:
     come last and always win, wherever in the file they sit: `use()` is
     an adoption, not a point in a stream.
 
-    A collection is a declaration file beside the configuration, named
+        use("starter")
+
+    A collection is a declaration file beside your configuration, named
     without its extension: `use("starter")` runs
-    `.claude/frisk/starter.py`. It is executed, not imported — a
-    composition must be able to happen twice in one process, and an
-    imported module declares once and then sits in `sys.modules`
-    saying nothing.
+    `.claude/frisk/starter.py`. It brings its cases with its rules.
+
+    Adopt as many as you like. Where two collections declare the same
+    tool, the one adopted **later** wins — the order is yours and
+    nothing else decides it. Your own declarations always win over all
+    of them, wherever in the file they sit, so adopting a collection
+    below your own `tool()` does not undo it.
     """
     raise NotImplementedError

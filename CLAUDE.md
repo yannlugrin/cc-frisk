@@ -328,14 +328,11 @@ own tree, whose paths `PLAN.md` `021` confirms rather than assumes;
 ## Current state
 
 - **Current step:** `007` — declarations, matchers, layering, at its
-  test gate (`D-032`): the cases are written and red, the implementation
-  is not. They are also the config-facing API's first draft (`D-034`),
-  so this gate approves an interface as well as behaviour.
+  test gate (`D-032`): cases written and red, implementation not.
 - **Next step:** `008` — reading the line.
 - **World state:** the harness (`just setup/check/test/verify`) runs the
-  same checks locally, in the commit hook and in CI, green; `setup` also
-  installs the engine, and the 3.9 floor is executed by CI's test
-  matrix, not asserted. `src/frisk/` ships a CLI that judges nothing yet
+  same checks locally, in the commit hook and in CI, green, and `setup`
+  installs the engine. `src/frisk/` ships a CLI that judges nothing yet
   and cannot exit 0 saying so. The permission boundary — guard plus
   `.claude/settings.json` — is live, untracked and unchanged since
   `002`. `origin` is `github.com/yannlugrin/cc-frisk`, **public**, and
@@ -357,6 +354,10 @@ own tree, whose paths `PLAN.md` `021` confirms rather than assumes;
   a subagent's context carries, what frontmatter binds, when a
   definition loads; read before touching `.claude/skills/` or
   `.claude/agents/`, or trusting a subagent on a rule.
+  `user-facing-rulings.md` — an index of what the operator
+  documentation owes and where each ruling is written; read before
+  writing any §12 deliverable, and extend it whenever a step settles
+  something a user would not learn from the specification alone.
 
 *A closed list of item kinds — current and next step, live world-state,
 open obligations, `.claude/docs/` pointers — and nothing else. A closed

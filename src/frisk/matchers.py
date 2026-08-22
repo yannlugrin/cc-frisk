@@ -122,65 +122,92 @@ class Matcher:
 
 
 def one_of(*values: str) -> Matcher:
-    """The value is exactly one of these strings.
+    """Match a value that is exactly one of these strings.
 
-    The single-value case is spelled the same way — `one_of("cat")` —
-    deliberately: a second constructor for it would be two names for
-    one concept in a surface §5.3 asks to keep small.
+        flag("--mode", one_of("dry-run", "check"))
+
+    Comparison is exact, not a prefix: `one_of("check")` does not match
+    `checkout`. A single value is spelled the same way, `one_of("cat")`.
     """
     raise NotImplementedError
 
 
 def matching(regex: str) -> Matcher:
-    """The raw string matches this regular expression.
+    """Match a value against a regular expression.
 
-    Anchoring is the author's: an unanchored `validates?\\.ya?ml` also
-    accepts `validates.yaml.bak`.
+        at_least_one_operand(matching(r"^(create|delete)$"))
+
+    The whole value is searched, not just its start, so **anchor the
+    pattern yourself**: unanchored, `validates?\\.ya?ml` also accepts
+    `validates.yaml.bak`. The raw string is compared — nothing is
+    resolved or expanded first, which is what makes this the right
+    matcher for values that are not paths.
     """
     raise NotImplementedError
 
 
 def predicate(description: str, test: Callable[[str], bool]) -> Matcher:
-    """Everything else — a Python test, with the phrase that names it.
+    """Match a value with your own test, for what the others cannot say.
 
-    The description comes first because it is what the operator reads
-    in the registry and in a citation; the callable is the escape
-    hatch, and an escape hatch that cannot be cited is not reviewable.
+        predicate("a four-digit year", lambda v: v.isdigit() and len(v) == 4)
+
+    The description comes first because it is what your registry and
+    every refusal citing this matcher will show. Write it as the phrase
+    you would want to read in a prompt.
     """
     raise NotImplementedError
 
 
 def path_under(*boundaries: str) -> Matcher:
-    """The resolved path is one of these boundaries, or inside one.
+    """Match a path inside one of these directories.
+
+        every_operand(path_under("/tmp", ".scratch"))
+
+    `..` and `~` are resolved before comparing, so a boundary cannot be
+    escaped by spelling: `/tmp/../etc` is *not* under `/tmp`. Containment
+    is by whole path component, so `/tmpevil` is not under `/tmp`, and a
+    boundary contains itself.
 
     A boundary may carry glob wildcards, which never cross `/`:
     `/home/*/scratch` accepts `/home/me/scratch/build` and rejects
-    `/home/a/b/scratch`. Containment is by path component, so `/tmpevil`
-    is not under `/tmp`, and the boundary itself is inside itself.
+    `/home/a/b/scratch`.
 
-    Several boundaries combine as `any_of`, so a value satisfied by one
-    is satisfied, and an unknown outranks the others' clean misses.
+    Several boundaries mean *any of them*. Mixing absolute and relative
+    boundaries is fine, but note that a relative one only ever matches a
+    relative value: nothing on a command line says what directory it
+    would be relative to, so the answer is "cannot tell" rather than a
+    match, and the verdict moves to the stricter side.
     """
     raise NotImplementedError
 
 
 def path_matching(regex: str) -> Matcher:
-    """The resolved path matches this regular expression, exactly.
+    """Match a path against a regular expression, as a whole path.
 
-    The difference from `path_under` is deliberate and load-bearing:
-    this form constrains the path itself, so `^/mnt/\\w+/build$` accepts
-    `/mnt/data/build` and neither `/mnt/data/builds` nor
-    `/mnt/data/build/sub`. Resolution still happens first, so
+        env("BUILD_ROOT", path_matching(r"^/mnt/\\w+/build$"))
+
+    Unlike `path_under`, this does **not** accept what is inside a
+    match: `^/mnt/\\w+/build$` takes `/mnt/data/build` and refuses both
+    `/mnt/data/builds` and `/mnt/data/build/sub`. Use `path_under` for a
+    directory boundary and this for a path with a shape.
+
+    `..` and `~` are still resolved first, so
     `/mnt/data/build/../../../etc` is judged as `/etc`.
     """
     raise NotImplementedError
 
 
 def any_of(*matchers: Matcher) -> Matcher:
-    """Satisfied if any is; unproven if none is and any is unproven."""
+    """Match a value that satisfies at least one of these matchers.
+
+    env("TARGET", any_of(path_under("/tmp"), one_of("staging")))
+    """
     raise NotImplementedError
 
 
 def all_of(*matchers: Matcher) -> Matcher:
-    """Unsatisfied if any is; unproven if none is and any is unproven."""
+    """Match a value that satisfies every one of these matchers.
+
+    flag("--config", all_of(path_under("etc"), matching(r"\\.ya?ml$")))
+    """
     raise NotImplementedError
