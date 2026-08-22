@@ -995,7 +995,10 @@ Detail in git history.
   step that gains a consumer for it — §9 names two, the status-line
   sample and whatever the maintenance skill needs programmatically, and
   neither exists yet. The pinned text layout is what keeps the promise
-  in the meantime: it is stable by test, not by convention.
+  in the meantime: it is stable by test, not by convention — and
+  `--no-wrap` is the operator's addition for the interim, since the one
+  thing a tool reading plain text cannot cope with is a record split
+  across lines, while a reader wants exactly that for a long reason.
 - **Alternatives considered:** *ship `--json` now* — cheap in isolation,
   rejected under rule 11: a second output format with no reader is a
   second thing every later step's changes have to keep true, and its
