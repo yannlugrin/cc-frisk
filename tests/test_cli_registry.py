@@ -28,7 +28,16 @@ from frisk.cli import EXIT_CONFIG_ERROR, EXIT_NO_CONFIG
 from frisk.config import CURRENT_GENERATION, config_path
 
 CONFIG = f"""
-from frisk.declare import api_generation, ask, deny, flag, one_of, tool
+from frisk.declare import (
+    DENY,
+    api_generation,
+    ask,
+    case,
+    deny,
+    flag,
+    one_of,
+    tool,
+)
 
 api_generation({CURRENT_GENERATION})
 
@@ -47,6 +56,7 @@ tool(
             reason="A destroying mode.",
         ),
     ],
+    cases=[case("stubtool wipe", DENY)],
 )
 """
 
@@ -125,6 +135,26 @@ class RegistryCommandTests(unittest.TestCase):
         )
         self.assertIn("[unsatisfied]", other)
         self.assertNotIn("[satisfied]", other)
+
+    def test_the_flags_reach_the_registry(self) -> None:
+        # The three the layout contract defines: cases hidden until
+        # asked for, the composed list alone, and one record per line
+        # for whatever reads this without a JSON option (D-036).
+        self.write(CONFIG)
+        project = str(self.root)
+        _, plain, _ = run("registry", "--project", project)
+        self.assertNotIn("cases:", plain)
+
+        _, shown, _ = run("registry", "--project", project, "--cases")
+        self.assertIn("cases:", shown)
+
+        _, only, _ = run("registry", "--project", project, "--cases-only")
+        self.assertNotIn("tool(stubtool)", only)
+
+        _, unwrapped, _ = run("registry", "--project", project, "--no-wrap")
+        for line in unwrapped.splitlines():
+            with self.subTest(line=line):
+                self.assertFalse(line.startswith("        "))
 
     def test_the_output_is_ascii_and_escapes_what_it_prints(
         self,

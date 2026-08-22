@@ -147,6 +147,30 @@ def build_parser() -> argparse.ArgumentParser:
             "(default: found by walking up from here)"
         ),
     )
+    shown = registry.add_mutually_exclusive_group()
+    shown.add_argument(
+        "--cases",
+        action="store_true",
+        help=(
+            "also print the project's cases, under the declarations they prove"
+        ),
+    )
+    shown.add_argument(
+        "--cases-only",
+        action="store_true",
+        help=(
+            "print the composed list of cases and nothing else, every "
+            "layer's together"
+        ),
+    )
+    registry.add_argument(
+        "--no-wrap",
+        action="store_true",
+        help=(
+            "keep every record on one line: wrapped reasons read "
+            "better and parse worse"
+        ),
+    )
     registry.add_argument(
         "--value",
         metavar="<value>",

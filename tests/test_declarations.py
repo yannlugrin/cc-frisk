@@ -354,6 +354,25 @@ class ToolKindTests(unittest.TestCase):
         self.assertTrue(entry.gated)
         self.assertFalse(entry.rule_bearing)
 
+    def test_a_granted_world_cannot_be_declared_open(self) -> None:
+        # `closed_world` is three-valued so that unset means "closed
+        # exactly when grants are declared". An explicit False beside a
+        # grant is the one combination that says nothing coherent: a
+        # grant an undeclared flag could escape is not a proof of a
+        # safe shape (§3.2).
+        def declare() -> None:
+            tool(
+                "stubtool",
+                default=ask(reason="stubtool changes infrastructure."),
+                grants=[
+                    grant(when=no_operands(), reason="Nothing to act on.")
+                ],
+                closed_world=False,
+            )
+
+        with self.assertRaises(ConfigurationError):
+            compose(declare)
+
     def test_a_default_only_tool_is_registered_and_nothing_else(
         self,
     ) -> None:

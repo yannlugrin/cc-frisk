@@ -40,7 +40,6 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Union
 
-from .errors import ConfigurationError
 from .matchers import (
     Matcher,
     all_of,
@@ -53,9 +52,13 @@ from .matchers import (
 )
 from .verdicts import Verdict
 
+#: The configuration's whole vocabulary, and nothing else. §3.5 makes
+#: this surface the stability boundary the plugin versions on, so a
+#: name here is a name promised not to break — which is why the
+#: module's types (`Matcher`, `Source`, `Rule`) are absent: they are
+#: what the engine passes around, not what a configuration writes.
 __all__ = [
     # Matchers, re-exported so a configuration has one import line.
-    "Matcher",
     "all_of",
     "any_of",
     "matching",
@@ -77,6 +80,10 @@ __all__ = [
     "every_operand",
     "at_least_one_operand",
     "no_operands",
+    # Scopes.
+    "anywhere",
+    "host_only",
+    "inside",
     # Verdicts, as declarations and as case expectations.
     "deny",
     "ask",
@@ -87,27 +94,25 @@ __all__ = [
     "ASK",
     "ALLOW",
     "SILENT",
+    # Assignments.
+    "accounted",
+    "benign_assignments",
+    # Handoffs.
+    "handoff",
+    "option_handoff",
+    # Cases.
+    "case",
+    "cases",
     # Entities.
     "tool",
     "wrapper",
     "shell",
     "interpreter",
-    "handoff",
-    "option_handoff",
-    "accounted",
-    "benign_assignments",
     "redirections",
     # Composition.
     "amend",
+    "drop",
     "use",
-    "anywhere",
-    "host_only",
-    "inside",
-    # Cases.
-    "case",
-    "cases",
-    "Source",
-    "ConfigurationError",
 ]
 
 
@@ -512,9 +517,7 @@ def accounted(name: str | Matcher, value: Matcher | None = None) -> Assignment:
     raise NotImplementedError
 
 
-def benign_assignments(
-    *declared: Assignment, drop: Sequence[str] = ()
-) -> None:
+def benign_assignments(*declared: Assignment | Drop) -> None:
     """The assignments no registered tool has to account for (§3.2).
 
     The display/locale class — `LC_*`, `LANG`, `TZ`, `NO_COLOR` and kin
@@ -523,6 +526,9 @@ def benign_assignments(
     a configuration adds to it and drops from it by name. Without this
     layer `LC_ALL=C git status` would be an unaccounted assignment on a
     registered tool, and therefore an ask.
+
+    Additions and removals travel together, as they do in `amend()`:
+    `benign_assignments(accounted("PROJECT_LOCALE"), drop("TZ"))`.
 
     What belongs here is exactly what cannot change what runs.
     `GIT_SSH_COMMAND` and its dozens of siblings are the reason the
@@ -647,7 +653,7 @@ def tool(
     rules: Sequence[Rule] = (),
     grants: Sequence[Grant] = (),
     handoffs: Sequence[Handoff] = (),
-    closed_world: bool = False,
+    closed_world: bool | None = None,
     cases: Sequence[Case] = (),
 ) -> None:
     """Register a tool: what it is called, what it takes, what it may do.
@@ -677,6 +683,15 @@ def tool(
     more, which is why `closed_world` exists as its own word: declaring
     grants closes the world implicitly, and a tool that needs a closed
     world without a grant says so.
+
+    `closed_world` is three-valued rather than a flag. Left unset it
+    means *closed exactly when grants are declared*, which is the
+    reading §3.2 gives — grants are checked "universally and
+    closed-world", so declaring one closes the world by existing. `True`
+    closes it without a grant. `False` is refused where any grant
+    stands: a grant that could be escaped by an undeclared flag is not
+    a proof of anything, so opening a granted tool's world is a
+    contradiction rather than a preference.
 
     `options` are the options that precede a subcommand and are
     stripped so the subcommand lands where rules expect it —
@@ -773,23 +788,51 @@ def redirections(*rules: Rule) -> None:
 # Composition (§3.4)
 
 
+@dataclass(frozen=True)
+class Drop:
+    """Names to remove from the list this sits in."""
+
+    names: Sequence[str]
+
+
+def drop(*names: str) -> Drop:
+    """Remove these from the list this appears in (§3.4).
+
+    An `amend()` list holds what is added and what is taken away
+    together, so the two read side by side and the list itself says
+    what a name refers to: a flag in `flags`, a label in `rules` and
+    `grants`, an alias in `aliases`, a handoff's position in
+    `handoffs`, a variable in `assignments`.
+
+        amend("sudo", flags=[drop("-u"), takes_value("--prompt-file")])
+        amend("git", rules=[drop("forced push")])
+
+    Rules and grants are named by their **label**: the one given at
+    declaration, or one derived as `<name>:<verdict>:<subcommand>` —
+    `git:ask:commit`, with a numeric suffix where that collides.
+    `frisk registry` prints whichever it is, so what an operator drops
+    is what they read.
+
+    Dropping and adding the same name in one amendment is refused:
+    §3.2 makes order within a source meaningless, so the pair has no
+    defined reading. Replace it with the declaration you meant.
+    """
+    raise NotImplementedError
+
+
 def amend(
     name: str = "",
     *,
-    aliases: Sequence[str] = (),
+    aliases: Sequence[str | Drop] = (),
     default: Rule | None = None,
-    flags: Sequence[FlagSet] = (),
-    options: Sequence[FlagSet] = (),
-    assignments: Sequence[Assignment] = (),
-    rules: Sequence[Rule] = (),
-    grants: Sequence[Grant] = (),
-    handoffs: Sequence[Handoff] = (),
+    flags: Sequence[FlagSet | Drop] = (),
+    options: Sequence[FlagSet | Drop] = (),
+    assignments: Sequence[Assignment | Drop] = (),
+    rules: Sequence[Rule | Drop] = (),
+    grants: Sequence[Grant | Drop] = (),
+    handoffs: Sequence[Handoff | Drop] = (),
+    closed_world: bool | None = None,
     cases: Sequence[Case] = (),
-    drop: Sequence[str] = (),
-    drop_flags: Sequence[str] = (),
-    drop_assignments: Sequence[str] = (),
-    drop_handoffs: Sequence[str] = (),
-    drop_aliases: Sequence[str] = (),
 ) -> None:
     """Amend the declaration beneath instead of replacing it (§3.4).
 
@@ -799,11 +842,32 @@ def amend(
     a rule, narrow a grant — because adopting a collection and then
     trimming it is what makes collections adoptable at all.
 
-    `drop` names rules and grants by their label. Every rule and grant
-    has one: the label given at declaration, or one derived as
-    `<name>:<verdict>:<subcommand>` — `git:ask:commit`, with a numeric
-    suffix where that collides. `frisk registry` prints whichever it
-    is, so what an operator drops is what they read.
+    Removals travel inside the list they act on, as `drop(…)`, rather
+    than in keywords of their own: the list says what the name refers
+    to, and a trim reads beside the addition that replaces it. `tool()`
+    takes no `Drop`, which is what makes "remove something from a
+    declaration that does not exist yet" a type error rather than a
+    runtime one.
+
+    `closed_world` behaves here as it does on `tool()`: unset is
+    *derived*, and derived is evaluated on the state the amendment
+    leaves behind — closed exactly when grants are declared. So
+    dropping the last grant re-opens a world nobody closed on purpose,
+    while a world set explicitly with `True` survives a trim made for
+    another reason. That is what the third state is for; a plain flag
+    could say neither.
+
+    Dropping the last grant is not a tool losing its guard: what stays
+    is the default verdict, declared and unchanged, which is the shape
+    a gated tool has anyway once nothing releases it. The amendment
+    says *no shape bypasses the default here*. Removing the granted
+    behaviour itself is a `tool()` redeclaration, which replaces rather
+    than amends.
+
+    There is no way to drop a `default=`, deliberately: a default
+    verdict is replaced by declaring another, and a tool with no
+    default at all is a different thing from one whose default was
+    removed.
     """
     raise NotImplementedError
 

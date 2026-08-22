@@ -862,8 +862,23 @@ Detail in git history.
   ranking makes equivalent. Flag arities are declared in named buckets
   (`bare`, `takes_value`, `may_take_value`) so a thirty-flag closed
   world reads as three lines; on a gated tool that same declaration
-  *is* the accounted set, and `closed_world=True` says so without a
-  grant. A tool is named once, and the name says which of §4.2's two
+  *is* the accounted set, and `closed_world` says so without a grant —
+  three-valued rather than a flag, so that unset reads as "closed
+  exactly when grants are declared", an explicit `False` beside a grant
+  is refused rather than ignored, and an amendment leaves a world
+  someone closed on purpose alone. *Derived* is evaluated on the state
+  a declaration leaves behind, so dropping a tool's last grant re-opens
+  a world nobody closed explicitly — which is the operator's reading:
+  the declared default stays and keeps doing what it says, and the
+  amendment means "no shape bypasses the default here" rather than
+  "this tool is unguarded". Removing granted behaviour altogether is a
+  `tool()` redeclaration, which replaces. The alternative — refusing
+  such an amendment until it says what the world becomes — was rejected
+  because it cannot be stated as a rule about the resulting state (a
+  derived closed world with no grants *is* a rules-only tool), so it
+  would be the model's only history-dependent validation, and one that
+  loses its meaning when a later layer replaces the declaration
+  outright. A tool is named once, and the name says which of §4.2's two
   forms it is the way a shell already does: no separator is a
   basename, a separator is a project-relative path, and a script at the
   project root takes the `./` a shell needs there too. An absolute path
@@ -872,9 +887,13 @@ Detail in git history.
   machine, and accepting it would register something that reads like a
   gate on git and would not match `git push`.
   Shadowing is `tool()` again to replace and `amend()` to
-  update, `amend` dropping rules and grants by label — declared, or
-  derived as `<name>:<verdict>:<subcommand>` and printed by
-  `frisk registry`, so what is dropped is what was read. Secure mode
+  update, `amend` dropping by label — declared, or derived as
+  `<name>:<verdict>:<subcommand>` and printed by `frisk registry`, so
+  what is dropped is what was read. Removals travel inside the list
+  they act on, as `drop(…)`, so the list itself says whether a name is
+  a flag, a label, an alias, a variable or a handoff position, and
+  `tool()` accepting no `Drop` makes "remove from what does not exist
+  yet" a type error rather than a runtime one. Secure mode
   and §7.2's failure dial are deliberately absent until the behaviour
   they configure ships; both are additive top-level declarations.
 - **Alternatives considered:** *objects the config wires together* —

@@ -53,6 +53,14 @@ ENGINE_LAYER = "engine"
 PROJECT_LAYER = "project"
 
 
+class Cases(enum.Enum):
+    """How much of the project's cases `describe` prints."""
+
+    HIDDEN = "hidden"
+    SHOWN = "shown"
+    ONLY = "only"
+
+
 class Kind(enum.Enum):
     """What a registered name is, and how the walk treats it (§3.4).
 
@@ -182,7 +190,28 @@ class Registry:
         raise NotImplementedError
 
     def cases(self) -> Sequence[Case]:
-        """Every case the configuration declared, tool-sited or not."""
+        """Every case from every layer, tool-sited or not (§8.2).
+
+        Not the project's own alone: §8.2 lets a rule's coverage be
+        supplied "by the source that contributed the rule (collections
+        carry their own cases, exactly as the starter registry ships
+        starter cases), so composition can never mint uncovered rules
+        or turn a live import into a coverage deny". Adopting a
+        collection therefore brings its cases with its rules, and
+        dropping one of its rules leaves no orphan case behind.
+
+        Where a case was *written* has no bearing on what it covers.
+        The coverage gate walks the effective registry's rules and
+        grants on one side and every case on the other, and asks which
+        declarations actually fired — "reached" meaning the rule
+        matched or the grant held, never merely that it was evaluated
+        (§8.2). Siting keeps a rule and its proof in one edit; it is
+        not an association the gate reads.
+
+        The engine's default layers contribute nothing here: they carry
+        no rules and no grants, so they stand outside the gate and have
+        nothing to prove.
+        """
         raise NotImplementedError
 
     def benign_assignments(self) -> Sequence[Assignment]:
@@ -193,50 +222,82 @@ class Registry:
         """The effective rules on redirection targets (§4.3)."""
         raise NotImplementedError
 
-    def describe(self, value: str | None = None) -> str:
+    def describe(
+        self,
+        value: str | None = None,
+        *,
+        cases: Cases = Cases.HIDDEN,
+        wrap: bool = True,
+    ) -> str:
         """The effective registry as text an operator can read (§9).
 
         The layout is part of the contract, not a rendering detail: it
         is what the operator reads at every step's manual test, and a
         format that drifts makes two sessions describe the same
-        boundary differently. It is a suite of blocks, one per entry,
-        separated by blank lines, ordered by name so two runs of the
-        same configuration compare line by line::
+        boundary differently. One block per entry, blank-line
+        separated, ordered by name so two runs of the same
+        configuration compare line by line::
 
-            tool git
-              source: collection:starter starter.py:4
-              aliases: git2
-              options: -C=value
-              flags: -m=value
-              assignments: GIT_PAGER=one of 'cat'
+            tool(git)
+              source: collection:starter starter.py:6
+              gated: no
               default: silent
-              deny [forced push] push
-                reason: A forced push rewrites remote history.
-                source: collection:starter starter.py:7
-              ask [git:ask:commit] commit
-                when: flag --tags
-                reason: A commit is work being recorded.
-                source: collection:starter starter.py:12
+              options: -C=value --git-dir=value -c=value
+              flags: -m=value --force
+              assignments: GIT_PAGER=one of 'cat'
+              rules:
+                deny(push) - forced push
+                  when: any flag in -f, --force, --mirror
+                  reason: A forced push rewrites remote history.
+                  source: collection:starter starter.py:9
 
         The rules that make it readable back:
 
-        * An entry's header is `<kind> <name>`, its fields are indented
-          two spaces, and a rule's own lines four. Fields absent from a
-          declaration are absent from the block — an empty `aliases:`
-          line is noise in a registry an operator scans.
-        * A rule reads `<verdict> [<label>] <subcommand>`, the label in
-          brackets because it is what `amend`'s `drop` takes. Rules keep
-          their declaration order: the ranking, not the order, decides
-          a verdict (§3.2), but an operator comparing the block against
-          the file they wrote needs the two to run in step.
-        * `source:` is `<layer> <file>:<line>` everywhere it appears —
-          on the entry, and again on any rule that came from elsewhere.
-        * Two sections follow the entries, under their own headers:
-          `benign assignments` and `redirections`.
+        * An entry's header is `<kind>(<name>)`, echoing the
+          declaration that produced it. Fields sit two spaces in, a
+          group's members four, and their own fields six.
+        * `source:` is `<layer> <file>:<line>` wherever it appears —
+          first on the entry, because in a *composed* registry the
+          question that brings someone to an entry is usually which
+          layer won, and again on any rule that came from elsewhere.
+        * `gated:` says **why**: `no`, `yes, by its grants`, or `yes, by
+          declaration`. It is the one property an operator cannot infer
+          by looking, since a closed world is derived from grants unless
+          it was declared outright, and it always prints on a tool — its
+          absence would read as "not applicable" rather than as "no".
+        * Booleans otherwise print as `key: yes` and only when true.
+        * `rules:`, `grants:` and `handoffs:` are groups with their
+          members indented under them, so a tool carrying twenty rules
+          and two grants does not make a reader infer where one list
+          ends. A rule reads `<verdict>(<subcommand>) - <label>`, the
+          label being what `drop` takes inside an `amend` list. Rules
+          keep their declaration order: the ranking decides a verdict
+          (§3.2), but an operator comparing the block against the file
+          they wrote needs the two to run in step.
+        * A field, group or section nothing filled is absent, not
+          empty. A registry that ends with a bare `redirections` header
+          every time teaches the reader to skip the place where a rule
+          about `.claude` would appear.
+        * Two sections follow the entries when they have content, under
+          their own headers: `benign assignments` and `redirections`.
         * Everything is ASCII and escaped. A reason is text the
           configuration supplies, and this output is read by a human
           deciding what their boundary is: a newline inside a reason
           must not be able to forge a line of frisk's own output.
+
+        `cases` keeps the project's cases out of the way by default.
+        They are the longest section on a mature tool and the least
+        useful thing to read when the question is "what gates git?" —
+        `Cases.SHOWN` adds them under each declaration and as a final
+        section for those belonging to no tool, and `Cases.ONLY` prints
+        the composed list alone, every layer's cases together, with no
+        declarations around them.
+
+        `wrap` breaks a long reason onto continuation lines indented
+        past its key. It is on for a reader and off for a parser: a
+        tool reading this output plainly wants one record per line, and
+        that stays true whether or not §9's machine-readable option
+        ever ships.
 
         With `value`, every matcher line gains what that matcher
         answers, as a trailing `[satisfied]`, `[unsatisfied]` or
