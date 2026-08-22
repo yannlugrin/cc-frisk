@@ -234,14 +234,12 @@ class RecognitionTests(unittest.TestCase):
     def test_a_basename_and_a_path_declaration_do_not_collide(
         self,
     ) -> None:
-        # Declaring both must not read as the same name declared twice,
-        # or a project could never attach policy to a script whose
-        # basename it also knows. Which of the two *wins* when the
-        # engine meets `tools/deploy.py` is §4.2's most-specific-wins
-        # rule, and it is unobservable here: `lookup` and `lookup_path`
-        # are separate doors, so asking each one says nothing about
-        # which would answer. That case belongs to tool recognition,
-        # with a command word to resolve.
+        # Declaring both must not read as one name declared twice, or a
+        # project could never attach policy to a script whose basename
+        # it also knows. Which of the two *wins* is §4.2's
+        # most-specific-wins rule, and it is unobservable here —
+        # `lookup` and `lookup_path` are separate doors — so it belongs
+        # to `008`, with a command word to resolve.
         def declare() -> None:
             tool("deploy.py")
             tool(
@@ -417,16 +415,10 @@ class ConditionTests(unittest.TestCase):
                 self.assertTrue(condition.describe().strip())
 
     def test_the_end_of_options_marker_is_matchable(self) -> None:
-        # §4.2: `--` is recognized as the end-of-options marker and is
-        # itself matchable — it is the explicit "operand is a path"
-        # signal some rules key on. The corpus needs it: context A asks
-        # on `checkout` with `--` (pathspec) and not on plain checkout,
-        # so the starter rules of `023` are written against this
-        # spelling.
-        # What this proves is the floor available at this layer: the
-        # constructor accepts `--` as a flag name like any other, so a
-        # rule can key on it. That the *parser* recognizes it as the
-        # end-of-options marker is `008`'s, with a line to read.
+        # §4.2 makes `--` matchable, and context A needs it: `checkout`
+        # with a pathspec asks where plain checkout does not. All this
+        # layer can show is that the constructor takes it like any
+        # other flag name; recognizing it on a line is `008`'s.
         marker = flag("--")
         self.assertTrue(marker.describe().strip())
 
