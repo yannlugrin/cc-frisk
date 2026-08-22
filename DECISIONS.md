@@ -1098,3 +1098,36 @@ Detail in git history.
   it.
 - **Approved by:** operator, 2026-08-22 — "corpus is an example, and a
   floor, not a ceiling".
+
+### D-039 — A value-optional flag declares what a bare use means
+
+- **Date:** 2026-08-22
+- **Step:** `007`
+- **Context:** §4.2 requires the value-optional arity because reading
+  such a flag as value-required "can swallow the very token that
+  decides the verdict". It follows that the bare and valued spellings
+  are not interchangeable — and the operator asked the question that
+  exposes what was missing: how do you write a rule about a flag that
+  may be used bare, used with the tool's default value, or used with
+  one of a few others, when the first two mean the same thing?
+- **Decision:** `may_take_value(*names, default=None)`. The default is
+  what the *tool* does with a bare flag, declared once beside the
+  arity, and the engine substitutes it when the flag is bare. With
+  `may_take_value("--argument", default="check")`, the condition
+  `flag("--argument", one_of("check"))` matches `--argument` and
+  `--argument check` alike, and `one_of("full", "deep")` picks out the
+  others. Undeclared, a bare use has no value to test, so a value
+  condition on it is **unprovable** rather than false — §3.3's stricter
+  side, and the same treatment a `$VAR` value gets, for the same
+  reason: the value exists and the line does not show it.
+- **Alternatives considered:** *unprovable always, with no way to
+  declare a default* — the first ruling, and wrong: it makes the
+  operator's case unwritable, since no condition could ever match the
+  bare form. *A `no_value()` matcher*, so a rule says
+  `any_of(no_value(), one_of("check"))` — expressible, but it restates
+  the tool's default at every rule that touches the flag, and gets it
+  wrong once. *Putting the default on the condition* — same objection,
+  repeated per rule rather than per tool. The fact belongs to the tool,
+  so it is declared with the tool.
+- **Approved by:** operator, 2026-08-22, whose question defined the
+  requirement.

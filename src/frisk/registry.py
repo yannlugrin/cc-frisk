@@ -118,6 +118,11 @@ class Entry:
     aliases: Sequence[str] = ()
     default: PlacedRule | None = None
     flags: Mapping[str, Arity] = field(default_factory=dict)
+    #: What a value-optional flag means when used bare, for the flags
+    #: whose declaration said so. Kept beside `flags` rather than in it
+    #: so that the common case — every flag's arity, nothing else —
+    #: stays one mapping to read.
+    flag_defaults: Mapping[str, str] = field(default_factory=dict)
     options: Mapping[str, Arity] = field(default_factory=dict)
     assignments: Sequence[Assignment] = ()
     rules: Sequence[PlacedRule] = ()

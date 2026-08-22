@@ -181,15 +181,28 @@ def takes_value(*names: str) -> FlagSet:
     raise NotImplementedError
 
 
-def may_take_value(*names: str) -> FlagSet:
+def may_take_value(*names: str, default: str | None = None) -> FlagSet:
     """These flags take a value unless the next token looks like a flag.
 
-        flags=[may_take_value("--argument")]
+        flags=[may_take_value("--argument", default="check")]
 
     For a flag that takes a value only when the next token is not
     itself a flag — some hand-rolled tools accept both
     `--argument custom` and a bare `--argument`. Reading one as always
     taking a value swallows the very token that decides the verdict.
+
+    `default` is what the tool itself uses when the flag is bare. Give
+    it and the two spellings become one case: with
+    `may_take_value("--argument", default="check")`, the condition
+    `flag("--argument", one_of("check"))` matches `--argument` and
+    `--argument check` alike, while `one_of("full", "deep")` picks out
+    the others. frisk cannot know your tool's default; you can, and
+    this is where you say it.
+
+    Leave it out and a bare use has no value to test, so a condition on
+    that value can be neither proven nor ruled out. It comes back
+    unprovable, which sends the verdict to the stricter side rather
+    than letting a rule go quiet about a flag it could not read.
     """
     raise NotImplementedError
 

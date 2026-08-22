@@ -25,6 +25,7 @@ specification. This file is what accumulated *beside* it.
 | Why an absolute path is refused in a declaration | `D-034`; `declare.tool` |
 | That declaring a grant closes a tool's world, that `closed_world` says so without one, and that dropping the last grant re-opens a world nobody closed on purpose | `D-034`; `declare.amend` |
 | That a removal travels inside the list it acts on, and what a label is | `D-034`; `declare.drop` |
+| That a value-optional flag can declare what a bare use means, and that without it a condition on its value is unprovable | `D-039`; `declare.may_take_value` |
 | That an amendment corrects an arity or narrows a matcher by re-declaring, never by dropping first | `declare.amend`; the composition suite |
 | That collections compose in the order the configuration adopts them, and the operator's own declarations always win wherever they sit | §3.4; `registry.py` module docstring |
 | That a collection ships the cases for its own rules, and adopting it brings them | §8.2; `Registry.cases` |

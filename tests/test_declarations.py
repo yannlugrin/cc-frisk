@@ -137,6 +137,28 @@ class FlagArityTests(unittest.TestCase):
         self.assertEqual(entry.flags["--inventory"], Arity.VALUE)
         self.assertEqual(entry.flags["--argument"], Arity.OPTIONAL_VALUE)
 
+    def test_a_value_optional_flag_can_carry_its_default(self) -> None:
+        # The fact frisk cannot know and the operator can: what the
+        # tool does when the flag is bare. Declaring it makes
+        # `--argument` and `--argument check` one case for a condition
+        # on the value, which is the whole point of saying it.
+        def declare() -> None:
+            tool(
+                "stubtool",
+                flags=[
+                    may_take_value("--argument", default="check"),
+                    may_take_value("--other"),
+                ],
+            )
+
+        entry = compose(declare).lookup("stubtool")
+        assert entry is not None
+        self.assertEqual(entry.flags["--argument"], Arity.OPTIONAL_VALUE)
+        self.assertEqual(entry.flag_defaults["--argument"], "check")
+        # Undeclared, a bare use has no value to test at all, which is
+        # what makes a condition on it unprovable rather than false.
+        self.assertNotIn("--other", entry.flag_defaults)
+
     def test_pre_subcommand_options_are_a_separate_set(self) -> None:
         # `git -C dir push` needs -C stripped so the subcommand lands
         # where rules expect it; a flag declaration would not do that.
