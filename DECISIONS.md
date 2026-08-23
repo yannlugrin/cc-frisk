@@ -1269,3 +1269,34 @@ Detail in git history.
 - **Approved by:** operator, 2026-08-23 — "layer order decide, like any
   other override case", and, on the printing, "I rule on not print the
   shadowed aliases (but they are not deleted)".
+
+### D-044 — A declared path may leave the project
+
+- **Date:** 2026-08-23
+- **Step:** `007`
+- **Context:** `D-034` refuses an absolute path in a tool name because
+  the configuration is committed and travels with the project, where
+  `/usr/bin/git` is a different machine's file. The cold review asked
+  whether `../shared/deploy.py` should be refused on the same argument:
+  it names a file outside the project, what it points at depends on
+  where the checkout sits, and it matches only a command line spelled
+  with that same prefix.
+- **Decision:** accepted, not refused. Two repositories checked out
+  side by side is an ordinary layout and running the neighbour's tool
+  is an ordinary thing to do. The form is narrow — it holds only while
+  the two keep their relative positions, and a command line reaching
+  the same file by another spelling is not matched — and that is the
+  operator's trade to make. `declare.tool`'s docstring says both halves,
+  and a case pins the acceptance so a later session does not tidy it
+  into a refusal.
+- **Alternatives considered:** *refuse it like an absolute path* — my
+  recommendation, and rejected: the two are not alike. An absolute path
+  is wrong on every machine but the author's, while a relative one is
+  right on every checkout that keeps the layout, which is the whole
+  team's. Refusing would remove a use that works for the sake of ones
+  that were never promised. *Point the operator at the basename form
+  instead* — not a substitute: `deploy.py` gates every file of that
+  name anywhere, which is broader than what was asked for.
+- **Approved by:** operator, 2026-08-23 — "developers often have 2
+  projects with 2 different repos living beside, and using a tool in
+  the other is ok… it's an edge case, but it's okay".

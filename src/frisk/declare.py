@@ -996,6 +996,13 @@ def tool(
     `/opt/homebrew/bin/git` on someone else's machine. Declare the
     command name instead.
 
+    A path may leave the project — `../shared/deploy.py`, for the
+    neighbouring checkout everyone on the team has beside this one.
+    It holds only while the two keep their relative positions, and it
+    matches only a command line spelled with that same prefix, which
+    makes it a narrow tool; frisk lets you say it because the layout
+    is real and the trade is yours.
+
     `aliases` are other names for the same tool — drop-in replacements
     such as `podman` for `docker`.
 

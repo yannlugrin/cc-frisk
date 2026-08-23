@@ -23,6 +23,7 @@ specification. This file is what accumulated *beside* it.
 | That a command with no operands never satisfies "every operand" | `D-035` (2); `declare.every_operand` |
 | That a tool is named once, and a separator in the name is what makes it a path — `./deploy.py` for a script at the project root | `D-034`; `declare.tool` |
 | Why an absolute path is refused in a declaration | `D-034`; `declare.tool` |
+| That a declared path *may* leave the project — `../shared/deploy.py` for a neighbouring checkout — and what makes that narrow: it holds only while the two keep their relative positions, and matches only a command line spelled with the same prefix | `D-044`; `declare.tool` |
 | That declaring a grant closes a tool's world, that `closed_world` says so without one, and that dropping the last grant re-opens a world nobody closed on purpose | `D-034`; `declare.amend` |
 | That a removal travels inside the list it acts on, and what a label is | `D-034`; `declare.drop` |
 | That a value-optional flag can declare what a bare use means, and that without it a condition on its value is unprovable | `D-039`; `declare.may_take_value` |

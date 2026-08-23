@@ -260,6 +260,25 @@ class RecognitionTests(unittest.TestCase):
             with self.subTest(spelling=spelling):
                 self.assertIsNotNone(registry.lookup_path(spelling))
 
+    def test_a_declared_path_may_leave_the_project(self) -> None:
+        # Ruled on after the test gate (`D-044`). Two repositories
+        # checked out side by side is an ordinary layout and running
+        # the neighbour's tool is an ordinary thing to do, so this is
+        # not refused the way an absolute path is — even though it
+        # holds only while the two keep their relative positions.
+        def declare() -> None:
+            tool(
+                "../shared/deploy.py",
+                default=ask(reason="The neighbouring checkout's deploy."),
+            )
+
+        registry = compose(declare)
+        for spelling in ("../shared/deploy.py", "./../shared/deploy.py"):
+            with self.subTest(spelling=spelling):
+                self.assertIsNotNone(registry.lookup_path(spelling))
+        # And it is still a path declaration, not a basename one.
+        self.assertIsNone(registry.lookup("deploy.py"))
+
     def test_a_path_declaration_is_not_a_basename_declaration(
         self,
     ) -> None:
