@@ -512,6 +512,20 @@ class ShadowingTests(CollectionFixture):
         with self.assertRaises(ConfigurationError):
             self.compose(declare, with_defaults=True)
 
+    def test_one_source_speaks_for_a_name_once(self) -> None:
+        # Added during implementation, not at the gate: the two forms
+        # in one source have no order-free reading, and the losing
+        # order discards the amendment in silence. `tool()` replaces
+        # what sits beneath, so the amendment survives below it and is
+        # wiped above it — an order deciding a boundary, which §3.2
+        # forbids and `registry.py`'s own invariant denies.
+        def declare() -> None:
+            amend("sudo", flags=[drop("-u")])
+            tool("sudo", default=silent())
+
+        with self.assertRaises(ConfigurationError):
+            self.compose(declare, with_defaults=True)
+
     def test_a_fresh_declaration_takes_no_drops(self) -> None:
         # Removing something from a declaration that does not exist yet
         # is a type error first — `tool()` accepts no `Drop` — and a

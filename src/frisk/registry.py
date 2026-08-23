@@ -143,11 +143,16 @@ class Entry:
     default: PlacedRule | None = None
     flags: Mapping[str, Arity] = field(default_factory=dict)
     #: What a value-optional flag means when used bare, for the flags
-    #: and pre-subcommand options whose declaration said so. Kept
-    #: beside `flags` rather than in it so that the common case — every
-    #: flag's arity, nothing else — stays one mapping to read.
+    #: whose declaration said so (`D-039`). Kept beside `flags` rather
+    #: than in it so that the common case — every flag's arity, nothing
+    #: else — stays one mapping to read.
     flag_defaults: Mapping[str, str] = field(default_factory=dict)
     options: Mapping[str, Arity] = field(default_factory=dict)
+    #: The same, for the pre-subcommand options. A separate mapping
+    #: because the two are separate namespaces: a tool declaring `-u`
+    #: in both would otherwise have one default, and dropping either
+    #: would take the other's with it.
+    option_defaults: Mapping[str, str] = field(default_factory=dict)
     assignments: Sequence[Assignment] = ()
     rules: Sequence[PlacedRule] = ()
     grants: Sequence[PlacedGrant] = ()
@@ -465,6 +470,7 @@ class _Building:
     flags: dict[str, Arity] = field(default_factory=dict)
     flag_defaults: dict[str, str] = field(default_factory=dict)
     options: dict[str, Arity] = field(default_factory=dict)
+    option_defaults: dict[str, str] = field(default_factory=dict)
     assignments: list[Assignment] = field(default_factory=list)
     rules: list[PlacedRule] = field(default_factory=list)
     grants: list[PlacedGrant] = field(default_factory=list)
@@ -753,7 +759,7 @@ def _applied(building: _Building, entity: Entity) -> None:
     )
     _apply_flags(
         building.options,
-        building.flag_defaults,
+        building.option_defaults,
         entity.options,
         "option",
         building.name,
@@ -809,23 +815,33 @@ def _applied_to(
 
 
 def _no_repeats(layer: Layer) -> None:
-    """A name declared twice in one source is a mistake, not a shadow."""
+    """One source speaks for a name once, however it spells it.
+
+    Within a layer there is no order (§3.2), so a second declaration
+    has no order-free reading and is a mistake rather than a shadow —
+    shadowing is what layers are for. That holds across the two forms
+    as well as within each: `tool()` replaces what sits beneath, so an
+    `amend()` of the same name in the same source keeps its effect
+    when written below and loses it when written above, which is an
+    order deciding a boundary.
+    """
     claimed: dict[tuple[str, str], str] = {}
     for entity in layer.entities:
-        if entity.amendment:
-            continue
-        for key in [_key(entity.name)] + [
-            _key(str(alias))
-            for alias in entity.aliases
-            if not isinstance(alias, Drop)
-        ]:
+        keys = [_key(entity.name)]
+        if not entity.amendment:
+            keys += [
+                _key(str(alias))
+                for alias in entity.aliases
+                if not isinstance(alias, Drop)
+            ]
+        for key in keys:
             if key in claimed:
                 raise ConfigurationError(
-                    f"'{key[1]}' is declared twice in {layer.name}, by "
-                    f"'{claimed[key]}' and by '{entity.name}'. Within a "
-                    "source there is no order (§3.2), so the second is "
-                    "a mistake rather than a shadow; shadowing is what "
-                    "layers are for."
+                    f"'{key[1]}' is spoken for twice in {layer.name}, "
+                    f"by '{claimed[key]}' and by '{entity.name}'. "
+                    "Within a source there is no order (§3.2), so the "
+                    "second is a mistake rather than a shadow; "
+                    "shadowing is what layers are for."
                 )
             claimed[key] = entity.name
 
@@ -839,6 +855,7 @@ def _finished(building: _Building) -> Entry:
         default=building.default,
         flags=dict(building.flags),
         flag_defaults=dict(building.flag_defaults),
+        option_defaults=dict(building.option_defaults),
         options=dict(building.options),
         assignments=tuple(building.assignments),
         rules=tuple(building.rules),
@@ -907,6 +924,12 @@ def printable(text: str) -> str:
     must not be able to erase one. Backslashes are left alone, since a
     literal one cannot forge anything and doubling it would make every
     regex in the output unreadable.
+
+    It is idempotent, and applied twice on purpose: a reason is escaped
+    before it is wrapped, so the wrap measures the width the reader
+    sees rather than the width of a control character, and every line
+    is escaped again at the join, so no field added later can smuggle a
+    line break past the one place that stops it.
     """
     rendered = []
     for character in text:
@@ -1090,7 +1113,7 @@ def _entry_lines(
             lines.extend(_field(4, "reason", entry.default.rule.reason, wrap))
     if entry.options:
         lines.append(
-            "  options: " + _flag_text(entry.options, entry.flag_defaults)
+            "  options: " + _flag_text(entry.options, entry.option_defaults)
         )
     if entry.flags:
         lines.append(
