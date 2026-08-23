@@ -33,5 +33,7 @@ specification. This file is what accumulated *beside* it.
 | That the registry's cases are hidden until `--cases`, and `--no-wrap` exists for whatever parses the output | `D-036`; `cli.py` |
 | Which programs the engine walks as wrappers, shells and interpreters, and that the set is a floor | `D-038`; `defaults.py`; the defaults suite |
 | That the display and locale variables are excused for every tool, and that nothing which can direct execution is | §3.2; `declare.benign_assignments` |
+| That a `drop(...)` naming something no layer beneath declares is refused, exactly as an `amend` of an undeclared name is — a removal that silently does nothing is a boundary the operator believes they have | `registry.py` composition; the composition suite |
+| That the API generation is declared once for a whole configuration, adopted collections included | `config.py`; `declare.api_generation` |
 | Where the configuration lives and what the API generation declaration is for | `D-033`; `config.py` |
 | That a configuration which will not load denies rather than proceeds | §7.1; `config.load` |

@@ -327,16 +327,16 @@ own tree, whose paths `PLAN.md` `021` confirms rather than assumes;
 
 ## Current state
 
-- **Current step:** `007` — declarations, matchers, layering. Its test
-  gate is **approved and the cases are frozen** (`D-032`): one the
-  implementation shows wrong comes back as a change. Making them pass
-  is what remains.
+- **Current step:** `007` — declarations, matchers, layering,
+  **awaiting test**. The frozen cases all pass and no case was edited.
 - **Next step:** `008` — reading the line.
 - **World state:** the harness (`just setup/check/test/verify`) runs the
   same checks locally, in the commit hook and in CI, green, and `setup`
-  installs the engine. `src/frisk/` carries the config-facing API as
-  signatures that raise, and a CLI that judges nothing yet. The permission boundary — guard plus
-  `.claude/settings.json` — is live, untracked and unchanged since
+  installs the engine. `src/frisk/` carries the config-facing API, the
+  three-valued matchers, composition and `frisk registry`, reading
+  `.claude/frisk/config.py` (`D-033`); nothing judges a command line
+  yet, and `explain` still says so. The permission boundary — guard
+  plus `.claude/settings.json` — is live, untracked, unchanged since
   `002`. `origin` is `github.com/yannlugrin/cc-frisk`, **public**, and
   carries the guard's backup branch (`D-028`). **Every write under
   `.claude/` prompts** — no setting removes it.
