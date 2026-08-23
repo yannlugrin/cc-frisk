@@ -28,8 +28,10 @@ deny-all is loud.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
-from .registry import Registry
+from .errors import ConfigurationError
+from .registry import PROJECT_LAYER, Registry, collecting
 
 #: The directory, relative to the project root, and the file in it.
 CONFIG_DIRECTORY = ".claude/frisk"
@@ -48,7 +50,7 @@ DEPRECATED_GENERATIONS: tuple[int, ...] = ()
 
 def config_path(project_root: Path) -> Path:
     """The configuration file for a project root."""
-    raise NotImplementedError
+    return project_root / CONFIG_DIRECTORY / CONFIG_FILENAME
 
 
 def locate(start: Path) -> Path | None:
@@ -60,7 +62,11 @@ def locate(start: Path) -> Path | None:
     nothing and must say so visibly (§5.4), which is a message, not a
     failure.
     """
-    raise NotImplementedError
+    for directory in [start, *start.parents]:
+        candidate = config_path(directory)
+        if candidate.is_file():
+            return candidate
+    return None
 
 
 def load(path: Path) -> Registry:
@@ -70,4 +76,66 @@ def load(path: Path) -> Registry:
     unreadable — a declaration error, a missing or out-of-range API
     generation, a collection that is not beside the config.
     """
-    raise NotImplementedError
+    if not path.is_file():
+        raise ConfigurationError(
+            f"no configuration at '{path}': frisk reads "
+            f"{CONFIG_FILENAME} in {CONFIG_DIRECTORY}/ inside the "
+            "project."
+        )
+    namespace: dict[str, Any] = {
+        "__name__": "frisk_configuration",
+        "__file__": str(path),
+    }
+    with collecting(
+        PROJECT_LAYER, base_dir=path.parent, with_defaults=True
+    ) as declared:
+        try:
+            exec(compile(path.read_text(), str(path), "exec"), namespace)
+        except ConfigurationError:
+            raise
+        except Exception as failure:
+            # Everything else a configuration can do — a syntax error,
+            # a name it misspelled, an exception of its own — is one
+            # event to the caller: the boundary cannot be read.
+            raise ConfigurationError(
+                f"the configuration at '{path}' did not load: "
+                f"{failure.__class__.__name__}: {failure}"
+            ) from failure
+    registry = declared.registry()
+    _speakable(path, registry.generation())
+    return registry
+
+
+def _speakable(path: Path, generation: int | None) -> None:
+    """Refuse a contract this engine does not know, and say so.
+
+    Misreading a configuration is worse than refusing it: a refusal is
+    loud where a misreading is silent and plausible. The message names
+    both numbers and points at the migration help, because a refusal
+    with no way forward is how an operator ends up deleting the guard
+    instead of upgrading it (§3.5).
+    """
+    spoken = (
+        f"this frisk speaks generation {CURRENT_GENERATION}"
+        if len(SUPPORTED_GENERATIONS) == 1
+        else (
+            f"this frisk speaks generations {min(SUPPORTED_GENERATIONS)} "
+            f"to {max(SUPPORTED_GENERATIONS)}, and writes "
+            f"{CURRENT_GENERATION}"
+        )
+    )
+    forward = (
+        "The frisk skill migrates a configuration between generations; "
+        "ask it rather than editing blind."
+    )
+    if generation is None:
+        raise ConfigurationError(
+            f"the configuration at '{path}' declares no API generation. "
+            "It is how a configuration says which contract it expects, "
+            f"and its absence is not a version: {spoken}. {forward}"
+        )
+    if generation not in SUPPORTED_GENERATIONS:
+        raise ConfigurationError(
+            f"the configuration at '{path}' declares API generation "
+            f"{generation}, and {spoken}. {forward}"
+        )

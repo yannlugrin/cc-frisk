@@ -37,9 +37,13 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Sequence
+from pathlib import Path
 from typing import NoReturn
 
 from . import __version__
+from .config import config_path, load, locate
+from .errors import ConfigurationError
+from .registry import Cases, printable
 
 PROGRAM = "frisk"
 
@@ -218,7 +222,56 @@ def registry_command(args: argparse.Namespace) -> int:
     second is not an empty registry and the third is not a silent one —
     both are the visible failure §5.4 and §7.1 ask for.
     """
-    raise NotImplementedError
+    found = _configuration(args.project)
+    if found is None:
+        where = args.project or "here or any directory above it"
+        print(
+            f"{PROGRAM}: no configuration in {printable(str(where))}. "
+            "An enabled frisk with no configuration gates nothing.",
+            file=sys.stderr,
+        )
+        return EXIT_NO_CONFIG
+    try:
+        registry = load(found)
+    except ConfigurationError as failure:
+        print(f"{PROGRAM}: {printable(str(failure))}", file=sys.stderr)
+        return EXIT_CONFIG_ERROR
+    print(
+        REGISTRY_HEADER.format(
+            program=PROGRAM,
+            version=__version__,
+            config=printable(str(found)),
+            generation=registry.generation(),
+        )
+    )
+    print()
+    print(
+        registry.describe(
+            args.value,
+            cases=_shown(args),
+            wrap=not args.no_wrap,
+        )
+    )
+    return 0
+
+
+def _configuration(project: str | None) -> Path | None:
+    """The configuration to print, or None where there is none.
+
+    `--project` names a project, so its configuration is the one at
+    that root: walking up from a named directory would answer about a
+    parent the operator did not name.
+    """
+    if project is not None:
+        named = config_path(Path(project))
+        return named if named.is_file() else None
+    return locate(Path.cwd())
+
+
+def _shown(args: argparse.Namespace) -> Cases:
+    if args.cases_only:
+        return Cases.ONLY
+    return Cases.SHOWN if args.cases else Cases.HIDDEN
 
 
 def main(argv: Sequence[str] | None = None) -> int:
