@@ -28,6 +28,18 @@ class Verdict(enum.Enum):
     SILENT = "silent"
 
 
+#: Strength, strongest first. A mapping rather than the declaration
+#: order of the enum, so that reordering the members above — which
+#: reads as cosmetic — cannot silently reorder the ranking a whole
+#: line's judgment rests on.
+_RANK = {
+    Verdict.DENY: 0,
+    Verdict.ASK: 1,
+    Verdict.ALLOW: 2,
+    Verdict.SILENT: 3,
+}
+
+
 def strongest(verdicts: Iterable[Verdict]) -> Verdict:
     """The strongest of these, `SILENT` when there are none.
 
@@ -35,7 +47,11 @@ def strongest(verdicts: Iterable[Verdict]) -> Verdict:
     only the ranking — how an allow earned on one invocation is
     withheld because another asked is §6.1's combination, not this.
     """
-    raise NotImplementedError
+    strongest_so_far = Verdict.SILENT
+    for verdict in verdicts:
+        if _RANK[verdict] < _RANK[strongest_so_far]:
+            strongest_so_far = verdict
+    return strongest_so_far
 
 
 def fires_at(declared: Verdict, outcome: Outcome) -> Verdict | None:
@@ -48,7 +64,13 @@ def fires_at(declared: Verdict, outcome: Outcome) -> Verdict | None:
     while an allow rule fires nothing at all, because an unknown never
     weakens a boundary (§4.2).
     """
-    raise NotImplementedError
+    if outcome is Outcome.SATISFIED:
+        return declared
+    if outcome is Outcome.UNSATISFIED:
+        return None
+    if declared in (Verdict.DENY, Verdict.ASK):
+        return Verdict.ASK
+    return None
 
 
 def grant_holds(outcome: Outcome) -> bool:
@@ -57,4 +79,4 @@ def grant_holds(outcome: Outcome) -> bool:
     Only `SATISFIED` does. A grant is a proof of a safe shape, and
     unproven is the absence of the proof, not a weaker version of it.
     """
-    raise NotImplementedError
+    return outcome is Outcome.SATISFIED

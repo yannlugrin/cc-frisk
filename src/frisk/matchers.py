@@ -58,6 +58,10 @@ it. That is why the input type carries the flag.
 from __future__ import annotations
 
 import enum
+import fnmatch
+import os
+import re
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Callable, Union
 
@@ -103,6 +107,102 @@ class MatchContext:
 #: The context of a value with no line around it.
 NO_CONTEXT = MatchContext()
 
+#: A resolved path: whether it is absolute, and its components with
+#: `.` and `..` already applied. `None` stands for a path that cannot
+#: be resolved without touching the filesystem, which §4.5 forbids.
+Resolved = Union[tuple[bool, tuple[str, ...]], None]
+
+
+def combine_any(outcomes: Sequence[Outcome]) -> Outcome:
+    """Kleene's or: a decision outranks an unknown (`D-035`)."""
+    if Outcome.SATISFIED in outcomes:
+        return Outcome.SATISFIED
+    if Outcome.UNPROVEN in outcomes:
+        return Outcome.UNPROVEN
+    return Outcome.UNSATISFIED
+
+
+def combine_all(outcomes: Sequence[Outcome]) -> Outcome:
+    """Kleene's and: one clean miss decides, an unknown only delays."""
+    if Outcome.UNSATISFIED in outcomes:
+        return Outcome.UNSATISFIED
+    if Outcome.UNPROVEN in outcomes:
+        return Outcome.UNPROVEN
+    return Outcome.SATISFIED
+
+
+def _asked(value: Matchable) -> Value:
+    """A bare string is a plain, non-dynamic value."""
+    return value if isinstance(value, Value) else Value(value)
+
+
+def _expanded(text: str) -> str | None:
+    """`~` from the environment; `~other` and an absent `HOME` are None.
+
+    Naming another user's home means reading the password database,
+    and §4.5 forbids the engine every filesystem access there is.
+    """
+    if not text.startswith("~"):
+        return text
+    if text == "~" or text.startswith("~/"):
+        home = os.environ.get("HOME")
+        if not home:
+            return None
+        return home + text[1:]
+    return None
+
+
+def resolve(text: str) -> Resolved:
+    """Apply `~`, `.` and `..` textually, without a filesystem.
+
+    A `..` that would climb past an absolute root is dropped, as the
+    root's parent is itself; on a relative path it is kept, since what
+    it climbs past is the unknown base.
+    """
+    expanded = _expanded(text)
+    if expanded is None:
+        return None
+    absolute = expanded.startswith("/")
+    components: list[str] = []
+    for component in expanded.split("/"):
+        if component in ("", "."):
+            continue
+        if component == "..":
+            if components and components[-1] != "..":
+                components.pop()
+            elif not absolute:
+                components.append("..")
+            continue
+        components.append(component)
+    return absolute, tuple(components)
+
+
+def _inside(boundary: Sequence[str], value: Sequence[str]) -> bool:
+    """Whole-component containment, wildcards never crossing `/`."""
+    if len(value) < len(boundary):
+        return False
+    return all(
+        fnmatch.fnmatchcase(component, pattern)
+        for pattern, component in zip(boundary, value)
+    )
+
+
+def _could_be_inside(boundary: Sequence[str], value: Sequence[str]) -> bool:
+    """Whether *some* working directory would put `value` inside.
+
+    An absolute value sits inside a relative boundary exactly when it
+    reads as `<cwd>/<boundary>/<rest>`, so the boundary's components
+    have to appear in it as a run — `.scratch` appears nowhere in
+    `/etc/passwd`, and `etc` appears at the front of it (`D-037`).
+    """
+    width = len(boundary)
+    if width == 0:
+        return True
+    return any(
+        _inside(boundary, value[start : start + width])
+        for start in range(len(value) - width + 1)
+    )
+
 
 class Matcher:
     """The common shape: evaluate a value, describe yourself.
@@ -115,10 +215,170 @@ class Matcher:
     def evaluate(
         self, value: Matchable, context: MatchContext = NO_CONTEXT
     ) -> Outcome:
+        asked = _asked(value)
+        if asked.dynamic:
+            # An unknown never satisfies a positive condition (§4.2),
+            # and the family below never sees one: deciding it here
+            # once is what keeps that guarantee out of every matcher.
+            return Outcome.UNPROVEN
+        return self.decide(asked.text, context)
+
+    def decide(self, text: str, context: MatchContext) -> Outcome:
+        """Answer for a value known to be literal."""
         raise NotImplementedError
 
     def describe(self) -> str:
         raise NotImplementedError
+
+
+class PathMatcher(Matcher):
+    """The family that resolves before comparing (§3.2)."""
+
+    def decide(self, text: str, context: MatchContext) -> Outcome:
+        resolved = resolve(text)
+        if resolved is None:
+            return Outcome.UNPROVEN
+        absolute, components = resolved
+        if not absolute and context.relative_paths_unproven:
+            # The `cd` poisoning, and the reason it is this family's
+            # alone: two relative paths compare textually because they
+            # hang off one unknown base, and a `cd` is what stops them
+            # sharing it (§3.2, `D-037`).
+            return Outcome.UNPROVEN
+        return self.decide_path(absolute, components)
+
+    def decide_path(
+        self, absolute: bool, components: Sequence[str]
+    ) -> Outcome:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True)
+class OneOf(Matcher):
+    values: tuple[str, ...]
+
+    def decide(self, text: str, context: MatchContext) -> Outcome:
+        if text in self.values:
+            return Outcome.SATISFIED
+        return Outcome.UNSATISFIED
+
+    def describe(self) -> str:
+        return "one of " + ", ".join(f"'{each}'" for each in self.values)
+
+
+@dataclass(frozen=True)
+class Matching(Matcher):
+    pattern: str
+
+    def decide(self, text: str, context: MatchContext) -> Outcome:
+        if re.compile(self.pattern).search(text):
+            return Outcome.SATISFIED
+        return Outcome.UNSATISFIED
+
+    def describe(self) -> str:
+        return f"matching '{self.pattern}'"
+
+
+@dataclass(frozen=True)
+class Predicate(Matcher):
+    description: str
+    test: Callable[[str], bool]
+
+    def decide(self, text: str, context: MatchContext) -> Outcome:
+        return Outcome.SATISFIED if self.test(text) else Outcome.UNSATISFIED
+
+    def describe(self) -> str:
+        return self.description
+
+
+@dataclass(frozen=True)
+class PathUnder(PathMatcher):
+    boundaries: tuple[str, ...]
+
+    def decide_path(
+        self, absolute: bool, components: Sequence[str]
+    ) -> Outcome:
+        return combine_any(
+            [
+                self._against(boundary, absolute, components)
+                for boundary in self.boundaries
+            ]
+        )
+
+    def _against(
+        self, boundary: str, absolute: bool, components: Sequence[str]
+    ) -> Outcome:
+        resolved = resolve(boundary)
+        if resolved is None:
+            return Outcome.UNPROVEN
+        rooted, expected = resolved
+        if rooted == absolute:
+            # One unknown base, or none at all: compare textually.
+            if _inside(expected, components):
+                return Outcome.SATISFIED
+            return Outcome.UNSATISFIED
+        if rooted:
+            # Relative value, absolute boundary: some working
+            # directory would place it inside, and none is on the line.
+            return Outcome.UNPROVEN
+        if _could_be_inside(expected, components):
+            return Outcome.UNPROVEN
+        return Outcome.UNSATISFIED
+
+    def describe(self) -> str:
+        return "under " + " or ".join(self.boundaries)
+
+
+@dataclass(frozen=True)
+class PathMatching(PathMatcher):
+    pattern: str
+
+    def decide_path(
+        self, absolute: bool, components: Sequence[str]
+    ) -> Outcome:
+        rendered = ("/" if absolute else "") + "/".join(components)
+        if absolute and not components:
+            rendered = "/"
+        if re.compile(self.pattern).search(rendered):
+            return Outcome.SATISFIED
+        return Outcome.UNSATISFIED
+
+    def describe(self) -> str:
+        return f"a path matching '{self.pattern}'"
+
+
+@dataclass(frozen=True)
+class AnyOf(Matcher):
+    matchers: tuple[Matcher, ...]
+
+    def decide(self, text: str, context: MatchContext) -> Outcome:
+        return combine_any(
+            [each.evaluate(text, context) for each in self.matchers]
+        )
+
+    def describe(self) -> str:
+        return (
+            "any of ("
+            + "; ".join(each.describe() for each in self.matchers)
+            + ")"
+        )
+
+
+@dataclass(frozen=True)
+class AllOf(Matcher):
+    matchers: tuple[Matcher, ...]
+
+    def decide(self, text: str, context: MatchContext) -> Outcome:
+        return combine_all(
+            [each.evaluate(text, context) for each in self.matchers]
+        )
+
+    def describe(self) -> str:
+        return (
+            "all of ("
+            + "; ".join(each.describe() for each in self.matchers)
+            + ")"
+        )
 
 
 def one_of(*values: str) -> Matcher:
@@ -129,7 +389,7 @@ def one_of(*values: str) -> Matcher:
     Comparison is exact, not a prefix: `one_of("check")` does not match
     `checkout`. A single value is spelled the same way, `one_of("cat")`.
     """
-    raise NotImplementedError
+    return OneOf(tuple(values))
 
 
 def matching(regex: str) -> Matcher:
@@ -143,7 +403,7 @@ def matching(regex: str) -> Matcher:
     resolved or expanded first, which is what makes this the right
     matcher for values that are not paths.
     """
-    raise NotImplementedError
+    return Matching(regex)
 
 
 def predicate(description: str, test: Callable[[str], bool]) -> Matcher:
@@ -155,7 +415,7 @@ def predicate(description: str, test: Callable[[str], bool]) -> Matcher:
     every refusal citing this matcher will show. Write it as the phrase
     you would want to read in a prompt.
     """
-    raise NotImplementedError
+    return Predicate(description, test)
 
 
 def path_under(*boundaries: str) -> Matcher:
@@ -182,7 +442,7 @@ def path_under(*boundaries: str) -> Matcher:
     against `/etc/passwd` is undecided, since the working directory
     might be `/`.
     """
-    raise NotImplementedError
+    return PathUnder(tuple(boundaries))
 
 
 def path_matching(regex: str) -> Matcher:
@@ -198,7 +458,7 @@ def path_matching(regex: str) -> Matcher:
     `..` and `~` are still resolved first, so
     `/mnt/data/build/../../../etc` is judged as `/etc`.
     """
-    raise NotImplementedError
+    return PathMatching(regex)
 
 
 def any_of(*matchers: Matcher) -> Matcher:
@@ -206,7 +466,7 @@ def any_of(*matchers: Matcher) -> Matcher:
 
     env("TARGET", any_of(path_under("/tmp"), one_of("staging")))
     """
-    raise NotImplementedError
+    return AnyOf(tuple(matchers))
 
 
 def all_of(*matchers: Matcher) -> Matcher:
@@ -214,4 +474,4 @@ def all_of(*matchers: Matcher) -> Matcher:
 
     flag("--config", all_of(path_under("etc"), matching(r"\\.ya?ml$")))
     """
-    raise NotImplementedError
+    return AllOf(tuple(matchers))
