@@ -139,12 +139,14 @@ def api_generation(generation: int) -> None:
     """
     open_recording = recording("api_generation")
     if open_recording.generation is not None:
-        raise _refuse(
+        raise ConfigurationError(
             "api_generation() is declared twice: a configuration says "
             "once which contract it was written against."
         )
     if isinstance(generation, bool) or not isinstance(generation, int):
-        raise _refuse(f"api_generation({generation!r}) takes a whole number.")
+        raise ConfigurationError(
+            f"api_generation({generation!r}) takes a whole number."
+        )
     open_recording.generation = generation
 
 
@@ -375,7 +377,9 @@ def any_flag(*names: str) -> Condition:
     deny("push", when=any_flag("-f", "--force", "--mirror"), reason=…)
     """
     if not names:
-        raise _refuse("any_flag() names the flags it is an or over.")
+        raise ConfigurationError(
+            "any_flag() names the flags it is an or over."
+        )
     return AnyFlagUsed(tuple(names))
 
 
@@ -545,7 +549,9 @@ def inside(handoff_name: str) -> Inside:
     `host_only` for the other side.
     """
     if not handoff_name.strip():
-        raise _refuse("inside() names the handoff it confines a rule to.")
+        raise ConfigurationError(
+            "inside() names the handoff it confines a rule to."
+        )
     return Inside(handoff_name)
 
 
@@ -775,9 +781,11 @@ def accounted(name: str | Matcher, value: Matcher | None = None) -> Assignment:
     """
     if isinstance(name, str):
         if not name.strip():
-            raise _refuse("accounted() names the variable it expects.")
+            raise ConfigurationError(
+                "accounted() names the variable it expects."
+            )
     elif not isinstance(name, Matcher):
-        raise _refuse(
+        raise ConfigurationError(
             "accounted() takes a variable name, or a matcher for a "
             "family of them."
         )
@@ -861,9 +869,11 @@ def handoff(
     """
     path = tuple(subcommand.split())
     if not path:
-        raise _refuse("handoff() names the subcommand that hands over.")
+        raise ConfigurationError(
+            "handoff() names the subcommand that hands over."
+        )
     if keeps_operands < 0:
-        raise _refuse(
+        raise ConfigurationError(
             f"handoff('{subcommand}') keeps {keeps_operands} operands."
         )
     _typed(flags, (FlagSet,), what="flag", drops=False)
@@ -890,11 +900,11 @@ def option_handoff(
     operands resume.
     """
     if not option.strip():
-        raise _refuse(
+        raise ConfigurationError(
             "option_handoff() names the option that opens the inner command."
         )
     if not terminated_by:
-        raise _refuse(
+        raise ConfigurationError(
             f"option_handoff('{option}') needs a terminator: without "
             "one, nothing says where the inner command ends and the "
             "tool's own operands resume."
@@ -928,9 +938,9 @@ def case(command: str, expect: Verdict) -> Case:
     level for one that belongs to no single tool.
     """
     if not isinstance(command, str) or not command.strip():
-        raise _refuse("case() takes the command line to judge.")
+        raise ConfigurationError("case() takes the command line to judge.")
     if not isinstance(expect, Verdict):
-        raise _refuse(
+        raise ConfigurationError(
             f"case({command!r}, ...) states the verdict frisk must "
             "return — DENY, ASK, ALLOW or SILENT — and a rule is not "
             "one of them."
@@ -1148,9 +1158,9 @@ def redirections(*rules: Rule) -> None:
     open_recording = recording("redirections")
     for rule in rules:
         if not isinstance(rule, Rule):
-            raise _refuse(f"{rule!r} is not a verdict declaration.")
+            raise ConfigurationError(f"{rule!r} is not a verdict declaration.")
         if rule.target is None:
-            raise _refuse(
+            raise ConfigurationError(
                 "a redirection rule needs target=: these rules match "
                 "where the output lands rather than the command."
             )
@@ -1193,7 +1203,7 @@ def drop(*names: str) -> Drop:
     just declare it again — the new one replaces the old.
     """
     if not names:
-        raise _refuse("drop() names what it takes out of the list.")
+        raise ConfigurationError("drop() names what it takes out of the list.")
     return Drop(tuple(names))
 
 
@@ -1283,25 +1293,25 @@ def use(collection: str) -> None:
     open_recording = recording("use")
     base = open_recording.base_dir
     if base is None:
-        raise _refuse(
+        raise ConfigurationError(
             f"use('{collection}') has nowhere to look: a collection is "
             "a file beside the configuration, and no configuration "
             "directory is open."
         )
     if collection in open_recording.adopted:
-        raise _refuse(
+        raise ConfigurationError(
             f"use('{collection}') adopts the same collection twice, "
             "and the order of two adoptions of one file says nothing."
         )
     adopted = Path(os.path.normpath(str(base / f"{collection}.py")))
     if adopted.parent != base:
-        raise _refuse(
+        raise ConfigurationError(
             f"use('{collection}') reaches outside the configuration "
             "directory: the engine executes the project's own "
             "configuration and what sits beside it, and nothing else."
         )
     if not adopted.is_file():
-        raise _refuse(
+        raise ConfigurationError(
             f"use('{collection}') found no '{adopted.name}' beside the "
             "configuration."
         )
@@ -1480,10 +1490,6 @@ def _source(depth: int = 2) -> Source:
 # What a declaration is refused for
 
 
-def _refuse(message: str) -> ConfigurationError:
-    return ConfigurationError(message)
-
-
 def _conditions(when: When) -> tuple[Condition, ...]:
     """`when=` holds one condition or a sequence of them (`D-034`)."""
     if when is None:
@@ -1493,13 +1499,15 @@ def _conditions(when: When) -> tuple[Condition, ...]:
     given = tuple(when)
     for each in given:
         if not isinstance(each, Condition):
-            raise _refuse(f"when= takes conditions, and {each!r} is not one.")
+            raise ConfigurationError(
+                f"when= takes conditions, and {each!r} is not one."
+            )
     return given
 
 
 def _reasoned(subject: str, reason: str) -> str:
     if not reason.strip():
-        raise _refuse(
+        raise ConfigurationError(
             f"{subject} needs a reason: whoever meets this refusal is "
             "shown the reason and nothing else, so a missing one "
             "leaves them with no way forward."
@@ -1517,12 +1525,12 @@ def _typed(
     *,
     what: str,
     drops: bool,
-) -> tuple[object, ...]:
+) -> None:
     """Every item is of a kind this list accepts, `Drop` included."""
     for item in items:
         if isinstance(item, Drop):
             if not drops:
-                raise _refuse(
+                raise ConfigurationError(
                     f"drop() in a {what} list of a fresh declaration: "
                     "there is nothing beneath it to remove from. Use "
                     "amend() to take something out of what is already "
@@ -1530,8 +1538,7 @@ def _typed(
                 )
             continue
         if not isinstance(item, allowed):
-            raise _refuse(f"{item!r} is not a {what} declaration.")
-    return tuple(items)
+            raise ConfigurationError(f"{item!r} is not a {what} declaration.")
 
 
 def _entity(
@@ -1557,20 +1564,21 @@ def _entity(
     """Validate one entity declaration and record it."""
     open_recording = recording("amend" if amendment else kind)
     if not name.strip():
-        raise _refuse(
+        raise ConfigurationError(
             f"a {kind} must be named: the name is what a command line "
             "is recognized by (§4.2)."
         )
     if name.startswith("/") or name.startswith("~"):
-        raise _refuse(
+        raise ConfigurationError(
             f"'{name}' is an absolute path. A configuration is "
             "committed and travels with the project, where that path "
             "is a different machine's; declare the command name, or a "
             "project-relative path to a file in the project."
         )
-    for each in _typed(rules, (Rule,), what="rule", drops=amendment):
+    _typed(rules, (Rule,), what="rule", drops=amendment)
+    for each in rules:
         if isinstance(each, Rule) and each.target is not None:
-            raise _refuse(
+            raise ConfigurationError(
                 f"'{name}' declares a rule with target=: a target "
                 "matches where output lands, so the rule belongs in "
                 "redirections()."
@@ -1588,7 +1596,9 @@ def _entity(
     )
     _typed(cases, (Case,), what="case", drops=False)
     if default is not None and not isinstance(default, Rule):
-        raise _refuse("default= takes a verdict, such as ask(reason=...).")
+        raise ConfigurationError(
+            "default= takes a verdict, such as ask(reason=...)."
+        )
     open_recording.current.entities.append(
         Entity(
             kind=kind,
@@ -1617,12 +1627,14 @@ def _flag_set(
 ) -> FlagSet:
     """One arity bucket, with the names it was given."""
     if not names:
-        raise _refuse(f"a {arity.value} declaration names no flags.")
+        raise ConfigurationError(
+            f"a {arity.value} declaration names no flags."
+        )
     for name in names:
         if not isinstance(name, str) or not name.strip():
-            raise _refuse(f"{name!r} is not a flag name.")
+            raise ConfigurationError(f"{name!r} is not a flag name.")
     if default is not None and arity is not Arity.OPTIONAL_VALUE:
-        raise _refuse(
+        raise ConfigurationError(
             "default= says what a *bare* use of a value-optional flag "
             "means, so it belongs to may_take_value() alone."
         )

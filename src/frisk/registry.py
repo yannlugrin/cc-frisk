@@ -143,9 +143,9 @@ class Entry:
     default: PlacedRule | None = None
     flags: Mapping[str, Arity] = field(default_factory=dict)
     #: What a value-optional flag means when used bare, for the flags
-    #: whose declaration said so. Kept beside `flags` rather than in it
-    #: so that the common case — every flag's arity, nothing else —
-    #: stays one mapping to read.
+    #: and pre-subcommand options whose declaration said so. Kept
+    #: beside `flags` rather than in it so that the common case — every
+    #: flag's arity, nothing else — stays one mapping to read.
     flag_defaults: Mapping[str, str] = field(default_factory=dict)
     options: Mapping[str, Arity] = field(default_factory=dict)
     assignments: Sequence[Assignment] = ()
@@ -453,10 +453,6 @@ def _key(name: str) -> tuple[str, str]:
     return ("name", name)
 
 
-def _refused(message: str) -> ConfigurationError:
-    return ConfigurationError(message)
-
-
 @dataclass
 class _Building:
     """One entry under construction, as the layers reach it."""
@@ -509,7 +505,7 @@ def _placed_rule(
     base = _derived(owner, rule.verdict.value, rule.subcommand)
     label = rule.label if rule.label is not None else _label(base, taken)
     if rule.label is not None and rule.label in taken:
-        raise _refused(
+        raise ConfigurationError(
             f"'{owner}' carries two declarations labelled "
             f"'{rule.label}': a label is what drop() reaches, so two "
             "of them would remove whichever was found first."
@@ -527,7 +523,7 @@ def _placed_grant(
     base = _derived(owner, "grant", grant.subcommand)
     label = grant.label if grant.label is not None else _label(base, taken)
     if grant.label is not None and grant.label in taken:
-        raise _refused(
+        raise ConfigurationError(
             f"'{owner}' carries two declarations labelled '{grant.label}'."
         )
     return PlacedGrant(
@@ -555,7 +551,7 @@ def _no_double_talk(
     """`drop("-u")` beside `takes_value("-u")` says two things at once."""
     both = sorted(set(removals) & set(added))
     if both:
-        raise _refused(
+        raise ConfigurationError(
             f"the {what} list both drops and declares "
             f"{', '.join(both)}: within a source there is no order "
             "(§3.2), so the pair has no reading. To change something, "
@@ -577,7 +573,7 @@ def _apply_flags(
         assert isinstance(item, FlagSet)
         for name in item.names:
             if name in declared and declared[name] is not item.arity:
-                raise _refused(
+                raise ConfigurationError(
                     f"'{owner}' declares {name} with two arities, "
                     f"{declared[name].value} and {item.arity.value}."
                 )
@@ -586,7 +582,7 @@ def _apply_flags(
     _no_double_talk(removals, list(declared), what)
     for name in removals:
         if name not in target:
-            raise _refused(
+            raise ConfigurationError(
                 f"'{owner}' declares no {what} {name}, so there is "
                 "nothing to drop."
             )
@@ -619,7 +615,7 @@ def _apply_assignments(
     for name in removals:
         matches = [a for a in target if _assignment_key(a) == name]
         if not matches:
-            raise _refused(
+            raise ConfigurationError(
                 f"{owner} accounts for no {name}, so there is nothing to drop."
             )
         for each in matches:
@@ -663,7 +659,7 @@ def _apply_handoffs(building: _Building, items: Sequence[object]) -> None:
             if _handoff_position(each) == name
         ]
         if not by_subcommand and not by_option:
-            raise _refused(
+            raise ConfigurationError(
                 f"'{building.name}' declares no handoff at {name}, so "
                 "there is nothing to drop."
             )
@@ -684,7 +680,7 @@ def _apply_aliases(building: _Building, items: Sequence[object]) -> None:
     _no_double_talk(removals, [str(each) for each in additions], "alias")
     for name in removals:
         if name not in building.aliases:
-            raise _refused(
+            raise ConfigurationError(
                 f"'{building.name}' has no alias {name}, so there is "
                 "nothing to drop."
             )
@@ -702,7 +698,7 @@ def _apply_rules(
     for label in removals:
         matches = [each for each in building.rules if each.label == label]
         if not matches:
-            raise _refused(
+            raise ConfigurationError(
                 f"'{building.name}' carries no rule labelled "
                 f"'{label}'. `frisk registry` prints the label of "
                 "every rule, derived ones included."
@@ -728,7 +724,7 @@ def _apply_grants(
     for label in removals:
         matches = [each for each in building.grants if each.label == label]
         if not matches:
-            raise _refused(
+            raise ConfigurationError(
                 f"'{building.name}' carries no grant labelled '{label}'."
             )
         for each in matches:
@@ -777,7 +773,7 @@ def _applied(building: _Building, entity: Entity) -> None:
     if entity.closed_world is not None:
         building.closed_world = entity.closed_world
     if building.closed_world is False and building.grants:
-        raise _refused(
+        raise ConfigurationError(
             f"'{building.name}' declares grants and an open world: a "
             "grant an undeclared flag could escape proves nothing "
             "(§3.2), so the pair contradicts itself rather than "
@@ -792,7 +788,7 @@ def _applied_to(
     if entity.amendment:
         standing = built.get(key)
         if standing is None:
-            raise _refused(
+            raise ConfigurationError(
                 f"amend('{entity.name}') has nothing to amend: no "
                 "layer beneath declares that name, and an amendment "
                 "that silently does nothing is a boundary the operator "
@@ -824,7 +820,7 @@ def _no_repeats(layer: Layer) -> None:
             if not isinstance(alias, Drop)
         ]:
             if key in claimed:
-                raise _refused(
+                raise ConfigurationError(
                     f"'{key[1]}' is declared twice in {layer.name}, by "
                     f"'{claimed[key]}' and by '{entity.name}'. Within a "
                     "source there is no order (§3.2), so the second is "
