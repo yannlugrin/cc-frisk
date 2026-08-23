@@ -35,6 +35,7 @@ asserted in the suite rather than left to argparse's defaults:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -263,7 +264,13 @@ def _configuration(project: str | None) -> Path | None:
     parent the operator did not name.
     """
     if project is not None:
-        named = config_path(Path(project))
+        # Absolute, because `.` is the natural spelling and the engine
+        # refuses a relative configuration directory — which is an
+        # invariant about the engine, not a fault in the input.
+        # `abspath` rather than `resolve`: normalizing `.` and `..` is
+        # the whole need, and following symlinks would report a path
+        # the operator did not name.
+        named = config_path(Path(os.path.abspath(project)))
         return named if named.is_file() else None
     return locate(Path.cwd())
 

@@ -45,7 +45,10 @@ rules that the string family does not:
 * **Nothing touches the filesystem** (§4.5): resolution is textual, and
   the paths being judged may not exist yet. `~` is expanded from the
   environment's `HOME`; `~other` is unproven, since naming another
-  user's home would mean reading the password database.
+  user's home would mean reading the password database. That is a
+  claim about the matchers written here — `predicate()` runs a callable
+  the configuration supplies, and what it does is the configuration's
+  to answer for.
 
 **Dynamic values are never matched.** A token the shell would expand
 carries no value at decision time, and an unknown never satisfies a
@@ -62,8 +65,10 @@ import fnmatch
 import os
 import re
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Union
+
+from .errors import ConfigurationError
 
 
 class Outcome(enum.Enum):
@@ -131,6 +136,26 @@ def combine_all(outcomes: Sequence[Outcome]) -> Outcome:
     return Outcome.SATISFIED
 
 
+def compiled(pattern: str) -> re.Pattern[str]:
+    """A declared pattern, compiled where it was declared.
+
+    Once, at declaration, for two reasons. A pattern that will not
+    compile is a structurally broken declaration, and §8.2 asks for
+    those at load — left to the first value that reaches it, it is a
+    traceback out of the middle of a printed registry or, on the hook
+    path, a runtime deny whose message is an engine stack. And the
+    pattern is a constant: recompiling it per judged value buys nothing
+    but a lookup in a cache this process shares with every other regex
+    user in it (§4.5).
+    """
+    try:
+        return re.compile(pattern)
+    except re.error as broken:
+        raise ConfigurationError(
+            f"'{pattern}' is not a usable regular expression: {broken}."
+        ) from broken
+
+
 def _asked(value: Matchable) -> Value:
     """A bare string is a plain, non-dynamic value."""
     return value if isinstance(value, Value) else Value(value)
@@ -178,11 +203,17 @@ def resolve(text: str) -> Resolved:
 
 
 def _inside(boundary: Sequence[str], value: Sequence[str]) -> bool:
-    """Whole-component containment, wildcards never crossing `/`."""
+    """Whole-component containment, wildcards never crossing `/`.
+
+    The equality test first is not an optimization of `fnmatchcase` but
+    a way around it: most boundary components carry no wildcard at all,
+    and for those the glob machinery is a cache lookup and a regex
+    match to answer a string comparison (§4.5).
+    """
     if len(value) < len(boundary):
         return False
     return all(
-        fnmatch.fnmatchcase(component, pattern)
+        pattern == component or fnmatch.fnmatchcase(component, pattern)
         for pattern, component in zip(boundary, value)
     )
 
@@ -269,9 +300,13 @@ class OneOf(Matcher):
 @dataclass(frozen=True)
 class Matching(Matcher):
     pattern: str
+    expression: re.Pattern[str] = field(init=False, compare=False, repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "expression", compiled(self.pattern))
 
     def decide(self, text: str, context: MatchContext) -> Outcome:
-        if re.compile(self.pattern).search(text):
+        if self.expression.search(text):
             return Outcome.SATISFIED
         return Outcome.UNSATISFIED
 
@@ -294,6 +329,20 @@ class Predicate(Matcher):
 @dataclass(frozen=True)
 class PathUnder(PathMatcher):
     boundaries: tuple[str, ...]
+    #: The boundaries resolved once, at declaration. They are constants
+    #: — resolving each of them again for every judged value is the
+    #: same `~` lookup and the same `..` walk, per value per boundary,
+    #: on the path §4.5 budgets in milliseconds.
+    resolved: tuple[Resolved, ...] = field(
+        init=False, compare=False, repr=False
+    )
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "resolved",
+            tuple(resolve(boundary) for boundary in self.boundaries),
+        )
 
     def decide_path(
         self, absolute: bool, components: Sequence[str]
@@ -301,14 +350,16 @@ class PathUnder(PathMatcher):
         return combine_any(
             [
                 self._against(boundary, absolute, components)
-                for boundary in self.boundaries
+                for boundary in self.resolved
             ]
         )
 
     def _against(
-        self, boundary: str, absolute: bool, components: Sequence[str]
+        self,
+        resolved: Resolved,
+        absolute: bool,
+        components: Sequence[str],
     ) -> Outcome:
-        resolved = resolve(boundary)
         if resolved is None:
             return Outcome.UNPROVEN
         rooted, expected = resolved
@@ -332,6 +383,10 @@ class PathUnder(PathMatcher):
 @dataclass(frozen=True)
 class PathMatching(PathMatcher):
     pattern: str
+    expression: re.Pattern[str] = field(init=False, compare=False, repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "expression", compiled(self.pattern))
 
     def decide_path(
         self, absolute: bool, components: Sequence[str]
@@ -339,7 +394,7 @@ class PathMatching(PathMatcher):
         rendered = ("/" if absolute else "") + "/".join(components)
         if absolute and not components:
             rendered = "/"
-        if re.compile(self.pattern).search(rendered):
+        if self.expression.search(rendered):
             return Outcome.SATISFIED
         return Outcome.UNSATISFIED
 
@@ -414,6 +469,13 @@ def predicate(description: str, test: Callable[[str], bool]) -> Matcher:
     The description comes first because it is what your registry and
     every refusal citing this matcher will show. Write it as the phrase
     you would want to read in a prompt.
+
+    Your callable runs on the decision path, once per value it is asked
+    about, inside a per-call budget measured in milliseconds. Keep it
+    pure and cheap: no filesystem, no network, no state of its own. An
+    exception from it is not caught — a matcher that raises is a
+    configuration defect, and frisk would rather that be loud than
+    become a verdict nobody can explain.
     """
     return Predicate(description, test)
 

@@ -285,6 +285,17 @@ class Registry:
         collected.extend(self._standalone_cases)
         return tuple(collected)
 
+    def standalone_cases(self) -> Sequence[Case]:
+        """The cases belonging to no single declaration (§5.2).
+
+        Asked of the registry rather than found by subtracting the
+        sited ones from `cases()`: a `Case` is a frozen dataclass, so
+        two equal ones are indistinguishable, and a case written at the
+        top level that happened to repeat a tool's would vanish from
+        the section that exists to show it.
+        """
+        return self._standalone_cases
+
     def benign_assignments(self) -> Sequence[Assignment]:
         """The effective benign assignment layer (§3.2)."""
         return self._benign
@@ -505,9 +516,25 @@ def _derived(name: str, verdict: str, subcommand: Sequence[str]) -> str:
     return ":".join(parts)
 
 
-def _placed_rule(
-    owner: str, rule: Rule, taken: Sequence[str], fallback: Source
-) -> PlacedRule:
+def _written(owner: str, declared_at: Source | None) -> Source:
+    """Where a rule or grant was written, which is never nowhere.
+
+    Every verdict constructor fills it from the caller's frame, and
+    `Rule` and `Grant` are absent from `declare.__all__`, so a
+    configuration cannot produce one without it. A check rather than a
+    fallback `Source`: §3.4 requires the layer and line to be
+    printable, and inventing one would print a lie.
+    """
+    if declared_at is None:
+        raise ConfigurationError(
+            f"a declaration on '{owner}' records no source. Rules and "
+            "grants come from deny(), ask(), allow(), silent() and "
+            "grant(), which is what records where they were written."
+        )
+    return declared_at
+
+
+def _placed_rule(owner: str, rule: Rule, taken: Sequence[str]) -> PlacedRule:
     base = _derived(owner, rule.verdict.value, rule.subcommand)
     label = rule.label if rule.label is not None else _label(base, taken)
     if rule.label is not None and rule.label in taken:
@@ -519,12 +546,12 @@ def _placed_rule(
     return PlacedRule(
         rule=rule,
         label=label,
-        source=rule.declared_at or fallback,
+        source=_written(owner, rule.declared_at),
     )
 
 
 def _placed_grant(
-    owner: str, grant: Grant, taken: Sequence[str], fallback: Source
+    owner: str, grant: Grant, taken: Sequence[str]
 ) -> PlacedGrant:
     base = _derived(owner, "grant", grant.subcommand)
     label = grant.label if grant.label is not None else _label(base, taken)
@@ -535,7 +562,7 @@ def _placed_grant(
     return PlacedGrant(
         grant=grant,
         label=label,
-        source=grant.declared_at or fallback,
+        source=_written(owner, grant.declared_at),
     )
 
 
@@ -697,9 +724,7 @@ def _apply_aliases(building: _Building, items: Sequence[object]) -> None:
             building.aliases.append(item)
 
 
-def _apply_rules(
-    building: _Building, items: Sequence[object], fallback: Source
-) -> None:
+def _apply_rules(building: _Building, items: Sequence[object]) -> None:
     removals, additions = _dropped(items)
     for label in removals:
         matches = [each for each in building.rules if each.label == label]
@@ -718,14 +743,11 @@ def _apply_rules(
                 building.name,
                 item,
                 [each.label for each in building.rules],
-                fallback,
             )
         )
 
 
-def _apply_grants(
-    building: _Building, items: Sequence[object], fallback: Source
-) -> None:
+def _apply_grants(building: _Building, items: Sequence[object]) -> None:
     removals, additions = _dropped(items)
     for label in removals:
         matches = [each for each in building.grants if each.label == label]
@@ -742,7 +764,6 @@ def _apply_grants(
                 building.name,
                 item,
                 [each.label for each in building.grants],
-                fallback,
             )
         )
 
@@ -766,15 +787,15 @@ def _applied(building: _Building, entity: Entity) -> None:
     )
     _apply_assignments(building.assignments, entity.assignments, building.name)
     _apply_handoffs(building, entity.handoffs)
-    _apply_rules(building, entity.rules, entity.source)
-    _apply_grants(building, entity.grants, entity.source)
+    _apply_rules(building, entity.rules)
+    _apply_grants(building, entity.grants)
     building.cases.extend(entity.cases)
     if entity.default is not None:
         building.default = PlacedRule(
             rule=entity.default,
             label=entity.default.label
             or _derived(building.name, "default", ()),
-            source=entity.default.declared_at or entity.source,
+            source=_written(building.name, entity.default.declared_at),
         )
     if entity.closed_world is not None:
         building.closed_world = entity.closed_world
@@ -887,7 +908,6 @@ def _composed(recording: Recording) -> Registry:
                     "redirection",
                     rule,
                     [each.label for each in redirections],
-                    rule.declared_at or Source(layer.name, __file__, 0),
                 )
             )
         standalone.extend(layer.cases)
@@ -1190,19 +1210,9 @@ def _rendered(
         lines.extend(["", "redirections"])
         for placed in redirections:
             lines.extend(_rule_lines(2, placed, value, wrap))
-    standalone = [
-        case for case in registry.cases() if case not in _sited(registry)
-    ]
+    standalone = registry.standalone_cases()
     if cases is Cases.SHOWN and standalone:
         lines.extend(["", "cases"])
         for case in standalone:
             lines.append("  " + _case_text(case))
     return "\n".join(printable(line) for line in lines)
-
-
-def _sited(registry: Registry) -> list[Case]:
-    """The cases written beside a declaration, as opposed to alone."""
-    sited: list[Case] = []
-    for entry in registry.entries():
-        sited.extend(entry.cases)
-    return sited

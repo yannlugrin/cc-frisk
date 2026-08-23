@@ -90,9 +90,28 @@ def load(path: Path) -> Registry:
         PROJECT_LAYER, base_dir=path.parent, with_defaults=True
     ) as declared:
         try:
-            exec(compile(path.read_text(), str(path), "exec"), namespace)
+            # The bytes, not the text: Python source is UTF-8 by
+            # definition (PEP 3120), and `read_text()` would decode it
+            # with whatever the locale prefers — so a configuration
+            # holding one accented reason would load on a workstation
+            # and deny everything under `LC_ALL=C`. Handing `compile`
+            # the bytes is what CPython does for a source file: the
+            # BOM and a coding cookie are its business, not ours.
+            exec(compile(path.read_bytes(), str(path), "exec"), namespace)
         except ConfigurationError:
             raise
+        except SystemExit as failure:
+            # `SystemExit` is a `BaseException`, so it would otherwise
+            # walk straight out of here and end the process with the
+            # status the *configuration* chose — exit 0 for a boundary
+            # nothing composed, which is the one direction §7.1
+            # forbids. A config that grew out of a script and kept its
+            # `sys.exit(main())` is all it takes.
+            raise ConfigurationError(
+                f"the configuration at '{path}' exited instead of "
+                f"loading (status {failure.code!r}). A configuration "
+                "declares; it does not end the process."
+            ) from failure
         except Exception as failure:
             # Everything else a configuration can do — a syntax error,
             # a name it misspelled, an exception of its own — is one

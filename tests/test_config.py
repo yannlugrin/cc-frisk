@@ -188,6 +188,18 @@ class LoadFailureTests(ProjectFixture):
             load(self.write(body))
         self.assertIn("boom", str(raised.exception))
 
+    def test_a_configuration_that_exits_is_refused(self) -> None:
+        # Added during implementation, not at the gate. `SystemExit` is
+        # a `BaseException`, so it walked out of the loader untouched
+        # and ended the process with the status the *configuration*
+        # chose — exit 0, no registry, no message, for a boundary
+        # nothing composed. §7.1 asks for a deny; a config that grew
+        # out of a script and kept its `sys.exit(main())` got silence.
+        body = VALID.format(generation=CURRENT_GENERATION)
+        body += "\nraise SystemExit(0)\n"
+        with self.assertRaises(ConfigurationError):
+            load(self.write(body))
+
     def test_a_configuration_that_will_not_parse_is_refused(
         self,
     ) -> None:

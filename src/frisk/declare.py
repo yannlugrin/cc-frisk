@@ -1321,7 +1321,9 @@ def use(collection: str) -> None:
         "__file__": str(adopted),
     }
     try:
-        exec(compile(adopted.read_text(), str(adopted), "exec"), namespace)
+        # The bytes, for the reason `config.load` gives: a collection
+        # is Python source, and source is UTF-8 whatever the locale is.
+        exec(compile(adopted.read_bytes(), str(adopted), "exec"), namespace)
     finally:
         open_recording.pop()
 
@@ -1595,10 +1597,28 @@ def _entity(
         drops=amendment,
     )
     _typed(cases, (Case,), what="case", drops=False)
-    if default is not None and not isinstance(default, Rule):
-        raise ConfigurationError(
-            "default= takes a verdict, such as ask(reason=...)."
-        )
+    if default is not None:
+        if not isinstance(default, Rule):
+            raise ConfigurationError(
+                "default= takes a verdict, such as ask(reason=...)."
+            )
+        # A default is what the tool answers when nothing else matched,
+        # so neither of these has a reading — and both were silently
+        # dropped, which left the operator's file and the printed
+        # registry disagreeing about the boundary.
+        if default.subcommand:
+            raise ConfigurationError(
+                f"'{name}' declares a default on the subcommand "
+                f"'{' '.join(default.subcommand)}'. A default is the "
+                "verdict when no rule matched; put the subcommand in "
+                "rules= instead."
+            )
+        if default.target is not None:
+            raise ConfigurationError(
+                f"'{name}' declares a default with target=: a target "
+                "matches where output lands, so the rule belongs in "
+                "redirections()."
+            )
     open_recording.current.entities.append(
         Entity(
             kind=kind,

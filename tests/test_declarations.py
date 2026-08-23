@@ -57,6 +57,7 @@ from frisk.declare import (
     one_of,
     option,
     option_handoff,
+    path_matching,
     path_under,
     redirections,
     shell,
@@ -185,6 +186,27 @@ class FlagArityTests(unittest.TestCase):
 
         with self.assertRaises(ConfigurationError):
             compose(declare)
+
+
+class PatternDeclarationTests(unittest.TestCase):
+    """A pattern is compiled where it is written.
+
+    Added during implementation, not at the gate: an expression that
+    will not compile was raising `re.error` out of the first
+    evaluation that reached it — a traceback from the middle of a
+    printed registry, and on the hook path a runtime failure whose
+    message is an engine stack. §8.2's liveness pass is for
+    structurally broken declarations, and this is one.
+    """
+
+    def test_an_unusable_expression_is_refused_where_it_is_written(
+        self,
+    ) -> None:
+        for constructor in (matching, path_matching):
+            with self.subTest(matcher=constructor.__name__):
+                with self.assertRaises(ConfigurationError) as raised:
+                    constructor("[")
+                self.assertIn("[", str(raised.exception))
 
 
 class RecognitionTests(unittest.TestCase):
