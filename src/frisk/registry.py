@@ -352,9 +352,11 @@ class Registry:
         * `source:` is `<layer> <file>:<line>` wherever it appears —
           first on the entry, because in a *composed* registry the
           question that brings someone to an entry is usually which
-          layer won, and again on every rule and grant, which outlive
-          the entry they were declared on and are what an amendment
-          moves between layers.
+          layer won, and again on **every** rule and grant, never only
+          on one from another layer (`D-045`): a rule outlives the
+          entry it was declared on, an amendment is what moves one
+          between layers, and a column that is sometimes absent is one
+          whose absence a reader has to interpret.
         * `gated:` says **why**: `no`, `yes, by its grants`, or `yes, by
           declaration`. It is the one property an operator cannot infer
           by looking, since a closed world is derived from grants unless

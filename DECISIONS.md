@@ -1300,3 +1300,36 @@ Detail in git history.
 - **Approved by:** operator, 2026-08-23 — "developers often have 2
   projects with 2 different repos living beside, and using a tool in
   the other is ok… it's an edge case, but it's okay".
+
+### D-045 — Every rule and grant prints where it was written
+
+- **Date:** 2026-08-23
+- **Step:** `007`
+- **Context:** `Registry.describe`'s docstring is the layout contract
+  (`D-036`), and one sentence in it made the rule-level `source:` line
+  conditional: on the entry, "and again on any rule that came from
+  elsewhere". The implementation prints it on every rule and grant,
+  because an approved case requires a source line on a rule whose entry
+  came from the same layer. The docstring was reworded to match what
+  the cases pin; the ruling behind it was recorded only in a commit
+  message, which is not one of the memory files.
+- **Decision:** every rule and grant carries its own `source:` line,
+  unconditionally. Three reasons. A rule **outlives the entry it was
+  declared on** — an amendment is precisely what puts one layer's rule
+  on another layer's entry, so "same layer as its entry" is not a
+  property a reader may assume. A conditional column makes the reader
+  interpret an *absence*: does no source mean "the entry's" or "not
+  recorded"? And the line is what an operator opens to change the rule,
+  which is what §3.4's inspection requirement is for.
+- **Alternatives considered:** *print it only where the rule's layer
+  differs from its entry's* — the docstring's original rule, and what
+  it would save is three lines per rule in a large registry, paid for
+  by making the reader compute the common case; it also contradicted an
+  approved case. *Print no source on rules at all, entry-level only* —
+  smaller still, and it loses exactly the case that matters: an
+  amendment putting a project rule on a collection's entry, where
+  nothing would then say where the rule came from.
+- **Approved by:** operator, 2026-08-23. Filed as its own entry rather
+  than a clause in `D-036`, whose kernel is the text-only output and
+  the deferred JSON; if the operator meant that clause instead, this
+  entry folds into it.
