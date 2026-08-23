@@ -328,7 +328,8 @@ own tree, whose paths `PLAN.md` `021` confirms rather than assumes;
 ## Current state
 
 - **Current step:** `007` — declarations, matchers, layering,
-  **awaiting test**. The frozen cases all pass and no case was edited.
+  **awaiting test**. Every approved case passes, none was edited, and
+  twelve were added after it for what review and `D-041`/`D-043` found.
 - **Next step:** `008` — reading the line.
 - **World state:** the harness (`just setup/check/test/verify`) runs
   the same checks locally, in the commit hook and in CI, green.
