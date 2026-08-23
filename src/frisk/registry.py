@@ -1188,13 +1188,17 @@ def _entry_lines(
     lines.append(f"  source: {_source_text(entry.source)}")
     if entry.kind is Kind.TOOL:
         lines.append(f"  gated: {_gating(entry)}")
-    if entry.aliases:
-        lines.append(
-            "  aliases: "
-            + " ".join(
-                _alias_text(registry, entry, alias) for alias in entry.aliases
-            )
-        )
+    # Only the aliases that still reach this entry. One a later layer
+    # claimed is an override like any other (`D-043`) — a `tool("sudo")`
+    # over the engine's wrapper is not annotated either, and the word's
+    # new owner is an entry of its own in this same output. The alias
+    # stays *declared*, so `amend(aliases=[drop(...)])` can still find
+    # it; it is only absent from the effective state this prints.
+    reaching = [
+        alias for alias in entry.aliases if registry.resolves_to(alias, entry)
+    ]
+    if reaching:
+        lines.append("  aliases: " + " ".join(reaching))
     if entry.default is not None:
         lines.append(f"  default: {entry.default.rule.verdict.value}")
         if entry.default.rule.reason:

@@ -1245,14 +1245,27 @@ Detail in git history.
   amending an entry for an unrelated reason cannot take back a word a
   later layer has since claimed. Within one source the collision stays
   refused — that is `_no_repeats`, and a source has no order to decide
-  it with. The entry that loses a word prints it as
-  `aliases: podman (shadowed)`, because the loss is exactly what §3.4
-  says composition may not hide.
+  it with. **The entry that loses a word simply stops listing it**:
+  `describe` prints an entry's *reaching* aliases, not its declared
+  ones. Not printed is not deleted — the alias stays on the entry, or
+  an operator trimming an adopted collection would be told docker has
+  no alias to drop while their own file plainly declares one.
 - **Alternatives considered:** *refuse the collision across layers* —
   my recommendation, and rejected by the operator: every other
   cross-layer conflict is settled by order, and a name is not special
-  enough to be the exception. *Print the shadow and change nothing
-  else* — keeps every current verdict, but leaves the operator's own
-  layer losing to the engine's, which is the one thing §3.4 rules out.
+  enough to be the exception. *Mark the loser `podman (shadowed)`* —
+  also mine, on the ground that the loss was one nobody asked for;
+  rejected by the operator, whose counter settles it: somebody did ask,
+  by writing the declaration that claims the word, and the same
+  reasoning would owe a shadow note to every `tool("sudo")` that
+  replaces the engine's wrapper. The registry prints the effective
+  state, and an overridden declaration is not part of it.
+- **Deferred, and worth having.** Everything shadowed or dropped —
+  aliases, replaced entries, rules an amendment removed — is invisible
+  by design in a registry that prints what is effective. A `--shadowed`
+  debug mode showing all of it with the source that lost it would
+  answer "where did my `--force` rule go?" in one command. It is an
+  enhancement, not a gap: `PLAN.md` `037` carries it.
 - **Approved by:** operator, 2026-08-23 — "layer order decide, like any
-  other override case".
+  other override case", and, on the printing, "I rule on not print the
+  shadowed aliases (but they are not deleted)".

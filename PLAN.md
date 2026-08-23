@@ -1244,7 +1244,12 @@ initiative.
 §9's complete surface: `explain` **showing its work** — which invocations
 were found through which walls of §4.3 — the JSON output option, and
 `status` completed with the fields that need `021`'s resolution (which
-engine answered).
+engine answered). Plus `registry --shadowed`, the debug mode `D-043`
+defers here: the registry prints the effective state, so everything
+composition discarded — an alias a later layer claimed, a replaced
+entry, a rule an amendment dropped — is invisible by design, and
+"where did my `--force` rule go?" has no one-command answer. Show all
+of it with the source that lost it.
 
 ### 038 — The once-per-session visibly-inert notice — `pending`
 

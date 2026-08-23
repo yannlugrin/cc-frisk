@@ -626,11 +626,16 @@ class AliasResolutionTests(CollectionFixture):
         # later layer took is the word, not the declaration.
         self.assertIn("wrapper(sudo)", registry.describe().splitlines())
 
-    def test_the_entry_that_lost_a_word_says_so(self) -> None:
-        # §3.4: composition may not hide what it decided. Without this
-        # the loser prints `aliases: podman` and the operator reads a
-        # name that reaches somewhere else. The collection declares
-        # docker under both names; the project claims one of them.
+    def test_a_word_an_entry_no_longer_reaches_is_not_printed(
+        self,
+    ) -> None:
+        # The registry prints the effective state, and an alias a later
+        # layer claimed is not part of it. It is an override like any
+        # other — a `tool("sudo")` over the engine's wrapper is not
+        # annotated either — and the word's new owner is an entry of
+        # its own in the same output, so nothing is hidden by leaving
+        # the losing side quiet. The collection declares docker under
+        # both names; the project claims one of them.
         self.write_collection("aliased", ALIASED)
 
         def declare() -> None:
@@ -641,14 +646,28 @@ class AliasResolutionTests(CollectionFixture):
         found = registry.lookup("podman")
         assert found is not None
         self.assertEqual(found.name, "podman")
-        self.assertEqual(
-            [
-                line
-                for line in registry.describe().splitlines()
-                if line.startswith("  aliases:")
-            ],
-            ["  aliases: podman (shadowed)"],
-        )
+        described = registry.describe()
+        self.assertNotIn("  aliases: podman", described)
+        # And the field is absent rather than empty, the rule every
+        # other field follows.
+        self.assertNotIn("  aliases:", described)
+        self.assertIn("tool(docker)", described.splitlines())
+
+    def test_a_word_it_no_longer_reaches_is_still_droppable(self) -> None:
+        # Not printed is not deleted: the alias stays declared on the
+        # entry, or an operator trimming the collection they adopted
+        # would be told docker has no alias to drop while their own
+        # file plainly declares one.
+        self.write_collection("aliased", ALIASED)
+
+        def declare() -> None:
+            use("aliased")
+            tool("podman", default=silent())
+            amend("docker", aliases=[drop("podman")])
+
+        entry = self.compose(declare).lookup("docker")
+        assert entry is not None
+        self.assertEqual(entry.aliases, ())
 
     def test_an_unshadowed_alias_prints_plainly(self) -> None:
         self.write_collection("aliased", ALIASED)
