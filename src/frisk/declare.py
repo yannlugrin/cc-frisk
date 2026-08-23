@@ -36,10 +36,14 @@ here is shaped in a way that precludes them.
 from __future__ import annotations
 
 import enum
+import os
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from typing import Union
+from pathlib import Path
+from typing import Any, Union
 
+from .errors import ConfigurationError
 from .matchers import (
     Matcher,
     all_of,
@@ -133,7 +137,15 @@ def api_generation(generation: int) -> None:
 
     A configuration without it does not load.
     """
-    raise NotImplementedError
+    open_recording = recording("api_generation")
+    if open_recording.generation is not None:
+        raise _refuse(
+            "api_generation() is declared twice: a configuration says "
+            "once which contract it was written against."
+        )
+    if isinstance(generation, bool) or not isinstance(generation, int):
+        raise _refuse(f"api_generation({generation!r}) takes a whole number.")
+    open_recording.generation = generation
 
 
 # --------------------------------------------------------------------
@@ -150,10 +162,17 @@ class Arity(enum.Enum):
 
 @dataclass(frozen=True)
 class FlagSet:
-    """Flags sharing one arity, as one declaration."""
+    """Flags sharing one arity, as one declaration.
+
+    `default` is what a value-optional flag means when used bare
+    (`D-039`), and is None on every other arity: the fact belongs to
+    the tool, so it is declared once beside the arity rather than
+    restated at each rule that reads the value.
+    """
 
     arity: Arity
     names: Sequence[str]
+    default: str | None = None
 
 
 def bare(*names: str) -> FlagSet:
@@ -164,7 +183,7 @@ def bare(*names: str) -> FlagSet:
     Only needed on a gated tool, where every flag must be declared. A
     flag you never mention is assumed to take nothing anyway.
     """
-    raise NotImplementedError
+    return _flag_set(Arity.BARE, names)
 
 
 def takes_value(*names: str) -> FlagSet:
@@ -178,7 +197,7 @@ def takes_value(*names: str) -> FlagSet:
     it is a real deploy — the one direction that fails toward letting
     something through.
     """
-    raise NotImplementedError
+    return _flag_set(Arity.VALUE, names)
 
 
 def may_take_value(*names: str, default: str | None = None) -> FlagSet:
@@ -204,7 +223,7 @@ def may_take_value(*names: str, default: str | None = None) -> FlagSet:
     unprovable, which sends the verdict to the stricter side rather
     than letting a rule go quiet about a flag it could not read.
     """
-    raise NotImplementedError
+    return _flag_set(Arity.OPTIONAL_VALUE, names, default)
 
 
 # --------------------------------------------------------------------
@@ -238,6 +257,104 @@ class Condition:
 When = Union[Condition, Sequence[Condition], None]
 
 
+@dataclass(frozen=True)
+class FlagUsed(Condition):
+    """`flag(...)` — an operative flag, optionally carrying a value."""
+
+    name: str
+    value: Matcher | None = None
+
+    def describe(self) -> str:
+        if self.value is None:
+            return f"flag {self.name}"
+        return f"flag {self.name} is {self.value.describe()}"
+
+    def matchers(self) -> Sequence[Matcher]:
+        return () if self.value is None else (self.value,)
+
+
+@dataclass(frozen=True)
+class AnyFlagUsed(Condition):
+    """`any_flag(...)` — an or over flag names, not over conditions."""
+
+    names: Sequence[str]
+
+    def describe(self) -> str:
+        return "any flag in " + ", ".join(self.names)
+
+    def matchers(self) -> Sequence[Matcher]:
+        return ()
+
+
+@dataclass(frozen=True)
+class EnvSet(Condition):
+    """`env(...)` — an assignment in front of the command."""
+
+    name: str
+    value: Matcher | None = None
+
+    def describe(self) -> str:
+        if self.value is None:
+            return f"environment {self.name}"
+        return f"environment {self.name} is {self.value.describe()}"
+
+    def matchers(self) -> Sequence[Matcher]:
+        return () if self.value is None else (self.value,)
+
+
+@dataclass(frozen=True)
+class OptionUsed(Condition):
+    """`option(...)` — an option ahead of the subcommand."""
+
+    name: str
+    value: Matcher | None = None
+
+    def describe(self) -> str:
+        if self.value is None:
+            return f"option {self.name}"
+        return f"option {self.name} is {self.value.describe()}"
+
+    def matchers(self) -> Sequence[Matcher]:
+        return () if self.value is None else (self.value,)
+
+
+@dataclass(frozen=True)
+class EveryOperand(Condition):
+    """`every_operand(...)` — and at least one, by §3.2."""
+
+    value: Matcher
+
+    def describe(self) -> str:
+        return f"every operand is {self.value.describe()}"
+
+    def matchers(self) -> Sequence[Matcher]:
+        return (self.value,)
+
+
+@dataclass(frozen=True)
+class AtLeastOneOperand(Condition):
+    """`at_least_one_operand(...)` — the other quantifier."""
+
+    value: Matcher
+
+    def describe(self) -> str:
+        return f"at least one operand is {self.value.describe()}"
+
+    def matchers(self) -> Sequence[Matcher]:
+        return (self.value,)
+
+
+@dataclass(frozen=True)
+class NoOperands(Condition):
+    """`no_operands()` — the empty case, spelled deliberately."""
+
+    def describe(self) -> str:
+        return "no operands"
+
+    def matchers(self) -> Sequence[Matcher]:
+        return ()
+
+
 def flag(name: str, value: Matcher | None = None) -> Condition:
     """This flag is operative on the invocation, optionally with a value.
 
@@ -249,7 +366,7 @@ def flag(name: str, value: Matcher | None = None) -> Condition:
     `deploy.yml -i --syntax-check` a real deploy: `--syntax-check` is
     `-i`'s inventory string there, so a rule about it does not fire.
     """
-    raise NotImplementedError
+    return FlagUsed(name, value)
 
 
 def any_flag(*names: str) -> Condition:
@@ -257,7 +374,9 @@ def any_flag(*names: str) -> Condition:
 
     deny("push", when=any_flag("-f", "--force", "--mirror"), reason=…)
     """
-    raise NotImplementedError
+    if not names:
+        raise _refuse("any_flag() names the flags it is an or over.")
+    return AnyFlagUsed(tuple(names))
 
 
 def env(name: str, value: Matcher | None = None) -> Condition:
@@ -271,7 +390,7 @@ def env(name: str, value: Matcher | None = None) -> Condition:
     so matching is case-sensitive and a lower-case name is a variable
     too.
     """
-    raise NotImplementedError
+    return EnvSet(name, value)
 
 
 def option(name: str, value: Matcher | None = None) -> Condition:
@@ -284,7 +403,7 @@ def option(name: str, value: Matcher | None = None) -> Condition:
     "pushing is fine, but only for repositories under this directory"
     is said.
     """
-    raise NotImplementedError
+    return OptionUsed(name, value)
 
 
 def every_operand(value: Matcher) -> Condition:
@@ -300,7 +419,7 @@ def every_operand(value: Matcher) -> Condition:
     does not release it. If you mean to allow that, say so with
     `no_operands()`.
     """
-    raise NotImplementedError
+    return EveryOperand(value)
 
 
 def at_least_one_operand(value: Matcher) -> Condition:
@@ -308,7 +427,7 @@ def at_least_one_operand(value: Matcher) -> Condition:
 
     deny(when=at_least_one_operand(matching(r"^delete$")), reason=…)
     """
-    raise NotImplementedError
+    return AtLeastOneOperand(value)
 
 
 def no_operands() -> Condition:
@@ -319,7 +438,7 @@ def no_operands() -> Condition:
     The deliberate spelling for the empty case, which `every_operand`
     refuses.
     """
-    raise NotImplementedError
+    return NoOperands()
 
 
 # --------------------------------------------------------------------
@@ -357,6 +476,15 @@ class Source:
     file: str
     line: int
 
+    def __post_init__(self) -> None:
+        if not os.path.isabs(self.file):
+            raise ValueError(
+                f"a source file must be absolute, and '{self.file}' is "
+                "not: rendering it relative to the configuration's "
+                "directory would otherwise depend on the process's "
+                "working directory."
+            )
+
 
 # --------------------------------------------------------------------
 # Scopes (§4.3, §5.2)
@@ -367,7 +495,7 @@ class Anywhere:
     """Wherever the invocation is found. The default."""
 
     def describe(self) -> str:
-        raise NotImplementedError
+        return "anywhere"
 
 
 @dataclass(frozen=True)
@@ -375,7 +503,7 @@ class HostOnly:
     """Outside every handoff."""
 
     def describe(self) -> str:
-        raise NotImplementedError
+        return "on the host only"
 
 
 @dataclass(frozen=True)
@@ -385,7 +513,7 @@ class Inside:
     handoff: str
 
     def describe(self) -> str:
-        raise NotImplementedError
+        return f"inside {self.handoff}"
 
 
 #: Where a rule or grant applies (§4.3, §5.2). A handed-off command
@@ -416,7 +544,9 @@ def inside(handoff_name: str) -> Inside:
     same command on the host, and may deserve a different answer. Use
     `host_only` for the other side.
     """
-    raise NotImplementedError
+    if not handoff_name.strip():
+        raise _refuse("inside() names the handoff it confines a rule to.")
+    return Inside(handoff_name)
 
 
 # --------------------------------------------------------------------
@@ -434,6 +564,10 @@ class Rule:
     label: str | None = None
     scope: Scope = anywhere
     target: Matcher | None = None
+    #: Where the operator wrote it. Filled by the constructors below,
+    #: never by a configuration: §3.4's inspection requirement is what
+    #: needs it, and a rule can outlive the layer its entry came from.
+    declared_at: Source | None = None
 
 
 @dataclass(frozen=True)
@@ -445,6 +579,7 @@ class Grant:
     reason: str = ""
     label: str | None = None
     scope: Scope = anywhere
+    declared_at: Source | None = None
 
 
 def deny(
@@ -468,7 +603,16 @@ def deny(
     write the objection *and* the way forward. `label` names the rule
     for `amend`; `scope` confines it to the host or to one handoff.
     """
-    raise NotImplementedError
+    return _verdict(
+        Verdict.DENY,
+        subcommand,
+        when,
+        reason,
+        label,
+        scope,
+        target,
+        _source(),
+    )
 
 
 def ask(
@@ -488,7 +632,16 @@ def ask(
     anything that reaches outside the machine, or destroys work.
     Arguments are `deny`'s.
     """
-    raise NotImplementedError
+    return _verdict(
+        Verdict.ASK,
+        subcommand,
+        when,
+        reason,
+        label,
+        scope,
+        target,
+        _source(),
+    )
 
 
 def allow(
@@ -508,7 +661,16 @@ def allow(
     a gated tool, which says the same thing without waiving anything.
     Arguments are `deny`'s.
     """
-    raise NotImplementedError
+    return _verdict(
+        Verdict.ALLOW,
+        subcommand,
+        when,
+        reason,
+        label,
+        scope,
+        target,
+        _source(),
+    )
 
 
 def silent(
@@ -528,7 +690,16 @@ def silent(
     you mean it — a stated silence is deliberate where an absent rule
     is merely absent. The one verdict that needs no reason.
     """
-    raise NotImplementedError
+    return _verdict(
+        Verdict.SILENT,
+        subcommand,
+        when,
+        reason,
+        label,
+        scope,
+        None,
+        _source(),
+    )
 
 
 def grant(
@@ -557,7 +728,15 @@ def grant(
     A rule still wins over a grant. `deny` on a subcommand refuses it
     even where a grant would have released it.
     """
-    raise NotImplementedError
+    path = tuple(subcommand.split())
+    return Grant(
+        subcommand=path,
+        conditions=_conditions(when),
+        reason=_reasoned(_subject("grant", path), reason),
+        label=label,
+        scope=scope,
+        declared_at=_source(),
+    )
 
 
 #: Verdicts as values, for a case's expectation. Distinct from the
@@ -594,7 +773,15 @@ def accounted(name: str | Matcher, value: Matcher | None = None) -> Assignment:
     The name can be a matcher too, for a family:
     `accounted(matching(r"^LC_[A-Z_]+$"))`.
     """
-    raise NotImplementedError
+    if isinstance(name, str):
+        if not name.strip():
+            raise _refuse("accounted() names the variable it expects.")
+    elif not isinstance(name, Matcher):
+        raise _refuse(
+            "accounted() takes a variable name, or a matcher for a "
+            "family of them."
+        )
+    return Assignment(name=name, value=value)
 
 
 def benign_assignments(*declared: Assignment | Drop) -> None:
@@ -612,7 +799,9 @@ def benign_assignments(*declared: Assignment | Drop) -> None:
     runs: `GIT_SSH_COMMAND` and its many siblings are exactly what the
     accounting exists to catch.
     """
-    raise NotImplementedError
+    open_recording = recording("benign_assignments")
+    _typed(declared, (Assignment,), what="assignment", drops=True)
+    open_recording.current.benign.extend(declared)
 
 
 # --------------------------------------------------------------------
@@ -670,7 +859,19 @@ def handoff(
     where the inner command starts depends on knowing which tokens were
     swallowed as values.
     """
-    raise NotImplementedError
+    path = tuple(subcommand.split())
+    if not path:
+        raise _refuse("handoff() names the subcommand that hands over.")
+    if keeps_operands < 0:
+        raise _refuse(
+            f"handoff('{subcommand}') keeps {keeps_operands} operands."
+        )
+    _typed(flags, (FlagSet,), what="flag", drops=False)
+    return SubcommandHandoff(
+        subcommand=path,
+        keeps_operands=keeps_operands,
+        flags=tuple(flags),
+    )
 
 
 def option_handoff(
@@ -688,7 +889,17 @@ def option_handoff(
     nothing says where the inner command ends and the tool's own
     operands resume.
     """
-    raise NotImplementedError
+    if not option.strip():
+        raise _refuse(
+            "option_handoff() names the option that opens the inner command."
+        )
+    if not terminated_by:
+        raise _refuse(
+            f"option_handoff('{option}') needs a terminator: without "
+            "one, nothing says where the inner command ends and the "
+            "tool's own operands resume."
+        )
+    return OptionHandoff(option=option, terminated_by=tuple(terminated_by))
 
 
 # --------------------------------------------------------------------
@@ -716,7 +927,15 @@ def case(command: str, expect: Verdict) -> Case:
     Write them beside the rule they prove. Use `cases(…)` at the top
     level for one that belongs to no single tool.
     """
-    raise NotImplementedError
+    if not isinstance(command, str) or not command.strip():
+        raise _refuse("case() takes the command line to judge.")
+    if not isinstance(expect, Verdict):
+        raise _refuse(
+            f"case({command!r}, ...) states the verdict frisk must "
+            "return — DENY, ASK, ALLOW or SILENT — and a rule is not "
+            "one of them."
+        )
+    return Case(command=command, expect=expect)
 
 
 def cases(*declared: Case) -> None:
@@ -727,7 +946,9 @@ def cases(*declared: Case) -> None:
     For a case about a whole line — a wrapper walk, a substitution,
     two commands combining — where no single tool is the subject.
     """
-    raise NotImplementedError
+    open_recording = recording("cases")
+    _typed(declared, (Case,), what="case", drops=False)
+    open_recording.current.cases.extend(declared)
 
 
 # --------------------------------------------------------------------
@@ -783,7 +1004,21 @@ def tool(
     note that it cannot be set to `False` while a grant stands, since a
     grant an unknown flag could escape proves nothing.
     """
-    raise NotImplementedError
+    _entity(
+        "tool",
+        name,
+        _source(),
+        aliases=aliases,
+        default=default,
+        flags=flags,
+        options=options,
+        assignments=assignments,
+        rules=rules,
+        grants=grants,
+        handoffs=handoffs,
+        closed_world=closed_world,
+        cases=cases,
+    )
 
 
 def wrapper(
@@ -818,7 +1053,18 @@ def wrapper(
     gate everything an unknown runner runs: declare it with an `ask`
     default.
     """
-    raise NotImplementedError
+    _entity(
+        "wrapper",
+        name,
+        _source(),
+        aliases=aliases,
+        default=default,
+        flags=flags,
+        assignments=assignments,
+        rules=rules,
+        keeps_operands=keeps_operands,
+        operands_from_stdin=operands_from_stdin,
+    )
 
 
 def shell(
@@ -846,7 +1092,14 @@ def shell(
     running nothing at all, so a bare `eval` says nothing rather than
     asking.
     """
-    raise NotImplementedError
+    _entity(
+        "shell",
+        name,
+        _source(),
+        aliases=aliases,
+        flags=flags,
+        joins_operands=joins_operands,
+    )
 
 
 def interpreter(
@@ -868,7 +1121,13 @@ def interpreter(
     payload is left alone. Declare whatever takes a value, or the walk
     will mistake that value for the script.
     """
-    raise NotImplementedError
+    _entity(
+        "interpreter",
+        name,
+        _source(),
+        aliases=aliases,
+        flags=flags,
+    )
 
 
 def redirections(*rules: Rule) -> None:
@@ -886,7 +1145,16 @@ def redirections(*rules: Rule) -> None:
     Redirections say nothing by default: `2>/dev/null` is everywhere,
     and only your rules give any of them meaning.
     """
-    raise NotImplementedError
+    open_recording = recording("redirections")
+    for rule in rules:
+        if not isinstance(rule, Rule):
+            raise _refuse(f"{rule!r} is not a verdict declaration.")
+        if rule.target is None:
+            raise _refuse(
+                "a redirection rule needs target=: these rules match "
+                "where the output lands rather than the command."
+            )
+    open_recording.current.redirections.extend(rules)
 
 
 # --------------------------------------------------------------------
@@ -924,7 +1192,9 @@ def drop(*names: str) -> Drop:
     says two things at once. To change a flag's arity or a matcher,
     just declare it again — the new one replaces the old.
     """
-    raise NotImplementedError
+    if not names:
+        raise _refuse("drop() names what it takes out of the list.")
+    return Drop(tuple(names))
 
 
 def amend(
@@ -970,7 +1240,22 @@ def amend(
 
     You cannot drop a `default=`. Declare another one instead.
     """
-    raise NotImplementedError
+    _entity(
+        "amend",
+        name,
+        _source(),
+        amendment=True,
+        aliases=aliases,
+        default=default,
+        flags=flags,
+        options=options,
+        assignments=assignments,
+        rules=rules,
+        grants=grants,
+        handoffs=handoffs,
+        closed_world=closed_world,
+        cases=cases,
+    )
 
 
 def use(collection: str) -> None:
@@ -995,4 +1280,359 @@ def use(collection: str) -> None:
     of them, wherever in the file they sit, so adopting a collection
     below your own `tool()` does not undo it.
     """
-    raise NotImplementedError
+    open_recording = recording("use")
+    base = open_recording.base_dir
+    if base is None:
+        raise _refuse(
+            f"use('{collection}') has nowhere to look: a collection is "
+            "a file beside the configuration, and no configuration "
+            "directory is open."
+        )
+    if collection in open_recording.adopted:
+        raise _refuse(
+            f"use('{collection}') adopts the same collection twice, "
+            "and the order of two adoptions of one file says nothing."
+        )
+    adopted = Path(os.path.normpath(str(base / f"{collection}.py")))
+    if adopted.parent != base:
+        raise _refuse(
+            f"use('{collection}') reaches outside the configuration "
+            "directory: the engine executes the project's own "
+            "configuration and what sits beside it, and nothing else."
+        )
+    if not adopted.is_file():
+        raise _refuse(
+            f"use('{collection}') found no '{adopted.name}' beside the "
+            "configuration."
+        )
+    open_recording.adopted.append(collection)
+    layer = Layer(f"collection:{collection}")
+    open_recording.collections.append(layer)
+    open_recording.push(layer)
+    namespace: dict[str, Any] = {
+        "__name__": f"frisk_collection_{collection}",
+        "__file__": str(adopted),
+    }
+    try:
+        exec(compile(adopted.read_text(), str(adopted), "exec"), namespace)
+    finally:
+        open_recording.pop()
+
+
+# --------------------------------------------------------------------
+# What a declaration records
+#
+# A declaration returns nothing (see the module docstring): it appends
+# to the layer the caller has open. What is recorded is the operator's
+# words, unresolved — composition is `registry.py`'s, and keeping the
+# two apart is what lets `use()` execute a collection at the point of
+# the call while the operator's own layer still wins.
+
+#: The layer names a `Source` carries. They live here because a layer
+#: is what a recording is made of, and `registry.py` re-exports them
+#: beside the composition that reads them.
+ENGINE_LAYER = "engine"
+PROJECT_LAYER = "project"
+
+
+@dataclass
+class Entity:
+    """One `tool`, `wrapper`, `shell`, `interpreter` or `amend` call.
+
+    `kind` is the string `registry.Kind` is built from rather than the
+    enum itself: this module is the bottom of the import graph, and a
+    declaration must not have to know what composition makes of it.
+    """
+
+    kind: str
+    name: str
+    source: Source
+    amendment: bool = False
+    aliases: Sequence[object] = ()
+    default: Rule | None = None
+    flags: Sequence[object] = ()
+    options: Sequence[object] = ()
+    assignments: Sequence[object] = ()
+    rules: Sequence[object] = ()
+    grants: Sequence[object] = ()
+    handoffs: Sequence[object] = ()
+    closed_world: bool | None = None
+    cases: Sequence[Case] = ()
+    keeps_operands: int = 0
+    operands_from_stdin: bool = False
+    joins_operands: bool = False
+
+
+@dataclass
+class Layer:
+    """One source's declarations, in the order they were written."""
+
+    name: str
+    entities: list[Entity] = field(default_factory=list)
+    benign: list[object] = field(default_factory=list)
+    redirections: list[Rule] = field(default_factory=list)
+    cases: list[Case] = field(default_factory=list)
+
+
+class Recording:
+    """The layers being recorded, and which one is open.
+
+    The stack is what makes `use()` an adoption rather than a point in
+    a stream: adopting a collection pushes a layer of its own, so the
+    declarations it makes are attributed to it and land ahead of the
+    operator's, wherever in the file the `use()` call sits.
+    """
+
+    def __init__(self, layer: str, base_dir: Path | None) -> None:
+        self.base_dir = base_dir
+        self.generation: int | None = None
+        self.engine: Layer | None = None
+        self.collections: list[Layer] = []
+        self.project = Layer(layer)
+        self.adopted: list[str] = []
+        self._stack: list[Layer] = [self.project]
+
+    @property
+    def current(self) -> Layer:
+        return self._stack[-1]
+
+    def push(self, layer: Layer) -> None:
+        self._stack.append(layer)
+
+    def pop(self) -> None:
+        self._stack.pop()
+
+    def ordered(self) -> list[Layer]:
+        """Every layer, in composition order: engine, collections, us."""
+        layers = [] if self.engine is None else [self.engine]
+        return [*layers, *self.collections, self.project]
+
+
+_open: Recording | None = None
+
+
+def begin_recording(layer: str, base_dir: Path | None) -> Recording:
+    """Open a recording. `registry.collecting` is the only caller."""
+    global _open
+    if base_dir is not None:
+        if not base_dir.is_absolute():
+            raise ConfigurationError(
+                f"the configuration directory '{base_dir}' is relative: "
+                "which file a collection resolves to would then depend "
+                "on where the process was started."
+            )
+        base_dir = Path(os.path.normpath(str(base_dir)))
+    _open = Recording(layer, base_dir)
+    return _open
+
+
+def end_recording() -> None:
+    """Close the recording, whatever happened inside it."""
+    global _open
+    _open = None
+
+
+def recording(declaration: str) -> Recording:
+    """The open recording, or the error that says there is none."""
+    if _open is None:
+        raise ConfigurationError(
+            f"{declaration}() was called outside a configuration: "
+            "declarations are recorded into the collection being "
+            "loaded, and there is none open."
+        )
+    return _open
+
+
+def _source(depth: int = 2) -> Source:
+    """Where the caller's caller wrote this declaration.
+
+    The frame rather than the call stack: `Source` is built for every
+    declaration on every config load, which is the hook's hot path
+    (§4.5), and `inspect.stack()` reads the file behind every frame it
+    reports.
+    """
+    frame = sys._getframe(depth)
+    file = frame.f_code.co_filename
+    if not os.path.isabs(file):
+        file = os.path.abspath(file)
+    layer = PROJECT_LAYER if _open is None else _open.current.name
+    return Source(layer=layer, file=file, line=frame.f_lineno)
+
+
+# --------------------------------------------------------------------
+# What a declaration is refused for
+
+
+def _refuse(message: str) -> ConfigurationError:
+    return ConfigurationError(message)
+
+
+def _conditions(when: When) -> tuple[Condition, ...]:
+    """`when=` holds one condition or a sequence of them (`D-034`)."""
+    if when is None:
+        return ()
+    if isinstance(when, Condition):
+        return (when,)
+    given = tuple(when)
+    for each in given:
+        if not isinstance(each, Condition):
+            raise _refuse(f"when= takes conditions, and {each!r} is not one.")
+    return given
+
+
+def _reasoned(subject: str, reason: str) -> str:
+    if not reason.strip():
+        raise _refuse(
+            f"{subject} needs a reason: whoever meets this refusal is "
+            "shown the reason and nothing else, so a missing one "
+            "leaves them with no way forward."
+        )
+    return reason
+
+
+def _subject(verdict: str, subcommand: Sequence[str]) -> str:
+    return f"{verdict}({' '.join(subcommand)})"
+
+
+def _typed(
+    items: Sequence[object],
+    allowed: tuple[type, ...],
+    *,
+    what: str,
+    drops: bool,
+) -> tuple[object, ...]:
+    """Every item is of a kind this list accepts, `Drop` included."""
+    for item in items:
+        if isinstance(item, Drop):
+            if not drops:
+                raise _refuse(
+                    f"drop() in a {what} list of a fresh declaration: "
+                    "there is nothing beneath it to remove from. Use "
+                    "amend() to take something out of what is already "
+                    "declared."
+                )
+            continue
+        if not isinstance(item, allowed):
+            raise _refuse(f"{item!r} is not a {what} declaration.")
+    return tuple(items)
+
+
+def _entity(
+    kind: str,
+    name: str,
+    source: Source,
+    *,
+    amendment: bool = False,
+    aliases: Sequence[object] = (),
+    default: Rule | None = None,
+    flags: Sequence[object] = (),
+    options: Sequence[object] = (),
+    assignments: Sequence[object] = (),
+    rules: Sequence[object] = (),
+    grants: Sequence[object] = (),
+    handoffs: Sequence[object] = (),
+    closed_world: bool | None = None,
+    cases: Sequence[Case] = (),
+    keeps_operands: int = 0,
+    operands_from_stdin: bool = False,
+    joins_operands: bool = False,
+) -> None:
+    """Validate one entity declaration and record it."""
+    open_recording = recording("amend" if amendment else kind)
+    if not name.strip():
+        raise _refuse(
+            f"a {kind} must be named: the name is what a command line "
+            "is recognized by (§4.2)."
+        )
+    if name.startswith("/") or name.startswith("~"):
+        raise _refuse(
+            f"'{name}' is an absolute path. A configuration is "
+            "committed and travels with the project, where that path "
+            "is a different machine's; declare the command name, or a "
+            "project-relative path to a file in the project."
+        )
+    for each in _typed(rules, (Rule,), what="rule", drops=amendment):
+        if isinstance(each, Rule) and each.target is not None:
+            raise _refuse(
+                f"'{name}' declares a rule with target=: a target "
+                "matches where output lands, so the rule belongs in "
+                "redirections()."
+            )
+    _typed(aliases, (str,), what="alias", drops=amendment)
+    _typed(flags, (FlagSet,), what="flag", drops=amendment)
+    _typed(options, (FlagSet,), what="option", drops=amendment)
+    _typed(assignments, (Assignment,), what="assignment", drops=amendment)
+    _typed(grants, (Grant,), what="grant", drops=amendment)
+    _typed(
+        handoffs,
+        (SubcommandHandoff, OptionHandoff),
+        what="handoff",
+        drops=amendment,
+    )
+    _typed(cases, (Case,), what="case", drops=False)
+    if default is not None and not isinstance(default, Rule):
+        raise _refuse("default= takes a verdict, such as ask(reason=...).")
+    open_recording.current.entities.append(
+        Entity(
+            kind=kind,
+            name=name,
+            source=source,
+            amendment=amendment,
+            aliases=tuple(aliases),
+            default=default,
+            flags=tuple(flags),
+            options=tuple(options),
+            assignments=tuple(assignments),
+            rules=tuple(rules),
+            grants=tuple(grants),
+            handoffs=tuple(handoffs),
+            closed_world=closed_world,
+            cases=tuple(cases),
+            keeps_operands=keeps_operands,
+            operands_from_stdin=operands_from_stdin,
+            joins_operands=joins_operands,
+        )
+    )
+
+
+def _flag_set(
+    arity: Arity, names: Sequence[str], default: str | None = None
+) -> FlagSet:
+    """One arity bucket, with the names it was given."""
+    if not names:
+        raise _refuse(f"a {arity.value} declaration names no flags.")
+    for name in names:
+        if not isinstance(name, str) or not name.strip():
+            raise _refuse(f"{name!r} is not a flag name.")
+    if default is not None and arity is not Arity.OPTIONAL_VALUE:
+        raise _refuse(
+            "default= says what a *bare* use of a value-optional flag "
+            "means, so it belongs to may_take_value() alone."
+        )
+    return FlagSet(arity=arity, names=tuple(names), default=default)
+
+
+def _verdict(
+    verdict: Verdict,
+    subcommand: str,
+    when: When,
+    reason: str,
+    label: str | None,
+    scope: Scope,
+    target: Matcher | None,
+    source: Source,
+) -> Rule:
+    """One declared verdict, refused if it could refuse and says why."""
+    path = tuple(subcommand.split())
+    if verdict is not Verdict.SILENT:
+        reason = _reasoned(_subject(verdict.value, path), reason)
+    return Rule(
+        verdict=verdict,
+        subcommand=path,
+        conditions=_conditions(when),
+        reason=reason,
+        label=label,
+        scope=scope,
+        target=target,
+        declared_at=source,
+    )
