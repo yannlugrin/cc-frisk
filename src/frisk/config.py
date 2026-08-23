@@ -17,6 +17,24 @@ that surface: nothing here executes anything received over a network,
 and the only file executed is the project's own, plus the collections it
 adopts from beside it.
 
+**Loading a configuration is linear in its size, and re-parsed every
+time.** `exec(compile(source))` writes no `__pycache__`, so what an
+imported module pays once this pays on every load. Measured on this
+workstation (Python 3.14.4, 2026-08-23) with a generated configuration
+of N deny rules spread over T tools, twenty loads averaged: 100 rules
+over 10 tools, 1.01 ms with 0.35 ms of it compiling; 1000 rules over 50
+tools, 11.23 ms with 4.51 ms compiling. Composition is the rest and is
+cheap. §4.5 budgets a per-call decision in single-digit milliseconds,
+so a large configuration spends it before anything is judged — which is
+a question for the step that builds the hook door (`PLAN.md` `021`),
+not for this one: `frisk registry` can afford it and there is no hook
+yet. The remedy, if `021` wants one, is to import the configuration as
+a module (`importlib.util.spec_from_file_location`) and let CPython
+cache its bytecode, at the cost of a `__pycache__` beside the
+operator's config and an entry in `sys.modules`. Re-measure by
+regenerating such a configuration and timing `load()` against
+`compile()` alone.
+
 **Loading fails closed.** A configuration that raises, declares no API
 generation, or declares one outside the range the engine speaks does not
 produce a partial registry: it raises `ConfigurationError`, and §7.1

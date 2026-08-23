@@ -815,6 +815,14 @@ same-configuration), §8.2 (the CI pin), §13 (what first exposure owes).
   tooling. Re-measure its coverage against `.claude/docs/harness.md`'s
   table and decide whether `scripts/check_frontmatter.py`'s duplicated
   parse diagnostics retire.
+- **The per-call cost of loading the configuration**, which the hook
+  pays on every call and the CLI does not care about. `007` measured
+  it and recorded the numbers, the method and the remedy in
+  `src/frisk/config.py`'s module docstring: loading is linear in the
+  configuration's size and re-parses the source every time, because
+  `exec(compile(...))` caches no bytecode. Read it before choosing the
+  invocation mechanism — importing the configuration as a module is one
+  of the candidates and changes what this step decides.
 - **The plugin-side CLI invocation mechanism**, stated and confirmed
   build-free: §2.2 forbids the plugin from requiring dependency
   installation, so `006`'s console entry point cannot serve here. The
