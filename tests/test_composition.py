@@ -556,6 +556,66 @@ class ShadowingTests(CollectionFixture):
         self.assertEqual(entry.kind, Kind.TOOL)
 
 
+class AliasResolutionTests(CollectionFixture):
+    """A name and an alias are one kind of claim (`D-043`).
+
+    Added after the test gate, on the operator's ruling: a cross-layer
+    collision used to be decided by which map was consulted first — a
+    registered name always beat an alias, whatever layer each came
+    from — so a project's alias over an engine wrapper was simply dead,
+    and the registry printed it as though it worked.
+    """
+
+    def test_a_later_layer_s_alias_wins_over_an_earlier_name(
+        self,
+    ) -> None:
+        self.assertEqual(self.beneath("sudo").kind, Kind.WRAPPER)
+
+        def declare() -> None:
+            tool(
+                "gamma",
+                aliases=["sudo"],
+                default=ask(reason="Everything gamma does."),
+            )
+
+        registry = self.compose(declare, with_defaults=True)
+        found = registry.lookup("sudo")
+        assert found is not None
+        self.assertEqual(found.name, "gamma")
+        # The engine's own entry is still there to be read: what the
+        # later layer took is the word, not the declaration.
+        self.assertIn("wrapper(sudo)", registry.describe().splitlines())
+
+    def test_the_entry_that_lost_a_word_says_so(self) -> None:
+        # §3.4: composition may not hide what it decided. Without this
+        # the loser prints `aliases: podman` and the operator reads a
+        # name that reaches somewhere else. The collection declares
+        # docker under both names; the project claims one of them.
+        self.write_collection("aliased", ALIASED)
+
+        def declare() -> None:
+            use("aliased")
+            tool("podman", default=silent())
+
+        registry = self.compose(declare)
+        found = registry.lookup("podman")
+        assert found is not None
+        self.assertEqual(found.name, "podman")
+        self.assertEqual(
+            [
+                line
+                for line in registry.describe().splitlines()
+                if line.startswith("  aliases:")
+            ],
+            ["  aliases: podman (shadowed)"],
+        )
+
+    def test_an_unshadowed_alias_prints_plainly(self) -> None:
+        self.write_collection("aliased", ALIASED)
+        registry = self.compose(lambda: use("aliased"))
+        self.assertIn("  aliases: podman", registry.describe().splitlines())
+
+
 class BenignAssignmentTests(CollectionFixture):
     """The third default layer, shadowable like the others (§3.2)."""
 

@@ -225,6 +225,43 @@ class PathBoundaryTests(unittest.TestCase):
         # directory of `/` puts the value inside it.
         self.assertEqual(self.etc.evaluate("/etc/passwd"), Outcome.UNPROVEN)
 
+    def test_a_boundary_that_climbs_is_undecidable_not_absent(
+        self,
+    ) -> None:
+        # `D-041`, refining `D-037`: a leading `..` is the boundary
+        # re-basing itself onto a directory the line does not name, so
+        # it is not a component to look for. `..` appears in no
+        # resolved absolute path, and looking for it would answer a
+        # confident no for every climbing boundary — while a working
+        # directory anywhere in `/repo` puts the value inside this one.
+        self.assertEqual(
+            path_under("../shared").evaluate("/repo/shared/x"),
+            Outcome.UNPROVEN,
+        )
+        # And the other half still decides: no working directory makes
+        # `/etc/passwd` sit inside some parent's `shared`.
+        self.assertEqual(
+            path_under("../shared").evaluate("/etc/passwd"),
+            Outcome.UNSATISFIED,
+        )
+
+    def test_a_boundary_that_only_climbs_decides_nothing(self) -> None:
+        # Every absolute path is under *some* directory's parent, so
+        # there is nothing here to rule out.
+        self.assertEqual(
+            path_under("..").evaluate("/anything/at/all"), Outcome.UNPROVEN
+        )
+
+    def test_two_climbing_relative_paths_still_compare_textually(
+        self,
+    ) -> None:
+        # The same unknown base, so the `..` cancels on both sides and
+        # the comparison is the ordinary one (§3.2).
+        self.assertEqual(
+            path_under("../shared").evaluate("../shared/x"),
+            Outcome.SATISFIED,
+        )
+
     def test_an_absolute_value_is_never_satisfied_by_a_relative_one(
         self,
     ) -> None:

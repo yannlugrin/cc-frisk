@@ -214,14 +214,14 @@ class Registry:
     def __init__(
         self,
         entries: Mapping[tuple[str, str], Entry],
-        aliases: Mapping[str, Entry],
+        resolution: Mapping[str, tuple[str, str]],
         generation: int | None,
         benign: Sequence[Assignment],
         redirections: Sequence[PlacedRule],
         standalone_cases: Sequence[Case],
     ) -> None:
         self._entries = dict(entries)
-        self._aliases = dict(aliases)
+        self._resolution = dict(resolution)
         self._generation = generation
         self._benign = tuple(benign)
         self._redirections = tuple(redirections)
@@ -237,11 +237,22 @@ class Registry:
         return self._generation
 
     def lookup(self, name: str) -> Entry | None:
-        """The entry for a name or one of its aliases, if registered."""
-        found = self._entries.get(("name", name))
-        if found is not None:
-            return found
-        return self._aliases.get(name)
+        """The entry for a name or one of its aliases, if registered.
+
+        One map, filled in layer order, so a name and an alias are the
+        same kind of claim on the same word and the later layer wins —
+        the override rule everything else in composition follows
+        (`D-043`). A `name` claimed by a later layer's alias therefore
+        no longer reaches the earlier layer's entry, and `describe`
+        marks that alias `shadowed` on the entry that lost it, since
+        §3.4 does not let composition hide what it decided.
+        """
+        key = self._resolution.get(name)
+        return None if key is None else self._entries[key]
+
+    def resolves_to(self, name: str, entry: Entry) -> bool:
+        """Whether this name still reaches this entry (§3.4)."""
+        return self.lookup(name) is entry
 
     def lookup_path(self, path: str) -> Entry | None:
         """The entry whose name is this project-relative path (§4.2).
@@ -808,8 +819,44 @@ def _applied(building: _Building, entity: Entity) -> None:
         )
 
 
+def _claimed(
+    resolution: dict[str, tuple[str, str]],
+    key: tuple[str, str],
+    entity: Entity,
+    building: _Building,
+) -> None:
+    """Record which words now reach this entry, in layer order.
+
+    A name and an alias are the same kind of claim, so the later layer
+    wins over the earlier whichever form each used (`D-043`). A full
+    declaration releases whatever the name it replaces was reaching and
+    claims afresh; an amendment applies only its delta, so amending an
+    entry for an unrelated reason cannot take back an alias a later
+    layer has since claimed.
+    """
+    if entity.amendment:
+        for item in entity.aliases:
+            if isinstance(item, Drop):
+                for name in item.names:
+                    if resolution.get(name) == key:
+                        del resolution[name]
+            else:
+                resolution[str(item)] = key
+        return
+    for name in [
+        name for name, claimed in resolution.items() if claimed == key
+    ]:
+        del resolution[name]
+    if key[0] == "name":
+        resolution[entity.name] = key
+    for alias in building.aliases:
+        resolution[alias] = key
+
+
 def _applied_to(
-    built: dict[tuple[str, str], _Building], entity: Entity
+    built: dict[tuple[str, str], _Building],
+    resolution: dict[str, tuple[str, str]],
+    entity: Entity,
 ) -> None:
     key = _key(entity.name)
     if entity.amendment:
@@ -822,6 +869,7 @@ def _applied_to(
                 "believes they have."
             )
         _applied(standing, entity)
+        _claimed(resolution, key, entity, standing)
         return
     building = _Building(
         kind=entity.kind,
@@ -833,6 +881,7 @@ def _applied_to(
     )
     _applied(building, entity)
     built[key] = building
+    _claimed(resolution, key, entity, building)
 
 
 def _no_repeats(layer: Layer) -> None:
@@ -894,13 +943,14 @@ def _finished(building: _Building) -> Entry:
 def _composed(recording: Recording) -> Registry:
     """Compose the recorded layers into the effective registry."""
     built: dict[tuple[str, str], _Building] = {}
+    resolution: dict[str, tuple[str, str]] = {}
     benign: list[Assignment] = []
     redirections: list[PlacedRule] = []
     standalone: list[Case] = []
     for layer in recording.ordered():
         _no_repeats(layer)
         for entity in layer.entities:
-            _applied_to(built, entity)
+            _applied_to(built, resolution, entity)
         _apply_assignments(benign, layer.benign, "the benign layer")
         for rule in layer.redirections:
             redirections.append(
@@ -912,13 +962,9 @@ def _composed(recording: Recording) -> Registry:
             )
         standalone.extend(layer.cases)
     entries = {key: _finished(each) for key, each in built.items()}
-    aliases: dict[str, Entry] = {}
-    for entry in entries.values():
-        for alias in entry.aliases:
-            aliases[alias] = entry
     return Registry(
         entries=entries,
-        aliases=aliases,
+        resolution=resolution,
         generation=recording.generation,
         benign=tuple(benign),
         redirections=tuple(redirections),
@@ -1117,8 +1163,25 @@ def _case_text(case: Case) -> str:
     return f"{case.command} -> {case.expect.value}"
 
 
+def _alias_text(registry: Registry, entry: Entry, alias: str) -> str:
+    """An alias, and whether it still reaches the entry that owns it.
+
+    A later layer claiming the same word wins (`D-043`), which leaves
+    the earlier entry carrying an alias nobody can reach it by. §3.4
+    does not let composition hide what it decided, so the entry says
+    so rather than printing a name that goes elsewhere.
+    """
+    if registry.resolves_to(alias, entry):
+        return alias
+    return f"{alias} (shadowed)"
+
+
 def _entry_lines(
-    entry: Entry, value: str | None, cases: Cases, wrap: bool
+    registry: Registry,
+    entry: Entry,
+    value: str | None,
+    cases: Cases,
+    wrap: bool,
 ) -> list[str]:
     """One entry's block: header, its fields, then its groups."""
     lines = [f"{entry.kind.value}({entry.name})"]
@@ -1126,7 +1189,12 @@ def _entry_lines(
     if entry.kind is Kind.TOOL:
         lines.append(f"  gated: {_gating(entry)}")
     if entry.aliases:
-        lines.append("  aliases: " + " ".join(entry.aliases))
+        lines.append(
+            "  aliases: "
+            + " ".join(
+                _alias_text(registry, entry, alias) for alias in entry.aliases
+            )
+        )
     if entry.default is not None:
         lines.append(f"  default: {entry.default.rule.verdict.value}")
         if entry.default.rule.reason:
@@ -1199,7 +1267,7 @@ def _rendered(
     for entry in registry.entries():
         if lines:
             lines.append("")
-        lines.extend(_entry_lines(entry, value, cases, wrap))
+        lines.extend(_entry_lines(registry, entry, value, cases, wrap))
     benign = registry.benign_assignments()
     if benign:
         lines.extend(["", "benign assignments"])

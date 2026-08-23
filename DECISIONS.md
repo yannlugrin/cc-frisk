@@ -1223,3 +1223,36 @@ Detail in git history.
   rejected under rule 1: a specification that says two things is one a
   later session resolves differently.
 - **Approved by:** operator, 2026-08-23.
+
+### D-043 — A name and an alias are one claim, decided by layer order
+
+- **Date:** 2026-08-23
+- **Step:** `007`
+- **Context:** the cold review found that a cross-layer alias collision
+  was decided by which map `lookup` consulted first: registered names
+  before aliases, whatever layer each came from. A project declaring
+  `tool("gamma", aliases=["sudo"])` over the engine's `wrapper("sudo")`
+  got an alias that resolved nowhere, printed in `frisk registry` as
+  though it worked. §3.4 makes the operator's layer the one that always
+  wins and forbids a composition that hides what it decided; this did
+  both wrongly.
+- **Decision:** one resolution map, filled as each declaration is
+  applied and therefore in layer order, with a name and an alias as the
+  same kind of claim on the same word: the later layer wins, whichever
+  form each side used. A full declaration releases what the name it
+  replaces was reaching before claiming afresh, so a replacement cannot
+  leave a stale alias behind; an amendment applies only its delta, so
+  amending an entry for an unrelated reason cannot take back a word a
+  later layer has since claimed. Within one source the collision stays
+  refused — that is `_no_repeats`, and a source has no order to decide
+  it with. The entry that loses a word prints it as
+  `aliases: podman (shadowed)`, because the loss is exactly what §3.4
+  says composition may not hide.
+- **Alternatives considered:** *refuse the collision across layers* —
+  my recommendation, and rejected by the operator: every other
+  cross-layer conflict is settled by order, and a name is not special
+  enough to be the exception. *Print the shadow and change nothing
+  else* — keeps every current verdict, but leaves the operator's own
+  layer losing to the engine's, which is the one thing §3.4 rules out.
+- **Approved by:** operator, 2026-08-23 — "layer order decide, like any
+  other override case".

@@ -225,7 +225,19 @@ def _could_be_inside(boundary: Sequence[str], value: Sequence[str]) -> bool:
     reads as `<cwd>/<boundary>/<rest>`, so the boundary's components
     have to appear in it as a run — `.scratch` appears nowhere in
     `/etc/passwd`, and `etc` appears at the front of it (`D-037`).
+
+    A leading `..` is not one of those components (`D-041`): it is the
+    boundary re-basing itself onto a directory the line does not name,
+    and it appears in no resolved absolute path, so looking for it
+    would answer *unsatisfied* for every `../shared` — while a working
+    directory anywhere in `/repo` puts `/repo/shared/x` inside that
+    one. Resolution collects `..` at the front of a relative path, so
+    the front is the only place it can be.
     """
+    climbed = 0
+    while climbed < len(boundary) and boundary[climbed] == "..":
+        climbed += 1
+    boundary = boundary[climbed:]
     width = len(boundary)
     if width == 0:
         return True
