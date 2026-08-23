@@ -29,6 +29,7 @@ specification. This file is what accumulated *beside* it.
 | That an amendment corrects an arity or narrows a matcher by re-declaring, never by dropping first | `declare.amend`; the composition suite |
 | That collections compose in the order the configuration adopts them, and the operator's own declarations always win wherever they sit | §3.4; `registry.py` module docstring |
 | That a collection ships the cases for its own rules, and adopting it brings them | §8.2; `Registry.cases` |
+| That a collection may adopt another, and composes *over* what it adopted — whoever adopts decides, the same rule that puts the operator last | `Recording.adopt`; `registry.py` module docstring |
 | What `frisk registry` prints, field by field — and that `gated:` says *why* | `Registry.describe` |
 | That the registry's cases are hidden until `--cases`, and `--no-wrap` exists for whatever parses the output | `D-036`; `cli.py` |
 | Which programs the engine walks as wrappers, shells and interpreters, and that the set is a floor | `D-038`; `defaults.py`; the defaults suite |

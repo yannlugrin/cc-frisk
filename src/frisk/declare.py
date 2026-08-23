@@ -1305,10 +1305,7 @@ def use(collection: str) -> None:
             f"use('{collection}') found no '{adopted.name}' beside the "
             "configuration."
         )
-    open_recording.adopted.append(collection)
-    layer = Layer(f"collection:{collection}")
-    open_recording.collections.append(layer)
-    open_recording.push(layer)
+    open_recording.adopt(collection)
     namespace: dict[str, Any] = {
         "__name__": f"frisk_collection_{collection}",
         "__file__": str(adopted),
@@ -1397,7 +1394,27 @@ class Recording:
         return self._stack[-1]
 
     def push(self, layer: Layer) -> None:
+        """Open a layer: declarations now land in it."""
         self._stack.append(layer)
+
+    def adopt(self, name: str) -> None:
+        """Open a collection's layer, beneath whatever adopted it.
+
+        A collection the configuration adopts composes over the engine
+        and under the operator. One adopted *by a collection* composes
+        under its adopter, for the same reason the operator wins over
+        everything: whoever adopts decides. Inserting before the
+        adopter also keeps adoption order among siblings, since each
+        insertion lands after the ones already there.
+        """
+        layer = Layer(f"collection:{name}")
+        adopter = self._stack[-1]
+        if adopter is self.project:
+            self.collections.append(layer)
+        else:
+            self.collections.insert(self.collections.index(adopter), layer)
+        self.adopted.append(name)
+        self.push(layer)
 
     def pop(self) -> None:
         self._stack.pop()
