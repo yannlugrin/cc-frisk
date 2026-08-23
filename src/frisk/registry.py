@@ -31,26 +31,50 @@ uses to drop it — and `frisk registry` is its door.
 from __future__ import annotations
 
 import enum
+import os
+import textwrap
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import defaults
+
+# The two layer names are `declare`'s — a layer is what a recording is
+# made of — and are re-exported here, beside the composition that reads
+# them, because this is where a reader looks for composition's
+# vocabulary. The redundant alias is what says "re-export" out loud.
+from .declare import ENGINE_LAYER as ENGINE_LAYER
+from .declare import PROJECT_LAYER as PROJECT_LAYER
 from .declare import (
+    Anywhere,
     Arity,
     Assignment,
     Case,
+    Condition,
+    Drop,
+    Entity,
+    FlagSet,
     Grant,
+    Layer,
     OptionHandoff,
+    Recording,
     Rule,
+    Scope,
     Source,
     SubcommandHandoff,
+    begin_recording,
+    end_recording,
 )
+from .errors import ConfigurationError
+from .matchers import Matcher, combine_all
 
-#: The layer names that appear in a `Source` and in the inspection
-#: output. A collection's layer is `collection:<name>`.
-ENGINE_LAYER = "engine"
-PROJECT_LAYER = "project"
+# A collection's layer is `collection:<name>`; the other two are the
+# constants imported above.
+
+#: Where a rendered line stops. Only a reason ever wraps, and only when
+#: `describe(wrap=True)` asks for it.
+WIDTH = 79
 
 
 class Cases(enum.Enum):
@@ -133,6 +157,13 @@ class Entry:
     keeps_operands: int = 0
     operands_from_stdin: bool = False
     joins_operands: bool = False
+    #: The world as the configuration declared it, three-valued
+    #: (`D-034`): None is "closed exactly when grants are declared",
+    #: evaluated on the state a declaration leaves behind, and an
+    #: explicit True survives a trim that removes the last grant. It is
+    #: kept rather than resolved into `gated` because §9's output has
+    #: to say *why* a tool is gated, and only the declaration knows.
+    closed_world: bool | None = None
 
     @property
     def path_declared(self) -> bool:
@@ -144,7 +175,7 @@ class Entry:
         `./deploy.py` is a path and `deploy.py` is a basename, and
         resolution would erase exactly that difference.
         """
-        raise NotImplementedError
+        return "/" in self.name
 
     @property
     def gated(self) -> bool:
@@ -155,31 +186,57 @@ class Entry:
         tool the same `flags=` declaration is arity and nothing more,
         and git meeting a flag nobody wrote down is not a problem.
 
-        There is no separate `closed_world` here, though the
-        configuration has that word: grants are checked "universally
-        and closed-world" (§3.2), so declaring one closes the world,
-        and a field for it would always equal this property. The
-        keyword stays config-side, where it is how an operator closes a
-        world without writing a grant.
+        The stored half is `closed_world` above, three-valued as the
+        configuration wrote it; this property is the answer derived
+        from it and the grants, and it is what the engine asks. The two
+        are not one field because §9's output must say *why* a tool is
+        gated, and "by its grants" and "by declaration" are the same
+        answer to a different question.
         """
-        raise NotImplementedError
+        if self.closed_world is None:
+            return bool(self.grants)
+        return self.closed_world
 
     @property
     def rule_bearing(self) -> bool:
         """Carries at least one rule (§3.2, §4.3)."""
-        raise NotImplementedError
+        return bool(self.rules)
 
 
 class Registry:
     """The composed result: what the engine will judge against."""
 
+    def __init__(
+        self,
+        entries: Mapping[tuple[str, str], Entry],
+        aliases: Mapping[str, Entry],
+        generation: int | None,
+        benign: Sequence[Assignment],
+        redirections: Sequence[PlacedRule],
+        standalone_cases: Sequence[Case],
+    ) -> None:
+        self._entries = dict(entries)
+        self._aliases = dict(aliases)
+        self._generation = generation
+        self._benign = tuple(benign)
+        self._redirections = tuple(redirections)
+        self._standalone_cases = tuple(standalone_cases)
+        self._ordered = tuple(
+            sorted(
+                self._entries.values(), key=lambda e: (e.name, e.kind.value)
+            )
+        )
+
     def generation(self) -> int | None:
         """The API generation the configuration declared, if it did."""
-        raise NotImplementedError
+        return self._generation
 
     def lookup(self, name: str) -> Entry | None:
         """The entry for a name or one of its aliases, if registered."""
-        raise NotImplementedError
+        found = self._entries.get(("name", name))
+        if found is not None:
+            return found
+        return self._aliases.get(name)
 
     def lookup_path(self, path: str) -> Entry | None:
         """The entry whose name is this project-relative path (§4.2).
@@ -188,11 +245,11 @@ class Registry:
         a grant written for the operator's script from releasing a
         same-named file anywhere.
         """
-        raise NotImplementedError
+        return self._entries.get(("path", os.path.normpath(path)))
 
     def entries(self) -> Sequence[Entry]:
         """Every effective entry, in a stable order."""
-        raise NotImplementedError
+        return self._ordered
 
     def cases(self) -> Sequence[Case]:
         """Every case from every layer, tool-sited or not (§8.2).
@@ -217,15 +274,19 @@ class Registry:
         no rules and no grants, so they stand outside the gate and have
         nothing to prove.
         """
-        raise NotImplementedError
+        collected: list[Case] = []
+        for entry in self._ordered:
+            collected.extend(entry.cases)
+        collected.extend(self._standalone_cases)
+        return tuple(collected)
 
     def benign_assignments(self) -> Sequence[Assignment]:
         """The effective benign assignment layer (§3.2)."""
-        raise NotImplementedError
+        return self._benign
 
     def redirections(self) -> Sequence[PlacedRule]:
         """The effective rules on redirection targets (§4.3)."""
-        raise NotImplementedError
+        return self._redirections
 
     def describe(
         self,
@@ -264,7 +325,9 @@ class Registry:
         * `source:` is `<layer> <file>:<line>` wherever it appears —
           first on the entry, because in a *composed* registry the
           question that brings someone to an entry is usually which
-          layer won, and again on any rule that came from elsewhere.
+          layer won, and again on every rule and grant, which outlive
+          the entry they were declared on and are what an amendment
+          moves between layers.
         * `gated:` says **why**: `no`, `yes, by its grants`, or `yes, by
           declaration`. It is the one property an operator cannot infer
           by looking, since a closed world is derived from grants unless
@@ -315,15 +378,18 @@ class Registry:
         to tell `satisfied` from `unsatisfied` by the letters in front
         of it, and neither must an assertion.
         """
-        raise NotImplementedError
+        return _rendered(self, value, cases, wrap)
 
 
 class Collection:
     """Declarations being recorded, and what they compose into."""
 
+    def __init__(self, recording: Recording) -> None:
+        self._recording = recording
+
     def registry(self) -> Registry:
         """Compose the layers and return the effective registry."""
-        raise NotImplementedError
+        return _composed(self._recording)
 
 
 @contextmanager
@@ -349,4 +415,775 @@ def collecting(
     off, which exists for the suites that examine one declaration and
     would otherwise read the whole shell-wrapper layer.
     """
-    raise NotImplementedError
+    recording = begin_recording(layer, base_dir)
+    try:
+        if with_defaults:
+            engine = Layer(ENGINE_LAYER)
+            recording.engine = engine
+            recording.push(engine)
+            try:
+                defaults.declare()
+            finally:
+                recording.pop()
+        yield Collection(recording)
+    finally:
+        end_recording()
+
+
+# --------------------------------------------------------------------
+# Composition
+#
+# One pass over the layers in order, each declaration applied to what
+# the layers beneath it left. Nothing is deferred: an amendment sees
+# the composed state at its own layer, which is what makes dropping a
+# collection's rule by the label `frisk registry` printed for it work.
+
+
+def _key(name: str) -> tuple[str, str]:
+    """The namespace a name is looked up in, and its settled spelling.
+
+    Two namespaces, because §4.2 makes the two forms different claims:
+    `deploy.py` is a command word, `./deploy.py` is a file in the
+    project, and a project must be able to attach policy to both. The
+    written form stays on the entry; only the key is normalized, so
+    `./tools/deploy.py` and `tools/../tools/deploy.py` reach one entry.
+    """
+    if "/" in name:
+        return ("path", os.path.normpath(name))
+    return ("name", name)
+
+
+def _refused(message: str) -> ConfigurationError:
+    return ConfigurationError(message)
+
+
+@dataclass
+class _Building:
+    """One entry under construction, as the layers reach it."""
+
+    kind: str
+    name: str
+    source: Source
+    aliases: list[str] = field(default_factory=list)
+    default: PlacedRule | None = None
+    flags: dict[str, Arity] = field(default_factory=dict)
+    flag_defaults: dict[str, str] = field(default_factory=dict)
+    options: dict[str, Arity] = field(default_factory=dict)
+    assignments: list[Assignment] = field(default_factory=list)
+    rules: list[PlacedRule] = field(default_factory=list)
+    grants: list[PlacedGrant] = field(default_factory=list)
+    handoffs: list[SubcommandHandoff] = field(default_factory=list)
+    option_handoffs: list[OptionHandoff] = field(default_factory=list)
+    cases: list[Case] = field(default_factory=list)
+    closed_world: bool | None = None
+    keeps_operands: int = 0
+    operands_from_stdin: bool = False
+    joins_operands: bool = False
+
+
+def _label(base: str, taken: Sequence[str]) -> str:
+    """The derived label, with a numeric suffix where two collide.
+
+    Counted from the top of the declaration, which is why `drop`'s
+    docstring tells an operator to read the label off `frisk registry`
+    rather than to count for themselves.
+    """
+    if base not in taken:
+        return base
+    ordinal = 2
+    while f"{base}:{ordinal}" in taken:
+        ordinal += 1
+    return f"{base}:{ordinal}"
+
+
+def _derived(name: str, verdict: str, subcommand: Sequence[str]) -> str:
+    parts = [name, verdict]
+    if subcommand:
+        parts.append(" ".join(subcommand))
+    return ":".join(parts)
+
+
+def _placed_rule(
+    owner: str, rule: Rule, taken: Sequence[str], fallback: Source
+) -> PlacedRule:
+    base = _derived(owner, rule.verdict.value, rule.subcommand)
+    label = rule.label if rule.label is not None else _label(base, taken)
+    if rule.label is not None and rule.label in taken:
+        raise _refused(
+            f"'{owner}' carries two declarations labelled "
+            f"'{rule.label}': a label is what drop() reaches, so two "
+            "of them would remove whichever was found first."
+        )
+    return PlacedRule(
+        rule=rule,
+        label=label,
+        source=rule.declared_at or fallback,
+    )
+
+
+def _placed_grant(
+    owner: str, grant: Grant, taken: Sequence[str], fallback: Source
+) -> PlacedGrant:
+    base = _derived(owner, "grant", grant.subcommand)
+    label = grant.label if grant.label is not None else _label(base, taken)
+    if grant.label is not None and grant.label in taken:
+        raise _refused(
+            f"'{owner}' carries two declarations labelled '{grant.label}'."
+        )
+    return PlacedGrant(
+        grant=grant,
+        label=label,
+        source=grant.declared_at or fallback,
+    )
+
+
+def _dropped(items: Sequence[object]) -> tuple[list[str], list[object]]:
+    """A declaration list split into what it removes and what it adds."""
+    removals: list[str] = []
+    additions: list[object] = []
+    for item in items:
+        if isinstance(item, Drop):
+            removals.extend(item.names)
+        else:
+            additions.append(item)
+    return removals, additions
+
+
+def _no_double_talk(
+    removals: Sequence[str], added: Sequence[str], what: str
+) -> None:
+    """`drop("-u")` beside `takes_value("-u")` says two things at once."""
+    both = sorted(set(removals) & set(added))
+    if both:
+        raise _refused(
+            f"the {what} list both drops and declares "
+            f"{', '.join(both)}: within a source there is no order "
+            "(§3.2), so the pair has no reading. To change something, "
+            "declare it again — the new one replaces the old."
+        )
+
+
+def _apply_flags(
+    target: dict[str, Arity],
+    known_defaults: dict[str, str],
+    items: Sequence[object],
+    what: str,
+    owner: str,
+) -> None:
+    removals, additions = _dropped(items)
+    declared: dict[str, Arity] = {}
+    defaults_declared: dict[str, str | None] = {}
+    for item in additions:
+        assert isinstance(item, FlagSet)
+        for name in item.names:
+            if name in declared and declared[name] is not item.arity:
+                raise _refused(
+                    f"'{owner}' declares {name} with two arities, "
+                    f"{declared[name].value} and {item.arity.value}."
+                )
+            declared[name] = item.arity
+            defaults_declared[name] = item.default
+    _no_double_talk(removals, list(declared), what)
+    for name in removals:
+        if name not in target:
+            raise _refused(
+                f"'{owner}' declares no {what} {name}, so there is "
+                "nothing to drop."
+            )
+        del target[name]
+        known_defaults.pop(name, None)
+    for name, arity in declared.items():
+        target[name] = arity
+        value = defaults_declared[name]
+        if value is None:
+            known_defaults.pop(name, None)
+        else:
+            known_defaults[name] = value
+
+
+def _assignment_key(assignment: Assignment) -> str:
+    """A variable is named by its name, a family by its matcher."""
+    name = assignment.name
+    return name if isinstance(name, str) else name.describe()
+
+
+def _apply_assignments(
+    target: list[Assignment], items: Sequence[object], owner: str
+) -> None:
+    removals, additions = _dropped(items)
+    _no_double_talk(
+        removals,
+        [_assignment_key(a) for a in additions if isinstance(a, Assignment)],
+        "assignment",
+    )
+    for name in removals:
+        matches = [a for a in target if _assignment_key(a) == name]
+        if not matches:
+            raise _refused(
+                f"{owner} accounts for no {name}, so there is nothing to drop."
+            )
+        for each in matches:
+            target.remove(each)
+    for item in additions:
+        assert isinstance(item, Assignment)
+        key = _assignment_key(item)
+        replaced = False
+        for index, standing in enumerate(target):
+            if _assignment_key(standing) == key:
+                # Re-declaring a name replaces it: two declarations for
+                # one variable would leave the looser one to win.
+                target[index] = item
+                replaced = True
+                break
+        if not replaced:
+            target.append(item)
+
+
+def _handoff_position(handoff: object) -> str:
+    if isinstance(handoff, SubcommandHandoff):
+        return " ".join(handoff.subcommand)
+    assert isinstance(handoff, OptionHandoff)
+    return handoff.option
+
+
+def _apply_handoffs(building: _Building, items: Sequence[object]) -> None:
+    removals, additions = _dropped(items)
+    _no_double_talk(
+        removals, [_handoff_position(each) for each in additions], "handoff"
+    )
+    for name in removals:
+        by_subcommand = [
+            each
+            for each in building.handoffs
+            if _handoff_position(each) == name
+        ]
+        by_option = [
+            each
+            for each in building.option_handoffs
+            if _handoff_position(each) == name
+        ]
+        if not by_subcommand and not by_option:
+            raise _refused(
+                f"'{building.name}' declares no handoff at {name}, so "
+                "there is nothing to drop."
+            )
+        for each in by_subcommand:
+            building.handoffs.remove(each)
+        for option_handoff in by_option:
+            building.option_handoffs.remove(option_handoff)
+    for item in additions:
+        if isinstance(item, SubcommandHandoff):
+            building.handoffs.append(item)
+        else:
+            assert isinstance(item, OptionHandoff)
+            building.option_handoffs.append(item)
+
+
+def _apply_aliases(building: _Building, items: Sequence[object]) -> None:
+    removals, additions = _dropped(items)
+    _no_double_talk(removals, [str(each) for each in additions], "alias")
+    for name in removals:
+        if name not in building.aliases:
+            raise _refused(
+                f"'{building.name}' has no alias {name}, so there is "
+                "nothing to drop."
+            )
+        building.aliases.remove(name)
+    for item in additions:
+        assert isinstance(item, str)
+        if item not in building.aliases:
+            building.aliases.append(item)
+
+
+def _apply_rules(
+    building: _Building, items: Sequence[object], fallback: Source
+) -> None:
+    removals, additions = _dropped(items)
+    for label in removals:
+        matches = [each for each in building.rules if each.label == label]
+        if not matches:
+            raise _refused(
+                f"'{building.name}' carries no rule labelled "
+                f"'{label}'. `frisk registry` prints the label of "
+                "every rule, derived ones included."
+            )
+        for each in matches:
+            building.rules.remove(each)
+    for item in additions:
+        assert isinstance(item, Rule)
+        building.rules.append(
+            _placed_rule(
+                building.name,
+                item,
+                [each.label for each in building.rules],
+                fallback,
+            )
+        )
+
+
+def _apply_grants(
+    building: _Building, items: Sequence[object], fallback: Source
+) -> None:
+    removals, additions = _dropped(items)
+    for label in removals:
+        matches = [each for each in building.grants if each.label == label]
+        if not matches:
+            raise _refused(
+                f"'{building.name}' carries no grant labelled '{label}'."
+            )
+        for each in matches:
+            building.grants.remove(each)
+    for item in additions:
+        assert isinstance(item, Grant)
+        building.grants.append(
+            _placed_grant(
+                building.name,
+                item,
+                [each.label for each in building.grants],
+                fallback,
+            )
+        )
+
+
+def _applied(building: _Building, entity: Entity) -> None:
+    """Everything one declaration adds to or removes from an entry."""
+    _apply_aliases(building, entity.aliases)
+    _apply_flags(
+        building.flags,
+        building.flag_defaults,
+        entity.flags,
+        "flag",
+        building.name,
+    )
+    _apply_flags(
+        building.options,
+        building.flag_defaults,
+        entity.options,
+        "option",
+        building.name,
+    )
+    _apply_assignments(building.assignments, entity.assignments, building.name)
+    _apply_handoffs(building, entity.handoffs)
+    _apply_rules(building, entity.rules, entity.source)
+    _apply_grants(building, entity.grants, entity.source)
+    building.cases.extend(entity.cases)
+    if entity.default is not None:
+        building.default = PlacedRule(
+            rule=entity.default,
+            label=entity.default.label
+            or _derived(building.name, "default", ()),
+            source=entity.default.declared_at or entity.source,
+        )
+    if entity.closed_world is not None:
+        building.closed_world = entity.closed_world
+    if building.closed_world is False and building.grants:
+        raise _refused(
+            f"'{building.name}' declares grants and an open world: a "
+            "grant an undeclared flag could escape proves nothing "
+            "(§3.2), so the pair contradicts itself rather than "
+            "expressing a preference."
+        )
+
+
+def _applied_to(
+    built: dict[tuple[str, str], _Building], entity: Entity
+) -> None:
+    key = _key(entity.name)
+    if entity.amendment:
+        standing = built.get(key)
+        if standing is None:
+            raise _refused(
+                f"amend('{entity.name}') has nothing to amend: no "
+                "layer beneath declares that name, and an amendment "
+                "that silently does nothing is a boundary the operator "
+                "believes they have."
+            )
+        _applied(standing, entity)
+        return
+    building = _Building(
+        kind=entity.kind,
+        name=entity.name,
+        source=entity.source,
+        keeps_operands=entity.keeps_operands,
+        operands_from_stdin=entity.operands_from_stdin,
+        joins_operands=entity.joins_operands,
+    )
+    _applied(building, entity)
+    built[key] = building
+
+
+def _no_repeats(layer: Layer) -> None:
+    """A name declared twice in one source is a mistake, not a shadow."""
+    claimed: dict[tuple[str, str], str] = {}
+    for entity in layer.entities:
+        if entity.amendment:
+            continue
+        for key in [_key(entity.name)] + [
+            _key(str(alias))
+            for alias in entity.aliases
+            if not isinstance(alias, Drop)
+        ]:
+            if key in claimed:
+                raise _refused(
+                    f"'{key[1]}' is declared twice in {layer.name}, by "
+                    f"'{claimed[key]}' and by '{entity.name}'. Within a "
+                    "source there is no order (§3.2), so the second is "
+                    "a mistake rather than a shadow; shadowing is what "
+                    "layers are for."
+                )
+            claimed[key] = entity.name
+
+
+def _finished(building: _Building) -> Entry:
+    return Entry(
+        kind=Kind(building.kind),
+        name=building.name,
+        source=building.source,
+        aliases=tuple(building.aliases),
+        default=building.default,
+        flags=dict(building.flags),
+        flag_defaults=dict(building.flag_defaults),
+        options=dict(building.options),
+        assignments=tuple(building.assignments),
+        rules=tuple(building.rules),
+        grants=tuple(building.grants),
+        handoffs=tuple(building.handoffs),
+        option_handoffs=tuple(building.option_handoffs),
+        cases=tuple(building.cases),
+        keeps_operands=building.keeps_operands,
+        operands_from_stdin=building.operands_from_stdin,
+        joins_operands=building.joins_operands,
+        closed_world=building.closed_world,
+    )
+
+
+def _composed(recording: Recording) -> Registry:
+    """Compose the recorded layers into the effective registry."""
+    built: dict[tuple[str, str], _Building] = {}
+    benign: list[Assignment] = []
+    redirections: list[PlacedRule] = []
+    standalone: list[Case] = []
+    for layer in recording.ordered():
+        _no_repeats(layer)
+        for entity in layer.entities:
+            _applied_to(built, entity)
+        _apply_assignments(benign, layer.benign, "the benign layer")
+        for rule in layer.redirections:
+            redirections.append(
+                _placed_rule(
+                    "redirection",
+                    rule,
+                    [each.label for each in redirections],
+                    rule.declared_at or Source(layer.name, __file__, 0),
+                )
+            )
+        standalone.extend(layer.cases)
+    entries = {key: _finished(each) for key, each in built.items()}
+    aliases: dict[str, Entry] = {}
+    for entry in entries.values():
+        for alias in entry.aliases:
+            aliases[alias] = entry
+    return Registry(
+        entries=entries,
+        aliases=aliases,
+        generation=recording.generation,
+        benign=tuple(benign),
+        redirections=tuple(redirections),
+        standalone_cases=tuple(standalone),
+    )
+
+
+# --------------------------------------------------------------------
+# The printed registry (§9)
+#
+# The layout is contract, not rendering: it is what the operator reads
+# at every manual test, and a format that drifts makes two sessions
+# describe one boundary differently. `Registry.describe` states the
+# rules; this is where they are kept.
+
+
+def printable(text: str) -> str:
+    """Text a configuration supplied, as one printable ASCII line.
+
+    A reason is written by the configuration and read by a human
+    deciding what their boundary is: a newline inside one must not be
+    able to forge a line of frisk's own output, and a terminal escape
+    must not be able to erase one. Backslashes are left alone, since a
+    literal one cannot forge anything and doubling it would make every
+    regex in the output unreadable.
+    """
+    rendered = []
+    for character in text:
+        if character == "\n":
+            rendered.append("\\n")
+        elif character == "\r":
+            rendered.append("\\r")
+        elif character == "\t":
+            rendered.append("\\t")
+        elif " " <= character <= "~":
+            rendered.append(character)
+        else:
+            rendered.append(ascii(character)[1:-1])
+    return "".join(rendered)
+
+
+def _source_text(source: Source) -> str:
+    """`<layer> <file>:<line>`, the file by its name alone.
+
+    One column that reads two ways is a column nobody can scan, so the
+    engine's own layer is named the same way a configuration's is.
+    """
+    return f"{source.layer} {os.path.basename(source.file)}:{source.line}"
+
+
+def _gating(entry: Entry) -> str:
+    """Why a tool is gated, not only whether (`D-034`)."""
+    if entry.closed_world:
+        return "yes, by declaration"
+    if entry.grants:
+        return "yes, by its grants"
+    return "no"
+
+
+def _annotated(text: str, matchers: Sequence[Matcher], value: str) -> str:
+    """What these matchers answer for the probed value.
+
+    Bracketed and suffixed because the three words contain one another:
+    an eye scanning the column must not have to tell `satisfied` from
+    `unsatisfied` by the letters in front of it.
+    """
+    if not matchers:
+        return text
+    outcome = combine_all([each.evaluate(value) for each in matchers])
+    return f"{text} [{outcome.value}]"
+
+
+def _field(indent: int, key: str, text: str, wrap: bool) -> list[str]:
+    """One `key: value` line, its continuations reserved to depth 8."""
+    opening = f"{' ' * indent}{key}: "
+    body = printable(text)
+    if not wrap:
+        return [opening + body]
+    return textwrap.wrap(
+        body,
+        width=WIDTH,
+        initial_indent=opening,
+        subsequent_indent=" " * 8,
+        break_long_words=False,
+        break_on_hyphens=False,
+    ) or [opening.rstrip()]
+
+
+def _flag_text(
+    flags: Mapping[str, Arity], defaults_by_flag: Mapping[str, str]
+) -> str:
+    rendered = []
+    for name, arity in flags.items():
+        if arity is Arity.BARE:
+            rendered.append(name)
+        elif arity is Arity.VALUE:
+            rendered.append(f"{name}=value")
+        else:
+            bare_meaning = defaults_by_flag.get(name)
+            suffix = "" if bare_meaning is None else f"({bare_meaning})"
+            rendered.append(f"{name}=value?{suffix}")
+    return " ".join(rendered)
+
+
+def _assignment_text(assignment: Assignment, value: str | None = None) -> str:
+    name = _assignment_key(assignment)
+    if assignment.value is None:
+        return name
+    described = f"{name}={assignment.value.describe()}"
+    if value is None:
+        return described
+    return _annotated(described, [assignment.value], value)
+
+
+def _condition_lines(
+    indent: int, conditions: Sequence[Condition], value: str | None
+) -> list[str]:
+    lines = []
+    for condition in conditions:
+        described = condition.describe()
+        if value is not None:
+            described = _annotated(described, condition.matchers(), value)
+        lines.append(f"{' ' * indent}when: {described}")
+    return lines
+
+
+def _verdict_lines(
+    indent: int,
+    header: str,
+    conditions: Sequence[Condition],
+    scope: Scope,
+    reason: str,
+    source: Source,
+    target: Matcher | None,
+    value: str | None,
+    wrap: bool,
+) -> list[str]:
+    """One rule or grant: its header, then its own fields one deeper."""
+    inner = indent + 2
+    lines = [f"{' ' * indent}{header}"]
+    if target is not None:
+        described = target.describe()
+        if value is not None:
+            described = _annotated(described, [target], value)
+        lines.append(f"{' ' * inner}target: {described}")
+    lines.extend(_condition_lines(inner, conditions, value))
+    if not isinstance(scope, Anywhere):
+        lines.append(f"{' ' * inner}scope: {scope.describe()}")
+    if reason:
+        lines.extend(_field(inner, "reason", reason, wrap))
+    lines.append(f"{' ' * inner}source: {_source_text(source)}")
+    return lines
+
+
+def _rule_lines(
+    indent: int, placed: PlacedRule, value: str | None, wrap: bool
+) -> list[str]:
+    subcommand = " ".join(placed.rule.subcommand)
+    return _verdict_lines(
+        indent,
+        f"{placed.rule.verdict.value}({subcommand}) - {placed.label}",
+        placed.rule.conditions,
+        placed.rule.scope,
+        placed.rule.reason,
+        placed.source,
+        placed.rule.target,
+        value,
+        wrap,
+    )
+
+
+def _grant_lines(
+    indent: int, placed: PlacedGrant, value: str | None, wrap: bool
+) -> list[str]:
+    subcommand = " ".join(placed.grant.subcommand)
+    return _verdict_lines(
+        indent,
+        f"grant({subcommand}) - {placed.label}",
+        placed.grant.conditions,
+        placed.grant.scope,
+        placed.grant.reason,
+        placed.source,
+        None,
+        value,
+        wrap,
+    )
+
+
+def _case_text(case: Case) -> str:
+    return f"{case.command} -> {case.expect.value}"
+
+
+def _entry_lines(
+    entry: Entry, value: str | None, cases: Cases, wrap: bool
+) -> list[str]:
+    """One entry's block: header, its fields, then its groups."""
+    lines = [f"{entry.kind.value}({entry.name})"]
+    lines.append(f"  source: {_source_text(entry.source)}")
+    if entry.kind is Kind.TOOL:
+        lines.append(f"  gated: {_gating(entry)}")
+    if entry.aliases:
+        lines.append("  aliases: " + " ".join(entry.aliases))
+    if entry.default is not None:
+        lines.append(f"  default: {entry.default.rule.verdict.value}")
+        if entry.default.rule.reason:
+            lines.extend(_field(4, "reason", entry.default.rule.reason, wrap))
+    if entry.options:
+        lines.append(
+            "  options: " + _flag_text(entry.options, entry.flag_defaults)
+        )
+    if entry.flags:
+        lines.append(
+            "  flags: " + _flag_text(entry.flags, entry.flag_defaults)
+        )
+    if entry.assignments:
+        lines.append(
+            "  assignments: "
+            + " ".join(
+                _assignment_text(each, value) for each in entry.assignments
+            )
+        )
+    if entry.keeps_operands:
+        lines.append(f"  keeps operands: {entry.keeps_operands}")
+    if entry.operands_from_stdin:
+        lines.append("  operands from stdin: yes")
+    if entry.joins_operands:
+        lines.append("  joins operands: yes")
+    if entry.handoffs or entry.option_handoffs:
+        lines.append("  handoffs:")
+        for handoff in entry.handoffs:
+            position = " ".join(handoff.subcommand)
+            lines.append(f"    {position} keeps {handoff.keeps_operands}")
+            if handoff.flags:
+                lines.append(
+                    "      flags: "
+                    + _flag_text(
+                        {
+                            name: declared.arity
+                            for declared in handoff.flags
+                            for name in declared.names
+                        },
+                        {},
+                    )
+                )
+        for opened in entry.option_handoffs:
+            ends = " or ".join(opened.terminated_by)
+            lines.append(f"    {opened.option} until {ends}")
+    if entry.rules:
+        lines.append("  rules:")
+        for rule in entry.rules:
+            lines.extend(_rule_lines(4, rule, value, wrap))
+    if entry.grants:
+        lines.append("  grants:")
+        for grant in entry.grants:
+            lines.extend(_grant_lines(4, grant, value, wrap))
+    if cases is Cases.SHOWN and entry.cases:
+        lines.append("  cases:")
+        for case in entry.cases:
+            lines.append(f"    {_case_text(case)}")
+    return lines
+
+
+def _rendered(
+    registry: Registry, value: str | None, cases: Cases, wrap: bool
+) -> str:
+    """The whole registry, as the text `describe` promises."""
+    if cases is Cases.ONLY:
+        return "\n".join(
+            printable(_case_text(case)) for case in registry.cases()
+        )
+    lines: list[str] = []
+    for entry in registry.entries():
+        if lines:
+            lines.append("")
+        lines.extend(_entry_lines(entry, value, cases, wrap))
+    benign = registry.benign_assignments()
+    if benign:
+        lines.extend(["", "benign assignments"])
+        for assignment in benign:
+            lines.append("  " + _assignment_text(assignment, value))
+    redirections = registry.redirections()
+    if redirections:
+        lines.extend(["", "redirections"])
+        for placed in redirections:
+            lines.extend(_rule_lines(2, placed, value, wrap))
+    standalone = [
+        case for case in registry.cases() if case not in _sited(registry)
+    ]
+    if cases is Cases.SHOWN and standalone:
+        lines.extend(["", "cases"])
+        for case in standalone:
+            lines.append("  " + _case_text(case))
+    return "\n".join(printable(line) for line in lines)
+
+
+def _sited(registry: Registry) -> list[Case]:
+    """The cases written beside a declaration, as opposed to alone."""
+    sited: list[Case] = []
+    for entry in registry.entries():
+        sited.extend(entry.cases)
+    return sited
