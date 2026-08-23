@@ -256,75 +256,25 @@ behaviour done.
   nothing installed, which is what makes that possible (`D-031`). Detail
   in git history between tags step-005 and step-006.
 
-### 007 — Declarations, matchers, layering — `awaiting test`
+### 007 — Declarations, matchers, layering — `done`
 
-**Objective.** The config-facing API: what an operator writes, how it
-composes, and how a value is matched. **This comes before reading the
-line**, because tool recognition, flag arities and the
-gated/registered/rule-bearing distinction are all defined in terms of
-declarations — an engine step that parsed first would be judging against
-a model that did not exist yet.
-
-**Spec sections.** §3.4 (composition and layering, replace and
-update-with-removal), §3.5 (the compatibility contract's layers 1 and 2),
-§5.2 (the expressible surface — designed against the whole of it,
-including its final clause: the project's test cases beside the rules
-they prove), §5.3 (legibility), §3.2 (matchers, three-valued evaluation,
-quantifiers), §9 (the effective registry must be inspectable).
-
-**Deliverables.**
-
-- The declaration constructors for registering tools (names, aliases,
-  project-relative paths), rules, grants, per-tool default verdicts,
-  accounted flags and assignments, flag arities (bare, value-required,
-  value-optional), pre-subcommand options, handoffs and
-  redirection-target rules — the API designed against **all** of §5.2
-  even where §13 stages the behaviour later, so nothing is precluded.
-- **The case declaration form** — command → expected verdict, sited
-  beside the rule it proves (§5.2's closing clause). `019` consumes it,
-  `023` and `024` write starter ones; it is created here.
-- Matchers: patterns, path matchers resolving `..` and `~` **before**
-  comparing with §3.2's fixed cross-form semantics and its lexical `cd`
-  poisoning, and predicates. **Three-valued evaluation** — satisfied,
-  unsatisfied, unproven — with unproven moving stricter by role: failing
-  a grant condition, firing a deny/ask rule's condition at ask strength,
-  never reading as a plain false. The operand quantifiers are *declared*
-  here and answer at `009`: a condition evaluates against an invocation,
-  and giving one kind an evaluation of its own ahead of that shaped the
-  API around what could be tested early rather than around the model.
-- Per-name shadowing with both override forms. The engine's default
-  layers as declarations like any other: **shell wrappers and walked
-  interpreters** — enumerated, shadowable, and carrying no rules and no
-  grants, so they stand outside the coverage gate. (The *baseline read
-  tools* layer belongs to `017`, with the allow doctrine it exists to
-  serve; building it here would build something open fact (c) could
-  retire.)
-- Collection imports as composable units with an explicit total order,
-  the operator's own declarations last and always winning.
-- The API-generation declaration the scaffold will write, and the
-  fail-closed check when a config declares a generation outside the
-  accepted range.
-- **The configuration's location convention**, fixed here rather than at
-  the scaffold: §5.1 puts the config in a dedicated directory inside the
-  project's `.claude/`, whose name should carry the plugin's name. This
-  plan assumes `.claude/frisk/` and logs it at this step, because every
-  later step's test instructions say "write a config by hand in a scratch
-  project", `018`'s hook must resolve it, and `021`'s same-configuration
-  requirement presupposes it. The scaffold at `024` *creates* that
-  directory; it does not get to invent where it goes.
-- **The effective-registry inspection surface** (§3.4 requires it: "the
-  effective registry must be inspectable (§9) so composition never hides
-  a rule") — `frisk` prints the composed registry, each declaration's
-  source, and each matcher's three-valued outcome against a given value.
-  This is what makes this step testable before any verdict exists.
-
-**How the operator tests it.** Write a small config by hand in a scratch
-project — the legibility test is the operator reading it — then print the
-effective registry and watch shadowing, collection order and
-update-with-removal do what the config says; feed a few values to the
-matchers and read satisfied / unsatisfied / **unproven** back. Unit
-suites cover the path matcher's traversal guarantees in their own right
-(§8.1). Local and free.
+- **Outcome (approved 2026-08-23, tag `step-007`):** the config-facing
+  API exists and composes. Declarations for every entity kind, rules,
+  grants, three flag arities with a value-optional default (`D-039`),
+  conditions, scopes, both handoff shapes, cases and redirection rules
+  (`D-034`); three-valued matchers resolving `~` and `..` before
+  comparing, cross-form by decidability (`D-037`, refined by `D-041`)
+  and combining by Kleene's rule (`D-035`); layered composition with
+  per-name shadowing, `amend`/`drop`, collection order, and a name and
+  an alias as one claim decided by layer order (`D-043`); the
+  configuration at `.claude/frisk/config.py` (`D-033`), loading fail-
+  closed with §3.5's three generation tiers; and `frisk registry` as
+  §3.4's inspection surface, text-only (`D-036`), every rule printing
+  where it was written (`D-045`), narrowing under `--value` and
+  retiring that flag at `009` (`D-046`). A declared path may leave the
+  project (`D-044`), and §5.3's mandatory reason is §3.2's non-silent
+  one (`D-042`). Nothing judges a command line yet. Detail in git
+  history between tags `step-006` and `step-007`.
 
 ### 008 — Reading the line — `pending`
 
@@ -941,7 +891,7 @@ path and the engine suite can be forbidden from importing it.
   prove the engine expresses it, and a **worked example** in the operator
   configuration reference (`039`), which is how an operator who wants
   docker gated writes it. This is a deviation from a specification
-  *should*; `D-009` carries the reason, and §14 Q10 asks whether §5.4's
+  *should*; `D-009` carries the reason, and §14 Q9 asks whether §5.4's
   text should be amended to match rather than merely deviated from.
 - Starter cases covering **every** starter rule, beside the rules they
   prove, so the coverage gate passes from day one.
@@ -1012,7 +962,7 @@ supported install path, the resolution rule and both CLI doors. The proof
 that *this project's* verdicts did not move is its own cases re-running
 under `019`'s selftest, which is exactly the mechanism §3.5's third layer
 and §8.2 exist for. Transcribing an existing prototype registry into
-frisk's declaration form remains hand work; see §14 Q11.
+frisk's declaration form remains hand work; see §14 Q10.
 
 **How the operator tests it.** Scaffold a throwaway project, read the
 generated config in one pass (the legibility requirement is this test),
@@ -1427,28 +1377,20 @@ silent assumptions.
    and deliverables only, without the spec-section list, locations and
    test statement an open entry owes. They are expanded when Milestone 8
    closes. If the operator wants them sized now, say so.
-6. **The config directory's name.** §5.1 leaves it to the implementation
-   and says it "should carry the plugin's name". This plan assumes
-   `.claude/frisk/` in a target project and logs it at `007` — moved
-   there from the scaffold step, because `018`'s hook must resolve the
-   config, `021`'s same-configuration requirement presupposes a
-   convention, and every engine step's test instructions already assume
-   one. The scaffold creates the directory; it does not decide where it
-   goes.
-7. **The interim honesty obligations.** §4.3 and §4.4 require interim
+6. **The interim honesty obligations.** §4.3 and §4.4 require interim
    gaps to be *named in the honesty documentation* — a 1.0 deliverable
    (`039`) — while the gaps exist from parity. This plan names them in
    the pre-1.0 README (`028`). If the operator would rather a minimal
    honesty document ship at parity, that is a small step to add before
    `028`.
-8. **Packaging shape and the plugin's second door.** This plan assumes
+7. **Packaging shape and the plugin's second door.** This plan assumes
    `pyproject.toml` with a `src/frisk/` layout and a `frisk` console
    entry point for the repository-installable door — but §2.2 forbids the
    plugin from requiring an install, so the plugin-side door needs a
    different, build-free mechanism, decided at `021`. Flagged because it
    decides how the CI matrix, the sentinel's probe and the
    repository-installable door all look.
-9. **The sentinel's restaging (`D-007`).** An earlier draft built the
+8. **The sentinel's restaging (`D-007`).** An earlier draft built the
    sentinel and its kill switches before parity. §13 names the sentinel
    offer as a 1.0 item and the pre-1.0 bar does not mention it, so this
    plan moves it to `035` — with the honest consequence that before 1.0,
@@ -1456,7 +1398,7 @@ silent assumptions.
    the seatbelt earlier, it is a deliberate quick win under §13's
    "everything else may ship here as a quick win" and moves back.
 
-10. **Should §5.4 be amended, or merely deviated from (`D-009`)?** The
+9. **Should §5.4 be amended, or merely deviated from (`D-009`)?** The
    starter registry now ships git ground rules only. Two clauses of §5.4
    describe a world where it also ships docker: "a small set of
    additional common tools… docker is the recommended candidate", and the
@@ -1473,7 +1415,7 @@ silent assumptions.
    does not ship is the drift rule 1 exists to prevent, and the amendment
    is two sentences.
 
-11. **A prototype-to-frisk migration aid — wanted, or hand work?** Parity
+10. **A prototype-to-frisk migration aid — wanted, or hand work?** Parity
    proves the engine and the configuration API can *express* what a
    prototype-generation registry expressed; it does not transcribe one.
    §10's migration capability is engine-version migration inside frisk,

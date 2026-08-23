@@ -327,20 +327,19 @@ own tree, whose paths `PLAN.md` `021` confirms rather than assumes;
 
 ## Current state
 
-- **Current step:** `007` — declarations, matchers, layering,
-  **awaiting test**. Every approved case passes, none was edited, and
-  twelve were added after it for what review and `D-041`/`D-043` found.
-- **Next step:** `008` — reading the line.
+- **Current step:** `008` — reading the line.
+- **Next step:** `009` — judging and combining.
 - **World state:** the harness (`just setup/check/test/verify`) runs
   the same checks locally, in the commit hook and in CI, green.
   `src/frisk/` carries the config-facing API, the three-valued
   matchers, composition and `frisk registry`, reading
   `.claude/frisk/config.py` (`D-033`); nothing judges a command line
   yet. The permission boundary — guard plus `.claude/settings.json` —
-  is live, untracked, unchanged since `002`. `origin` is `github.com/yannlugrin/cc-frisk`, **public**, and
-  carries the guard's backup branch (`D-028`). **Every write under
+  is live, untracked, unchanged since `002`. `origin` is
+  `github.com/yannlugrin/cc-frisk`, **public**, and carries the
+  guard's backup branch (`D-028`). **Every write under
   `.claude/` prompts** — no setting removes it.
-- **Open obligations:** `PLAN.md` §14 carries eleven open questions,
+- **Open obligations:** `PLAN.md` §14 carries ten open questions,
   each answered at the step that needs it; `D-007`'s and `D-010`'s
   stagings stay reversible on request. `.claude/settings.json` still
   publishes an allow list only as narrow as the guard no clone
