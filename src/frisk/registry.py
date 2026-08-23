@@ -406,6 +406,13 @@ class Registry:
         contain one another: an eye scanning the column must not have
         to tell `satisfied` from `unsatisfied` by the letters in front
         of it, and neither must an assertion.
+
+        A value also **narrows** what is printed to the declarations
+        that could answer it — an entry carrying no matcher at all, as
+        every engine wrapper does, can never be annotated and is not
+        part of the answer (`D-046`). Plain `describe()` remains the
+        whole boundary; this is the other question, asked of the same
+        registry.
         """
         return _rendered(self, value, cases, wrap)
 
@@ -1261,6 +1268,28 @@ def _entry_lines(
     return lines
 
 
+def _answers(entry: Entry) -> bool:
+    """Whether any matcher on this entry could read a probed value.
+
+    An entry with none of them can never carry an annotation, so under
+    `--value` it is 142 lines of registry standing between the reader
+    and four lines of answer (`D-046`).
+    """
+    for placed in entry.rules:
+        if placed.rule.target is not None:
+            return True
+        if any(each.matchers() for each in placed.rule.conditions):
+            return True
+    for granted in entry.grants:
+        if any(each.matchers() for each in granted.grant.conditions):
+            return True
+    if entry.default is not None and any(
+        each.matchers() for each in entry.default.rule.conditions
+    ):
+        return True
+    return any(each.value is not None for each in entry.assignments)
+
+
 def _rendered(
     registry: Registry, value: str | None, cases: Cases, wrap: bool
 ) -> str:
@@ -1271,10 +1300,17 @@ def _rendered(
         )
     lines: list[str] = []
     for entry in registry.entries():
+        # With a value, only what can answer it: the question is what
+        # the value satisfies, and an entry carrying no matcher is not
+        # part of that answer (`D-046`).
+        if value is not None and not _answers(entry):
+            continue
         if lines:
             lines.append("")
         lines.extend(_entry_lines(registry, entry, value, cases, wrap))
     benign = registry.benign_assignments()
+    if value is not None:
+        benign = tuple(each for each in benign if each.value is not None)
     if benign:
         lines.extend(["", "benign assignments"])
         for assignment in benign:

@@ -390,6 +390,12 @@ default verdict replacing every implicit silence — built here because it
 shapes the decision model and could not be retrofitted; the operator-
 facing switch and its guidance are 1.0.
 
+Also **retire `frisk registry --value`** (`D-046`). It exists because
+`007` had no verdict to observe and the three-valued model needed a
+window; `explain` on a real command line is that window from here on,
+with the line's context the flag can never have. Removing it takes the
+flag, `describe`'s `value` parameter and the cases that pin them.
+
 **How the operator tests it.** `frisk explain` on lines that should deny,
 ask and stay silent under a hand-written config, reading the reason and
 the citation each time; §4.5's budget observable in the command's own

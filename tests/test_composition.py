@@ -1268,6 +1268,49 @@ class InspectionTests(CollectionFixture):
         ]
         self.assertEqual(annotations, ["[satisfied]", "[unsatisfied]"])
 
+    def test_a_value_prints_only_what_can_answer_it(self) -> None:
+        # Ruled on after the test gate (`D-046`): `--value` asks what a
+        # value satisfies, and an entry carrying no matcher can never
+        # be annotated. On a real project that was four annotations in
+        # 142 lines, 23 of its 26 entries being engine wrappers that
+        # can never answer anything.
+        def declare() -> None:
+            tool(
+                "stubtool",
+                rules=[
+                    ask(
+                        "apply",
+                        when=flag("--mode", one_of("destroy")),
+                        reason="A destroying mode.",
+                    )
+                ],
+            )
+            wrapper("myrunner", flags=[takes_value("--as")])
+
+        registry = self.compose(declare, with_defaults=True)
+        whole = registry.describe().splitlines()
+        self.assertIn("wrapper(myrunner)", whole)
+        self.assertIn("wrapper(sudo)", whole)
+
+        answering = registry.describe(value="destroy").splitlines()
+        self.assertIn("tool(stubtool)", answering)
+        # The runner carries no matcher, and neither does any engine
+        # default: none of them is part of the answer.
+        self.assertNotIn("wrapper(myrunner)", answering)
+        self.assertNotIn("wrapper(sudo)", answering)
+        self.assertNotIn("benign assignments", answering)
+
+    def test_a_registry_with_nothing_to_answer_prints_nothing(
+        self,
+    ) -> None:
+        # The honest answer to "what does this value satisfy?" when no
+        # declaration reads a value at all. The CLI says so on stderr
+        # rather than leaving an empty page to read as a failure.
+        registry = self.compose(
+            lambda: tool("stubtool", default=silent()), with_defaults=True
+        )
+        self.assertEqual(registry.describe(value="destroy"), "")
+
     def test_a_value_it_cannot_decide_reads_as_unproven(self) -> None:
         def declare() -> None:
             tool(

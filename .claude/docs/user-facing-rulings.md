@@ -33,6 +33,7 @@ specification. This file is what accumulated *beside* it.
 | That a collection may adopt another, and composes *over* what it adopted — whoever adopts decides, the same rule that puts the operator last | `Recording.adopt`; `registry.py` module docstring |
 | What `frisk registry` prints, field by field — and that `gated:` says *why* | `Registry.describe` |
 | That the registry's cases are hidden until `--cases`, and `--no-wrap` exists for whatever parses the output | `D-036`; `cli.py` |
+| That `--value` prints only the declarations that could answer the value, and that it is a temporary window on three-valued matching which retires when `explain` returns verdicts | `D-046`; `Registry.describe` |
 | Which programs the engine walks as wrappers, shells and interpreters, and that the set is a floor | `D-038`; `defaults.py`; the defaults suite |
 | That the display and locale variables are excused for every tool, and that nothing which can direct execution is | §3.2; `declare.benign_assignments` |
 | That a `drop(...)` naming something no layer beneath declares is refused, exactly as an `amend` of an undeclared name is — a removal that silently does nothing is a boundary the operator believes they have | `registry.py` composition; the composition suite |

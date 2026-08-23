@@ -181,8 +181,9 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="<value>",
         default=None,
         help=(
-            "also show what each matcher answers for this value: "
-            "satisfied, unsatisfied or unproven"
+            "show what each matcher answers for this value — "
+            "satisfied, unsatisfied or unproven — and print only the "
+            "declarations that can answer it"
         ),
     )
     registry.set_defaults(handler=registry_command)
@@ -253,13 +254,20 @@ def registry_command(args: argparse.Namespace) -> int:
         )
     )
     print()
-    print(
-        registry.describe(
-            args.value,
-            cases=_shown(args),
-            wrap=not args.no_wrap,
-        )
+    described = registry.describe(
+        args.value,
+        cases=_shown(args),
+        wrap=not args.no_wrap,
     )
+    print(described)
+    if args.value is not None and not described.strip():
+        # A value narrows the output to what can answer it, so nothing
+        # at all is a real answer — and one an empty page states badly.
+        print(
+            f"{PROGRAM}: no declaration in this registry reads a value, "
+            "so there is nothing for this one to answer.",
+            file=sys.stderr,
+        )
     return 0
 
 

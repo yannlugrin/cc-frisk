@@ -1333,3 +1333,46 @@ Detail in git history.
   than a clause in `D-036`, whose kernel is the text-only output and
   the deferred JSON; if the operator meant that clause instead, this
   entry folds into it.
+
+### D-046 — `registry --value` narrows to what can answer, and retires at `009`
+
+- **Date:** 2026-08-23
+- **Step:** `007`
+- **Context:** the operator ran `frisk registry --value /tmp/build` on a
+  small real project and read the top of the output, which is the
+  engine's `bash` wrapper. The annotation was there — four of them, in
+  142 lines across 26 entries, 23 of which were engine wrappers, shells
+  and interpreters that carry no rules, no grants and no value
+  matchers, and so can never be annotated at all. Answering "what does
+  this value satisfy?" with 142 lines and a suggestion to `grep` is a
+  tool that stopped one step short.
+- **Decision:** two rulings. **A value narrows the output** to the
+  declarations that could answer it — an entry with no matcher
+  anywhere on it is skipped, and the benign layer prints only the
+  assignments constrained by value. On the project above that is 39
+  lines instead of 142, with the same four answers. Plain
+  `frisk registry` remains the whole boundary; `--value` is the other
+  question asked of the same registry. Where *nothing* answers, the
+  output is empty and the CLI says so on stderr, because an empty page
+  reads as a failure and this is a real answer.
+  **And the flag retires at `009`,** where `explain` first returns a
+  verdict with its reason and citation. `--value` exists because `007`
+  has nothing that judges a command line, so the three-valued model
+  would otherwise be invisible from outside until then — `PLAN.md`
+  `007` names it as the step's own test instrument in those words. Its
+  limits are what make it temporary: it feeds one string to *every*
+  matcher regardless of what that matcher constrains, and evaluates
+  with no line around it, so it can never show the `cd` poisoning. It
+  answers "what would this matcher say about this string", never "what
+  happens if I run this", and `explain` answers the second.
+- **Alternatives considered:** *leave it and pipe through `grep`* — the
+  smallest change, and rejected: four useful lines in 142 is not an
+  output an operator reads, and "pipe it" is what a tool says when it
+  has not finished. *Delete it now* — legitimate under rule 11, and
+  rejected because it is this step's stated test instrument: without
+  it the operator takes three-valued matching on the suite's word until
+  `009`. *Keep it past `009` as a matcher-debugging tool* — its honest
+  residual use, and rejected as the weaker version of a command that
+  will answer the same question with the context it lacks.
+- **Approved by:** operator, 2026-08-23 — narrow it now, "and we will
+  delete it later when explain works".
