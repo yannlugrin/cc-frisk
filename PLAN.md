@@ -256,7 +256,7 @@ behaviour done.
   nothing installed, which is what makes that possible (`D-031`). Detail
   in git history between tags step-005 and step-006.
 
-### 007 — Declarations, matchers, layering — `awaiting test`
+### 007 — Declarations, matchers, layering — `in progress`
 
 **Objective.** The config-facing API: what an operator writes, how it
 composes, and how a value is matched. **This comes before reading the

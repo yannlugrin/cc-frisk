@@ -327,30 +327,30 @@ own tree, whose paths `PLAN.md` `021` confirms rather than assumes;
 
 ## Current state
 
-- **Current step:** `007` — declarations, matchers, layering, at its
-  test gate (`D-032`): cases written and red, implementation not.
+- **Current step:** `007` — declarations, matchers, layering. Its test
+  gate is **approved and the cases are frozen** (`D-032`): one the
+  implementation shows wrong comes back as a change. Making them pass
+  is what remains.
 - **Next step:** `008` — reading the line.
 - **World state:** the harness (`just setup/check/test/verify`) runs the
   same checks locally, in the commit hook and in CI, green, and `setup`
-  installs the engine. `src/frisk/` ships a CLI that judges nothing yet
-  and cannot exit 0 saying so. The permission boundary — guard plus
+  installs the engine. `src/frisk/` carries the config-facing API as
+  signatures that raise, and a CLI that judges nothing yet. The permission boundary — guard plus
   `.claude/settings.json` — is live, untracked and unchanged since
   `002`. `origin` is `github.com/yannlugrin/cc-frisk`, **public**, and
   carries the guard's backup branch (`D-028`). **Every write under
   `.claude/` prompts** — no setting removes it.
 - **Open obligations:** `PLAN.md` §14 carries eleven open questions,
-  each answered at the step that needs it. The sentinel may be
-  re-staged before parity if `D-007`'s residue proves uncomfortable;
-  `D-010` stays reversible on request. `.claude/settings.json` still
-  publishes an allow list only as narrow as the guard no clone receives
-  (`001`).
+  each answered at the step that needs it; `D-007`'s and `D-010`'s
+  stagings stay reversible on request. `.claude/settings.json` still
+  publishes an allow list only as narrow as the guard no clone
+  receives (`001`).
 - **`.claude/docs/` pointers:** `harness.md` — harness behaviour,
-  re-measure recipes, what CI pins; read before touching the `justfile`,
-  `scripts/`, `.pre-commit-config.yaml`, `pyproject.toml`,
-  `.github/workflows/` or any linter config. `guard-record.md` — the
+  re-measure recipes, what CI pins; read before touching any harness
+  file the layout above names, or `.github/workflows/`. `guard-record.md` — the
   guard's restore recipe, reach, blind spots and probes; read before
-  touching `.claude/settings.json` or `.claude/hooks/`, **and before
-  designing any probe of a permission mechanism**. `subagents.md` — what
+  touching `.claude/settings.json` or `.claude/hooks/`, and before
+  designing any probe of a permission mechanism. `subagents.md` — what
   a subagent's context carries, what frontmatter binds, when a
   definition loads; read before touching `.claude/skills/` or
   `.claude/agents/`, or trusting a subagent on a rule.
