@@ -1165,3 +1165,61 @@ Detail in git history.
 - **Approved by:** implementer (within latitude: a workflow choice, and
   `D-031`'s own note that the runner is revisited when a real need
   appears), reported with the step.
+
+### D-041 — A relative boundary that climbs is unproven against an absolute value, not unsatisfied
+
+- **Date:** 2026-08-23
+- **Step:** `007`
+- **Refines `D-037`,** whose principle it applies rather than changes.
+- **Context:** `D-037` keyed cross-form path matching on decidability:
+  an absolute value is unsatisfied against a relative boundary only
+  where *no* working directory could place it inside. §3.2 glossed that
+  test as "the boundary's components appearing nowhere in the value",
+  and the implementation searched for the boundary's resolved
+  components as a run. A boundary that climbs — `../shared` — resolves
+  to `("..", "shared")`, and `..` appears in no resolved absolute path,
+  so `/repo/shared/x` came back **unsatisfied** while a working
+  directory anywhere in `/repo` makes it true. The review found it; the
+  gloss and the principle disagreed.
+- **Decision:** a leading `..` is not a component to look for. It is the
+  boundary re-basing itself onto a directory the line does not name, so
+  it is dropped before the search, and what remains decides:
+  `../shared` against `/repo/shared/x` is **unproven**, `.scratch`
+  against `/etc/passwd` stays **unsatisfied**. §3.2's gloss is amended
+  to say so. Resolution already collects `..` at the front of a
+  relative path, so there is no other position to handle.
+- **Alternatives considered:** *leave it* — rejected by the operator:
+  the answer is false about the world, and false in the releasing
+  direction (unsatisfied fires nothing where unproven fires a deny rule
+  at ask strength). *Read the gloss as normative and amend the
+  principle instead* — rejected: the principle is the rule `D-037` was
+  argued and approved on, and the gloss was written to illustrate it.
+- **Approved by:** operator, 2026-08-23, who gave the reasoning: the
+  working directory is the unknown, so `../shared` is satisfied when it
+  is `/repo/shared` and unsatisfied otherwise — which is the definition
+  of unproven.
+
+### D-042 — §5.3's mandatory reason is §3.2's: every *non-silent* verdict
+
+- **Date:** 2026-08-23
+- **Step:** `007`
+- **Context:** §5.3 said "every rule, grant and default verdict carries
+  a human-readable reason"; §3.2 says "every **non-silent** verdict must
+  carry a reason and a citation". A `silent()` rule is a rule, so the
+  two clauses contradicted each other for exactly one construct. The
+  test gate had already settled it in §3.2's favour — the approved case
+  `test_silence_needs_none` requires `silent("status")` to construct
+  without one — but nothing recorded the reconciliation, and `019`'s
+  liveness pass would have met the same question.
+- **Decision:** §5.3 is amended to "every non-silent rule, grant and
+  default verdict", with the reason stated: a declared silence refuses
+  nothing and so has nothing to explain. `silent()` is the one verdict
+  constructor that takes no `reason`, and the liveness rule "reasons are
+  non-empty" reads over the non-silent ones.
+- **Alternatives considered:** *require a reason on `silent()` too* —
+  §5.3's literal reading, and rejected because the reason exists to be
+  shown to whoever meets a refusal, and nobody meets a silence; it would
+  be ceremony collected for no reader. *Leave both sentences standing* —
+  rejected under rule 1: a specification that says two things is one a
+  later session resolves differently.
+- **Approved by:** operator, 2026-08-23.

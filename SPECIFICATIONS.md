@@ -492,9 +492,12 @@ section's summary and that table could be read apart.
   be read off the line; an absolute value never satisfies a relative
   boundary either, and is **unsatisfied** where no working directory
   could place it inside — the boundary's components appearing nowhere
-  in the value, as `.scratch` does not appear in `/etc/passwd` — and
+  in the value, as `.scratch` does not appear in `/etc/passwd`, where
+  a leading `..` is not one of those components but the boundary
+  re-basing itself onto a directory the line does not name — and
   unproven only where one could, as `./etc` against `/etc/passwd` with
-  the working directory at `/`. No resolution base is ever invented;
+  the working directory at `/`, or `../shared` against
+  `/repo/shared/x` with the working directory anywhere in `/repo`. No resolution base is ever invented;
   what cannot be ruled out is unproven, the stricter outcome. And a
   directory change earlier in the judged
   line (`cd /elsewhere && tool ./x`) makes every later relative *path*
@@ -1081,9 +1084,10 @@ earlier release.
 Requirements, not niceties: the configuration must read
 as *declarations* — an operator who does not know Python must be able to
 review their boundary, since a boundary that cannot be read is not the
-operator's. Every rule, grant and default verdict carries a
+operator's. Every non-silent rule, grant and default verdict carries a
 human-readable reason (empty reasons are a liveness failure, §8.2: a
-refusal that says nothing is worse than none). Construct names say what
+refusal that says nothing is worse than none); a declared silence
+refuses nothing and so has nothing to explain, as §3.2 already says. Construct names say what
 they do; ceremony is minimal; a registry entry should be reviewable in a
 single reading pass. This constrains the API design as strongly as any
 mechanism in §3.
