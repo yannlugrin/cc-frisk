@@ -152,6 +152,12 @@ wrapper(
 )
 """
 
+TUNED = """
+from frisk.declare import amend, takes_value
+
+amend("sudo", flags=[takes_value("--prompt-file")])
+"""
+
 ASSIGNED = """
 from frisk.declare import accounted, ask, tool
 
@@ -513,18 +519,52 @@ class ShadowingTests(CollectionFixture):
             self.compose(declare, with_defaults=True)
 
     def test_one_source_speaks_for_a_name_once(self) -> None:
-        # Added during implementation, not at the gate: the two forms
-        # in one source have no order-free reading, and the losing
-        # order discards the amendment in silence. `tool()` replaces
-        # what sits beneath, so the amendment survives below it and is
-        # wiped above it — an order deciding a boundary, which §3.2
-        # forbids and `registry.py`'s own invariant denies.
+        # Added during implementation, not at the gate: one file saying
+        # both "trim starter's git" and "replace starter's git" has no
+        # order-free reading, and the losing order discards the
+        # amendment in silence — `tool()` replaces what sits beneath,
+        # so the amendment survives below it and is wiped above it. An
+        # order deciding a boundary is what §3.2 forbids and what
+        # `registry.py`'s own invariant denies. The operator meant one
+        # of the two, and is asked which.
         def declare() -> None:
-            amend("sudo", flags=[drop("-u")])
-            tool("sudo", default=silent())
+            use("starter")
+            amend("git", rules=[drop("forced push")])
+            tool("git", default=silent())
 
         with self.assertRaises(ConfigurationError):
-            self.compose(declare, with_defaults=True)
+            self.compose(declare)
+
+    def test_a_later_source_replaces_what_an_earlier_one_amended(
+        self,
+    ) -> None:
+        # The limit of the rule above, and the reason it is stated per
+        # source rather than per name: two *files* saying different
+        # things about one name is not a mistake, it is layering. A
+        # collection that amends the engine's wrapper and a config that
+        # then declares its own tool for that name is the ordinary
+        # override — being able to overrule what `use()` brought in is
+        # what makes a collection adoptable at all.
+        self.write_collection("tuned", TUNED)
+
+        amended = self.compose(
+            lambda: use("tuned"), with_defaults=True
+        ).lookup("sudo")
+        assert amended is not None
+        self.assertEqual(amended.flags["--prompt-file"], Arity.VALUE)
+
+        def declare() -> None:
+            use("tuned")
+            tool("sudo", default=silent())
+
+        entry = self.compose(declare, with_defaults=True).lookup("sudo")
+        assert entry is not None
+        self.assertEqual(entry.kind, Kind.TOOL)
+        self.assertEqual(entry.source.layer, PROJECT_LAYER)
+        # The amendment went with the declaration it amended: a
+        # replacement replaces everything beneath it, engine layer and
+        # collection alike.
+        self.assertEqual(entry.flags, {})
 
     def test_a_fresh_declaration_takes_no_drops(self) -> None:
         # Removing something from a declaration that does not exist yet
