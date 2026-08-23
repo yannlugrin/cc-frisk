@@ -37,6 +37,7 @@ specification. This file is what accumulated *beside* it.
 | That a `drop(...)` naming something no layer beneath declares is refused, exactly as an `amend` of an undeclared name is — a removal that silently does nothing is a boundary the operator believes they have | `registry.py` composition; the composition suite |
 | That the API generation is declared once for a whole configuration, adopted collections included | `config.py`; `declare.api_generation` |
 | Where the configuration lives and what the API generation declaration is for | `D-033`; `config.py` |
+| That a deprecated generation still loads and every rule in it still holds, and that the nudge to migrate goes to stderr so a script reading the registry never meets it | §3.5; `config.deprecation` |
 | That a `predicate()` callable runs on the decision path and is the one matcher frisk cannot promise touches no filesystem — it is the configuration's code | `declare.predicate`; `matchers.py` module docstring |
 | That a regular expression a configuration declares is run against agent-supplied text with no backtracking bound, since the configuration is trusted code (§5.1) | `matchers.compiled`; §12's blind-spot list |
 | That a configuration which will not load denies rather than proceeds | §7.1; `config.load` |

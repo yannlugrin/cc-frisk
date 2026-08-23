@@ -143,6 +143,33 @@ def load(path: Path) -> Registry:
     return registry
 
 
+def deprecation(generation: int | None) -> str | None:
+    """The nudge a deprecated generation owes its operator, or None.
+
+    Deprecated is the middle tier of §3.5: the configuration loads and
+    every verdict it declares stands, and the operator is told —
+    visibly, once — that the contract it was written against is on its
+    way out. Where "visibly" is depends on the door, so this returns
+    the sentence and each caller decides the channel: `frisk registry`
+    writes it to stderr, where it cannot be mistaken for part of the
+    registry a script is reading from stdout.
+
+    The tier has nothing in it today (`DEPRECATED_GENERATIONS` is
+    empty) and is built and tested anyway: a migration path invented
+    under the pressure of needing one is a migration path nobody has
+    run.
+    """
+    if generation is None or generation not in DEPRECATED_GENERATIONS:
+        return None
+    return (
+        f"this configuration declares API generation {generation}, "
+        "which is deprecated: it still loads and every rule in it "
+        "still holds, but a later frisk will stop reading it. This "
+        f"engine writes generation {CURRENT_GENERATION}. The frisk "
+        "skill migrates a configuration between generations."
+    )
+
+
 def _speakable(path: Path, generation: int | None) -> None:
     """Refuse a contract this engine does not know, and say so.
 
@@ -151,6 +178,9 @@ def _speakable(path: Path, generation: int | None) -> None:
     both numbers and points at the migration help, because a refusal
     with no way forward is how an operator ends up deleting the guard
     instead of upgrading it (§3.5).
+
+    Refusing only: a deprecated generation is not a failure, and the
+    nudge it owes is `deprecation`'s.
     """
     spoken = (
         f"this frisk speaks generation {CURRENT_GENERATION}"

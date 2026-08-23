@@ -42,7 +42,7 @@ from pathlib import Path
 from typing import NoReturn
 
 from . import __version__
-from .config import config_path, load, locate
+from .config import config_path, deprecation, load, locate
 from .errors import ConfigurationError
 from .registry import Cases, printable
 
@@ -237,6 +237,13 @@ def registry_command(args: argparse.Namespace) -> int:
     except ConfigurationError as failure:
         print(f"{PROGRAM}: {printable(str(failure))}", file=sys.stderr)
         return EXIT_CONFIG_ERROR
+    nudge = deprecation(registry.generation())
+    if nudge is not None:
+        # §3.5's middle tier: the configuration loaded and every rule
+        # in it holds, so this is not a failure and the status stays 0
+        # — but stderr, never stdout, so a script reading the registry
+        # never finds a sentence of prose in it.
+        print(f"{PROGRAM}: {printable(nudge)}", file=sys.stderr)
     print(
         REGISTRY_HEADER.format(
             program=PROGRAM,

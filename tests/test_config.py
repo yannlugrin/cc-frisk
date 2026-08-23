@@ -19,7 +19,9 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
+from frisk import config
 from frisk.config import (
     CONFIG_DIRECTORY,
     CONFIG_FILENAME,
@@ -123,6 +125,29 @@ class GenerationTests(ProjectFixture):
         self.assertLessEqual(
             set(DEPRECATED_GENERATIONS), set(SUPPORTED_GENERATIONS)
         )
+
+    def test_a_deprecated_generation_is_nudged_not_refused(self) -> None:
+        # Added after the test gate, on the operator's ruling that the
+        # deprecation system must exist and be tested from the start.
+        # The tier is empty today, so the case supplies the deprecated
+        # generation rather than waiting for a real one — what is
+        # asserted is the machinery: it loads, and it says so.
+        with mock.patch.object(
+            config, "DEPRECATED_GENERATIONS", (CURRENT_GENERATION,)
+        ):
+            registry = load(
+                self.write(VALID.format(generation=CURRENT_GENERATION))
+            )
+            self.assertIsNotNone(registry.lookup("git"))
+            nudge = config.deprecation(CURRENT_GENERATION)
+        assert nudge is not None
+        self.assertIn("deprecated", nudge)
+        self.assertRegex(nudge, rf"\b{CURRENT_GENERATION}\b")
+        self.assertIn("migrat", nudge.lower())
+
+    def test_a_generation_in_good_standing_is_not_nudged(self) -> None:
+        self.assertIsNone(config.deprecation(CURRENT_GENERATION))
+        self.assertIsNone(config.deprecation(None))
 
     def test_a_configuration_in_range_loads(self) -> None:
         registry = load(

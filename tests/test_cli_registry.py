@@ -20,8 +20,9 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from frisk import __version__
+from frisk import __version__, config
 from frisk.cli import EXIT_CONFIG_ERROR, EXIT_NO_CONFIG
 from frisk.config import CURRENT_GENERATION, config_path
 from tests.test_cli import run
@@ -147,6 +148,21 @@ class RegistryCommandTests(unittest.TestCase):
         for line in unwrapped.splitlines():
             with self.subTest(line=line):
                 self.assertFalse(line.startswith("        "))
+
+    def test_a_deprecated_generation_is_said_on_stderr(self) -> None:
+        # Added after the test gate, with the deprecation tier itself.
+        # §3.5's middle tier loads and holds, so the status stays 0 and
+        # the registry still prints — the nudge goes to stderr, where a
+        # script reading the registry from stdout never meets it.
+        self.write(CONFIG)
+        with mock.patch.object(
+            config, "DEPRECATED_GENERATIONS", (CURRENT_GENERATION,)
+        ):
+            status, out, err = run("registry", "--project", str(self.root))
+        self.assertEqual(status, 0)
+        self.assertIn("stubtool", out)
+        self.assertNotIn("deprecated", out)
+        self.assertIn("deprecated", err)
 
     def test_the_output_is_ascii_and_escapes_what_it_prints(
         self,
