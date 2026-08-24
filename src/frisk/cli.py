@@ -6,8 +6,9 @@ uses — because a diagnosis must never depend on which door was
 available. It runs without Claude Code: nothing here reads a hook-time
 environment variable or the plugin cache path.
 
-This build carries the skeleton. `--version` answers; `explain` reports
-that there is no engine to answer with, and says so in the direction
+This build reads a line and reports it. `--version` answers, `registry`
+prints the composed boundary, and `explain` shows the invocations it
+found — with no verdict on any of them, and saying so in the direction
 that is safe to misread: not a verdict, not an allow.
 
 One cost is worth knowing before the hook door is designed: importing
@@ -44,7 +45,8 @@ from typing import NoReturn
 from . import __version__
 from .config import config_path, deprecation, load, locate
 from .errors import ConfigurationError
-from .registry import Cases, printable
+from .reading import Reading, read
+from .registry import Cases, engine_defaults, printable
 
 PROGRAM = "frisk"
 
@@ -60,16 +62,6 @@ EXIT_NO_CONFIG = 4
 #: The configuration exists and could not be loaded (§7.1). Loud, and
 #: never an empty registry standing in for a boundary that failed.
 EXIT_CONFIG_ERROR = 5
-
-_NO_ENGINE = """\
-{program} {version} carries no decision engine yet: this build ships the
-command line only.
-
-  command: {command}
-
-Nothing was parsed and no verdict was reached. This is not an allow:
-read a frisk of this version as absent from the permission path.\
-"""
 
 
 def render(command_line: str) -> str:
@@ -129,6 +121,15 @@ def build_parser() -> argparse.ArgumentParser:
         "command_line",
         metavar="<command-line>",
         help="the command line to judge, as one argument",
+    )
+    explain.add_argument(
+        "--project",
+        metavar="<dir>",
+        default=None,
+        help=(
+            "the project whose configuration decides "
+            "(default: found by walking up from here)"
+        ),
     )
     explain.set_defaults(handler=explain_command)
 
@@ -192,15 +193,46 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def explain_command(args: argparse.Namespace) -> int:
-    """`frisk explain <command-line>` — parses nothing yet, and says so."""
-    print(
-        _NO_ENGINE.format(
-            program=PROGRAM,
-            version=__version__,
-            command=render(args.command_line),
+    """`frisk explain <command-line>` — the invocations the line holds.
+
+    Three outcomes and two statuses. A configuration that will not load
+    is the loud failure of §7.1 and nothing is read. A project with no
+    configuration is read against the engine's default layers alone,
+    with §5.4's "this gates nothing" on stderr — visible, but not a
+    refusal to answer, because the report is still worth having.
+    Everything else reports the reading.
+
+    The status is `EXIT_NO_VERDICT` in both reading cases, and it is the
+    one true thing about this build: nothing here judges yet. `registry`
+    answers `EXIT_NO_CONFIG` for the unconfigured project because it has
+    nothing at all to print; this command does.
+    """
+    found = _configuration(args.project)
+    if found is None:
+        where = args.project or "here or any directory above it"
+        print(
+            f"{PROGRAM}: no configuration in {printable(str(where))}. "
+            "An enabled frisk with no configuration gates nothing; what "
+            "follows was read against the engine's default layers alone.",
+            file=sys.stderr,
         )
-    )
+        registry = engine_defaults()
+    else:
+        try:
+            registry = load(found)
+        except ConfigurationError as failure:
+            print(f"{PROGRAM}: {printable(str(failure))}", file=sys.stderr)
+            return EXIT_CONFIG_ERROR
+        nudge = deprecation(registry.generation())
+        if nudge is not None:
+            print(f"{PROGRAM}: {printable(nudge)}", file=sys.stderr)
+    print(_reported(args.command_line, read(args.command_line, registry)))
     return EXIT_NO_VERDICT
+
+
+def _reported(command_line: str, reading: Reading) -> str:
+    """The whole report for one command line."""
+    raise NotImplementedError
 
 
 #: The three lines that open a printed registry, before the entry

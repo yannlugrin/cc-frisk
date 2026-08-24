@@ -68,6 +68,7 @@ from .declare import (
 )
 from .errors import ConfigurationError
 from .matchers import Matcher, combine_all
+from .verdicts import Verdict
 
 # A collection's layer is `collection:<name>`; the other two are the
 # constants imported above.
@@ -206,6 +207,24 @@ class Entry:
     def rule_bearing(self) -> bool:
         """Carries at least one rule (§3.2, §4.3)."""
         return bool(self.rules)
+
+    @property
+    def speaking(self) -> bool:
+        """Can produce a non-silent verdict on its own (§3.2, `D-047`).
+
+        Wider than `rule_bearing`, narrower than being registered at
+        all: rules, grants, or a default verdict that is not silence.
+        §4.1's raw scan of an unparseable line is what needs it, and it
+        is why the two are separate predicates — a grants-only tool
+        carries no rule, so a scan asking `rule_bearing` would answer
+        an unparseable line naming `ansible-playbook` with silence.
+        """
+        if self.rules or self.grants:
+            return True
+        return (
+            self.default is not None
+            and self.default.rule.verdict is not Verdict.SILENT
+        )
 
 
 class Registry:
@@ -464,6 +483,20 @@ def collecting(
         yield Collection(recording)
     finally:
         end_recording()
+
+
+def engine_defaults() -> Registry:
+    """The registry an unconfigured project is read against (§5.4).
+
+    The engine's own default layers and nothing else (§3.4): the shell
+    wrappers, shells, interpreters and benign assignments that are
+    analysis knowledge rather than project policy. It carries no rule
+    and no grant, so it gates nothing — which §5.4 requires be said out
+    loud wherever this stands in for a configuration.
+    """
+    with collecting(with_defaults=True) as declared:
+        pass
+    return declared.registry()
 
 
 # --------------------------------------------------------------------
