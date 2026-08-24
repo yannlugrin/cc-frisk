@@ -456,8 +456,10 @@ section's summary and that table could be read apart.
   enumerated, values constrained — and anything else gets the tool's
   default verdict. A tool is **gated** exactly when it declares grants
   and/or closed worlds — distinct from *registered* (known to the engine
-  at all) and *rule-bearing* (carrying any rule); the three terms are
-  used with these meanings throughout. The closed world is the
+  at all), *rule-bearing* (carrying any rule) and *speaking* (able to
+  produce a non-silent verdict on its own: carrying rules, grants, or a
+  non-silent default verdict); the four terms are used with these
+  meanings throughout. The closed world is the
   load-bearing property: a flag or value nobody considered can only move
   a verdict *toward* the stricter outcome, never away from it.
   **Environment assignments are closed-world for every registered
@@ -679,9 +681,8 @@ silent gap becomes an unprompted destructive command.
 - **A line that cannot be parsed is unproven — not the deny of §7,
   which is reserved for the guard's own failures — and never silent
   approval of whatever it might contain.** Outcome: in the default posture, ask if a
-  *rule-bearing* tool's name — one with rules, grants or a non-silent
-  default verdict — appears as a whole whitespace-delimited word on the
-  raw line, words compared by basename so a path spelling like
+  *speaking* tool's name (§3.2) appears as a whole whitespace-delimited
+  word on the raw line, words compared by basename so a path spelling like
   `/usr/bin/git` does not evade the scan, silence otherwise (wrapper
   and baseline-read names are no signal: they appear on too many
   ordinary lines, and scanning for them would make the fallback fire

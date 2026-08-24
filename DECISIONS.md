@@ -1376,3 +1376,43 @@ Detail in git history.
   will answer the same question with the context it lacks.
 - **Approved by:** operator, 2026-08-23 — narrow it now, "and we will
   delete it later when explain works".
+
+### D-047 — `speaking` names what §4.1's raw scan looks for
+
+- **Date:** 2026-08-24
+- **Step:** `008`
+- **Context:** §3.2 fixes three terms and says they are used with those
+  meanings throughout: *registered* (known to the engine at all),
+  *gated* (declares grants and/or closed worlds) and *rule-bearing*
+  (carrying any rule). §4.1's unparseable-line fallback then borrows
+  the third for a strictly larger set — "a *rule-bearing* tool's name
+  — one with rules, grants or a non-silent default verdict". The two
+  readings disagree exactly where it matters: a grants-only gated tool
+  (`ansible-playbook`, `stubcli`) carries no rules, so under §3.2's
+  definition `ansible-playbook 'unbalanced` would scan clean and come
+  back silent — an unparseable line naming a deny-by-default tool,
+  answered with silence. §4.3's two discriminators (the lost walk, the
+  flag-shaped handoff command position) use the same word, so a reader
+  could not tell which set was meant there either. `Entry.rule_bearing`
+  in the engine implements §3.2's narrow reading and cites §4.3 for it.
+- **Decision:** the word stays narrow and the fourth term is named. §3.2
+  gains **speaking** — able to produce a non-silent verdict on its own:
+  carrying rules, grants, or a non-silent default verdict — and §4.1's
+  scan refers to it instead of glossing `rule-bearing` differently.
+  Nothing about what the engine does changes: §4.1 scans the larger set
+  it already described, §4.3's discriminators keep the narrow one, and
+  `Entry.rule_bearing` keeps its meaning. Only the word §4.1 borrowed
+  moves. The engine gains a second predicate beside `rule_bearing`, each
+  with one meaning, so the code cannot inherit the ambiguity.
+- **Alternatives considered:** *widen `rule-bearing` everywhere to
+  rules-or-grants-or-non-silent-default* — one term with one meaning,
+  and rejected because it silently changes §4.3: a grants-only tool
+  named among the remaining tokens of a lost walk would begin to ask
+  where it does not today, which is a behaviour change smuggled in as a
+  vocabulary fix, and one the corpus does not adjudicate. *Leave both
+  sentences standing and record the local reading in this log only* —
+  cheapest, and rejected because the ambiguity survives in the document
+  every future session reads as authoritative, and §4.3 is precisely
+  where it would bite next (steps `010` and `012`).
+- **Approved by:** operator, 2026-08-24 — rename §4.1's predicate,
+  no behaviour change.
