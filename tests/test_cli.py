@@ -14,11 +14,18 @@ import io
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
+from collections.abc import Iterator
 from pathlib import Path
 
 from frisk import __version__
-from frisk.cli import EXIT_NO_VERDICT, EXIT_USAGE, main
+from frisk.cli import (
+    EXIT_CONFIG_ERROR,
+    EXIT_NO_VERDICT,
+    EXIT_USAGE,
+    main,
+)
 
 REPOSITORY = Path(__file__).resolve().parent.parent
 SOURCE = REPOSITORY / "src"
@@ -66,6 +73,20 @@ def run_out_of_process(*argv: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+@contextlib.contextmanager
+def configured(config: str = "") -> Iterator[str]:
+    """A throwaway project root carrying a frisk configuration.
+
+    Yields the root, not the file: `--project` names a project, and the
+    engine is what decides where a project keeps its configuration.
+    """
+    with tempfile.TemporaryDirectory() as root:
+        written = Path(root) / ".claude" / "frisk"
+        written.mkdir(parents=True)
+        (written / "config.py").write_text(config or PROJECT_CONFIG)
+        yield root
+
+
 class VersionTest(unittest.TestCase):
     def test_version_prints_the_engine_version_on_stdout(self) -> None:
         status, out, err = run("--version")
@@ -81,9 +102,39 @@ class VersionTest(unittest.TestCase):
         self.assertRegex(__version__, r"^\d+\.\d+\.\d+")
 
 
+#: A project configuration for the cases that need `explain` to have a
+#: boundary to read against. Small on purpose: what a registry composes
+#: is `tests/test_composition.py`'s subject, and what a *line* holds is
+#: `tests/test_reading.py`'s. This is the door between them.
+PROJECT_CONFIG = """\
+from frisk.declare import api_generation, ask, deny, takes_value, tool
+
+api_generation(1)
+
+tool(
+    "git",
+    options=[takes_value("-C")],
+    rules=[
+        deny(
+            "push",
+            reason="A forced push rewrites remote history.",
+            label="forced push",
+        ),
+        ask("commit", reason="A commit is work being recorded."),
+    ],
+)
+"""
+
+
 class ExplainTest(unittest.TestCase):
     def test_explain_reports_on_stdout_and_leaves_stderr_empty(self) -> None:
-        status, out, err = run("explain", "git push --force")
+        # stderr carries what is *not* the answer — §5.4's "this project
+        # is unconfigured" among it — so a configured project must leave
+        # it empty.
+        with configured() as project:
+            status, out, err = run(
+                "explain", "--project", project, "git push --force"
+            )
         self.assertEqual(status, EXIT_NO_VERDICT)
         self.assertIn("git push --force", out)
         self.assertEqual(err, "")
@@ -140,6 +191,103 @@ class ExplainTest(unittest.TestCase):
         _, out, err = run("explain", "café --touché")
         out.encode("ascii")
         err.encode("ascii")
+
+
+class ExplainReadingTest(unittest.TestCase):
+    """`explain` begins showing the invocations it found (§9, `008`).
+
+    There is still no verdict — judging is `009` — so every case here
+    checks the *reading* the command reports and the invariant that
+    survives the whole build: no path out of `explain` returns 0.
+    """
+
+    def explain(self, command_line: str) -> tuple[int, str, str]:
+        with configured() as project:
+            return run("explain", "--project", project, command_line)
+
+    def test_the_invocation_is_reported_with_its_tool(self) -> None:
+        status, out, _ = self.explain("git push --force")
+        self.assertEqual(status, EXIT_NO_VERDICT)
+        self.assertIn("invocation", out)
+        self.assertIn("git", out)
+
+    def test_a_flag_is_reported_apart_from_the_operands(self) -> None:
+        _, out, _ = self.explain("git push --force")
+        self.assertIn("--force", out)
+        self.assertIn("push", out)
+
+    def test_a_declared_option_is_reported_with_its_value(self) -> None:
+        # The plan's own test line: `git -C dir push`. Read without the
+        # declaration it is two operands and no push in sight.
+        _, out, _ = self.explain("git -C /srv/repo push")
+        self.assertIn("-C", out)
+        self.assertIn("/srv/repo", out)
+
+    def test_every_invocation_on_the_line_is_reported(self) -> None:
+        _, out, _ = self.explain("git status\ngit push --force")
+        self.assertEqual(out.count("invocation"), 2, out)
+
+    def test_an_unregistered_command_is_reported_as_unregistered(
+        self,
+    ) -> None:
+        # Silence is a real answer (§3.2) and the operator has to be
+        # able to see that frisk knows nothing about a name.
+        _, out, _ = self.explain("make check")
+        self.assertIn("make", out)
+        self.assertIn("unregistered", out)
+
+    def test_an_unparseable_line_says_so(self) -> None:
+        # §4.1: unproven, "never silent approval of whatever it might
+        # contain". The report must not look like an empty line.
+        _, out, _ = self.explain("git status 'unbalanced")
+        self.assertIn("could not be parsed", out)
+
+    def test_an_unparseable_line_names_what_the_scan_found(self) -> None:
+        # The scan is the whole reason the fallback is not silence, so
+        # what it found is what the operator needs to see.
+        _, out, _ = self.explain("git status 'unbalanced")
+        self.assertIn("git", out)
+
+    def test_reading_a_line_is_still_not_a_verdict(self) -> None:
+        status, out, _ = self.explain("git push --force")
+        self.assertEqual(status, EXIT_NO_VERDICT)
+        self.assertIn("not an allow", out)
+
+    def test_an_unconfigured_project_is_said_out_loud(self) -> None:
+        # §5.4: an enabled frisk with no configuration gates nothing,
+        # and that must be visible rather than read as approval. The
+        # line is still read — the engine's own default layers are a
+        # boundary of sorts — so the report stands, the note goes to the
+        # channel that is not the answer, and the status stays the one
+        # true thing about this build: no verdict was reached. `registry`
+        # answers 4 here because it has nothing at all to print; this
+        # command does.
+        with tempfile.TemporaryDirectory() as empty:
+            status, out, err = run(
+                "explain", "--project", empty, "git push --force"
+            )
+        self.assertEqual(status, EXIT_NO_VERDICT)
+        self.assertIn("no configuration", err)
+        self.assertIn("invocation", out)
+
+    def test_a_configuration_that_will_not_load_is_loud(self) -> None:
+        # §7.1: never a partially built registry standing in for a
+        # boundary that failed, and never a reading that looks complete.
+        with configured("api_generation(1)\nbroken(\n") as project:
+            status, out, err = run(
+                "explain", "--project", project, "git push --force"
+            )
+        self.assertEqual(status, EXIT_CONFIG_ERROR)
+        self.assertEqual(out, "")
+        self.assertNotEqual(err, "")
+
+    def test_the_reported_reading_is_ascii_and_escaped(self) -> None:
+        # The operands are attacker-controlled text printed above the
+        # sentence that says no verdict was reached.
+        _, out, err = run("explain", "git commit -m 'caf\xe9\n\x1b[2J'")
+        out.encode("ascii")
+        err.encode("ascii")
+        self.assertNotIn("\x1b", out)
 
 
 class UsageTest(unittest.TestCase):
