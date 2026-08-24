@@ -276,7 +276,7 @@ behaviour done.
   one (`D-042`). Nothing judges a command line yet. Detail in git
   history between tags `step-006` and `step-007`.
 
-### 008 — Reading the line — `in progress`
+### 008 — Reading the line — `awaiting test`
 
 **Objective.** Turn a command string into the set of invocations it
 contains, correctly, with everything that binds to each one.
