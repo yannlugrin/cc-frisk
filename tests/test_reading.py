@@ -42,7 +42,7 @@ from frisk.declare import (
     tool,
 )
 from frisk.matchers import Value
-from frisk.reading import Assigned, Flag, Invocation, Reading, read
+from frisk.reading import Assigned, Doubt, Flag, Invocation, Reading, read
 from frisk.registry import Registry, collecting
 from tests.corpus import context_b
 
@@ -107,6 +107,20 @@ def policy() -> Registry:
         tool(
             "deploy.py",
             default=ask(reason="A deploy script anywhere deploys."),
+        )
+        # Gated by a grant, carrying no rule and no default verdict:
+        # the one shape that separates `D-047`'s grants limb from
+        # `rule_bearing`. Every other gated tool in this fixture also
+        # carries a rule or a non-silent default, so none of them can
+        # tell a narrow scan from a speaking one.
+        tool(
+            "stubgrant",
+            grants=[
+                grant(
+                    when=every_operand(path_under("/tmp")),
+                    reason="A scratch target is not production.",
+                ),
+            ],
         )
         # Registered, silent by declaration, carrying nothing else: the
         # case that separates *registered* from *speaking* (§3.2).
@@ -270,10 +284,18 @@ class SplittingTests(Reads):
         self.assertEqual(len(reading.invocations), 1)
 
     def test_a_line_of_only_separators_holds_nothing(self) -> None:
-        self.assertEqual(self.read("  ;  &&  \n\n ").invocations, ())
+        # Nothing to run is not a failure to parse: §4.1's fallback is
+        # for a line the engine could not read, and answering silence
+        # here through the *unparseable* door would put every empty
+        # segment through the raw scan.
+        reading = self.read("  ;  &&  \n\n ")
+        self.assertEqual(reading.invocations, ())
+        self.assertFalse(reading.unparseable)
 
     def test_the_empty_line_holds_nothing(self) -> None:
-        self.assertEqual(self.read("").invocations, ())
+        reading = self.read("")
+        self.assertEqual(reading.invocations, ())
+        self.assertFalse(reading.unparseable)
 
     def test_several_separators_split_into_several_invocations(self) -> None:
         reading = self.read("a && b || c ; d | e & f")
@@ -389,12 +411,13 @@ class UnparseableLineTests(Reads):
         self.assertEqual(reading.speaking, ("git",))
 
     def test_a_grants_only_tool_speaks(self) -> None:
-        # `D-047`: §4.1's scan looks for rules, grants *or* a non-silent
-        # default. stubcli carries a grant, a deny rule and a deny
-        # default; a reading that required a rule would answer an
-        # unparseable line naming it with silence.
-        reading = self.read("stubcli 'unbalanced")
-        self.assertEqual(reading.speaking, ("stubcli",))
+        # `D-047`'s grants limb, and the only case that can prove it:
+        # stubgrant carries a grant and nothing else, so a scan asking
+        # `rule_bearing` answers an unparseable line naming it with
+        # silence — which is what §4.1's gloss exists to prevent, and
+        # what an unparseable line naming `ansible-playbook` would get.
+        reading = self.read("stubgrant 'unbalanced")
+        self.assertEqual(reading.speaking, ("stubgrant",))
 
     def test_a_default_verdict_alone_speaks(self) -> None:
         # `D-047` again: stubalways has no rules and no grants at all.
@@ -424,7 +447,7 @@ class UnparseableLineTests(Reads):
 
     def test_the_scan_names_every_speaking_tool_it_finds(self) -> None:
         reading = self.read("git status && stubtool wipe 'unbalanced")
-        self.assertEqual(sorted(reading.speaking), ["git", "stubtool"])
+        self.assertEqual(reading.speaking, ("git", "stubtool"))
 
     def test_the_scan_reads_a_name_used_as_an_ordinary_word(self) -> None:
         # The accepted cost of a raw scan, and the reason it fires only
@@ -433,6 +456,22 @@ class UnparseableLineTests(Reads):
         # there is no parse to trust, and §3.3 sends the doubt stricter.
         reading = self.read("ls ../stubtool 'unbalanced")
         self.assertEqual(reading.speaking, ("stubtool",))
+
+    def test_a_parsed_line_carries_no_scan(self) -> None:
+        # The scan is the *fallback*: it fires where there is no parse
+        # to trust. On a parsed line §4.3 forbids scanning outright, so
+        # a reading that ran it anyway would hand `009` a signal it must
+        # remember never to read.
+        reading = self.read("git status && stubtool wipe")
+        self.assertFalse(reading.unparseable)
+        self.assertEqual(reading.speaking, ())
+
+    def test_the_scan_names_each_tool_once_in_a_stable_order(self) -> None:
+        # It is printed, and `009` will cite it: a name repeated once
+        # per mention, or ordered by where it happened to appear, is a
+        # different report for the same line.
+        reading = self.read("git status && git push 'unbalanced")
+        self.assertEqual(reading.speaking, ("git",))
 
     def test_an_alias_is_the_same_name_to_the_scan(self) -> None:
         reading = self.read("stub2 wipe 'unbalanced")
@@ -506,6 +545,22 @@ class AssignmentTests(Reads):
                 invocation = self.one(line)
                 self.assertNotEqual(invocation.name, "stubtool")
                 self.assertEqual(self.assignments(invocation), {})
+
+    def test_an_exotic_assignment_form_lands_stricter(self) -> None:
+        # §4.2: "Exotic assignment forms (array syntax and other
+        # shell-specific shapes) may gain full modeling later; until
+        # then they must land in the stricter direction, never be
+        # misread as something harmless."
+        #
+        # The naive reading is the harmless one and it is badly wrong:
+        # `FOO=(a` binds as an ordinary assignment, `b)` becomes the
+        # command word, and the tool that is actually being run drops to
+        # an operand of a command nobody wrote. Unparseable is the
+        # honest answer — the *segment structure* was not read — and
+        # §4.1's scan then does its job.
+        reading = self.read("FOO=(a b) stubtool apply")
+        self.assertTrue(reading.unparseable)
+        self.assertEqual(reading.speaking, ("stubtool",))
 
     def test_an_assignment_carrying_a_variable_is_dynamic(self) -> None:
         # §4.2: a value carrying `$FOO` cannot prove a grant condition.
@@ -627,15 +682,27 @@ class ArityTests(Reads):
         # makes the invocation malformed, which is unproven, not safe".
         # Corpus: `stubtool deploy.yml --limit` → ask.
         invocation = self.one("stubtool deploy.yml --limit")
-        self.assertTrue(invocation.unproven)
+        self.assertEqual(invocation.doubts, (Doubt.MALFORMED,))
         self.assertEqual(self.flags(invocation), {"--limit": None})
+
+    def test_a_malformed_option_on_a_rules_only_tool_is_malformed_too(
+        self,
+    ) -> None:
+        # §4.2 scopes the *unreadable-token* rule to gated invocations
+        # and states this one flat. A reading that priced both through
+        # one flag would leave `git -C` — the global option whose value
+        # decides which repository is touched — unpriced on a tool that
+        # is registered and not gated, which is the direction §3.3
+        # forbids.
+        invocation = self.one("git -C")
+        self.assertEqual(invocation.doubts, (Doubt.MALFORMED,))
 
     def test_a_malformed_flag_at_the_end_of_a_segment(self) -> None:
         # The segment ends at the separator, so the next command's word
         # is never eaten as a value.
         reading = self.read("stubtool apply --mode && git status")
         self.assertEqual(len(reading.invocations), 2)
-        self.assertTrue(reading.invocations[0].unproven)
+        self.assertEqual(reading.invocations[0].doubts, (Doubt.MALFORMED,))
         self.assertEqual(reading.invocations[1].name, "git")
 
     def test_a_value_optional_flag_takes_an_ordinary_next_token(self) -> None:
@@ -779,6 +846,23 @@ class RecognitionTests(Reads):
         # Corpus: `make check` → silent.
         self.assertIsNone(self.one("make check").entry)
 
+    def test_a_variable_in_command_position_is_a_name_that_cannot_be_read(
+        self,
+    ) -> None:
+        # §4.2: "A variable in *command position* (`$RUNNER deploy`) is
+        # a command that cannot be named". Its three verdicts are `009`
+        # and `010`'s; what reading owes is the fact itself, kept apart
+        # from an ordinary unregistered word — `010`'s lost walk asks
+        # for the first and stays silent for the second, and it must not
+        # have to re-parse the name to tell them apart.
+        invocation = self.one("$RUNNER deploy")
+        self.assertEqual(invocation.name, "$RUNNER")
+        self.assertIsNone(invocation.entry)
+        self.assertTrue(invocation.dynamic_name)
+
+    def test_an_ordinary_unknown_command_word_is_not_dynamic(self) -> None:
+        self.assertFalse(self.one("myrunner deploy").dynamic_name)
+
 
 class PathDeclarationTests(Reads):
     """A tool may be declared by project-relative path (§4.2)."""
@@ -844,9 +928,16 @@ class LineContextTests(Reads):
             reading.invocations[0].context.relative_paths_unproven
         )
 
-    def test_the_poisoning_is_lexical_not_scope_aware(self) -> None:
-        # §3.2 states the cost deliberately: it "applies to everything
-        # after the `cd` on the line", real shell scoping included.
+    def test_a_cd_reaches_past_an_intervening_command(self) -> None:
+        # §3.2: it "applies to everything after the `cd` on the line" —
+        # the invocation between them does not clear it.
+        #
+        # What this case does *not* prove is §3.2's lexical-not-scope-
+        # aware ruling, whose discriminating example is the subshell:
+        # "`(cd build && make) && tool ./x` is poisoned for `./x`
+        # although the outer base never moved". Bare `(...)` is `011`'s,
+        # and the case belongs there, where the parse can tell a
+        # subshell from a command word.
         reading = self.read("cd build && make && stubtool clean .scratch/x")
         self.assertTrue(
             reading.invocations[-1].context.relative_paths_unproven
@@ -866,7 +957,7 @@ class LineContextTests(Reads):
         reading = self.read("cd /srv && ./tools/deploy.py --now")
         invocation = reading.invocations[-1]
         self.assertIs(invocation.entry, POLICY.lookup_path("tools/deploy.py"))
-        self.assertTrue(invocation.unproven)
+        self.assertEqual(invocation.doubts, (Doubt.UNRESOLVED_PATH,))
 
 
 class UnreadableTokenTests(Reads):
@@ -878,7 +969,7 @@ class UnreadableTokenTests(Reads):
         # accepts". Corpus: `stubtool --syntax-check 'my file.yml'` →
         # ask, although the grant's flag is right there.
         invocation = self.one("stubtool --syntax-check 'my file.yml'")
-        self.assertTrue(invocation.unproven)
+        self.assertEqual(invocation.doubts, (Doubt.UNREADABLE,))
 
     def test_a_glob_character_is_unreadable(self) -> None:
         # §4.2: "an operand or value containing whitespace, glob
@@ -919,6 +1010,18 @@ class UnreadableTokenTests(Reads):
             invocation.flags[0], Flag("--tags", Value("$FOO", dynamic=True))
         )
 
+    def test_a_dynamic_token_on_an_unregistered_tool_is_still_marked(
+        self,
+    ) -> None:
+        # §4.2 names this shape: "On positions nothing constrains, it is
+        # an opaque token like any other word (`echo $FOO` stays silent
+        # in the default posture)." The token is still dynamic — a
+        # matcher would answer unproven for it — and the invocation
+        # carries no doubt, because there is no gate for one to fail.
+        invocation = self.one("echo $FOO")
+        self.assertEqual(invocation.operands, (Value("$FOO", dynamic=True),))
+        self.assertEqual(invocation.doubts, ())
+
     def test_a_plain_line_is_proven(self) -> None:
         # Corpus: `stubtool --syntax-check site.yml` → silent, which no
         # unproven reading of it could reach.
@@ -935,13 +1038,16 @@ class UnreadableTokenTests(Reads):
         invocation = self.one("stubtool clean /tmp/a$")
         self.assertFalse(invocation.operands[-1].dynamic)
 
-    def test_reading_reports_the_doubt_without_judging_it(self) -> None:
-        # The flag is a reading fact, not a verdict: what it costs is
-        # §3.2's business at `009`, where a gated tool's grants are what
-        # it withholds. Corpus: `git commit -m 'a plain message'` →
-        # silent, on a tool that is registered and not gated.
+    def test_a_strange_token_on_a_rules_only_tool_is_no_doubt(self) -> None:
+        # §4.2 scopes this rule to gated invocations — "a token a gated
+        # invocation carries that the engine cannot read as a plain
+        # word" — because what a strange token defeats is a grant, and a
+        # rules-only tool has none. Corpus: `git commit -m 'a plain
+        # message'` → silent, on a tool that is registered and not
+        # gated. Recorded flat, it would be a doubt on nearly every
+        # ordinary line.
         invocation = self.one("git commit -m 'a plain message'")
-        self.assertTrue(invocation.unproven)
+        self.assertEqual(invocation.doubts, ())
         entry = invocation.entry
         assert entry is not None
         self.assertFalse(entry.gated)

@@ -23,21 +23,58 @@ heredocs are `011`. Handoffs and redirections are `012`. Reading stops
 at the segment boundary and hands each segment's command word to the
 registry.
 
-**And doubt is reported, never priced.** A token no matcher can read, a
-declared value-taking flag with nothing after it, a name whose identity
-an in-line `cd` has unsettled: each sets `Invocation.unproven`, and
-what that costs is §3.2's business. On a gated tool it is what no grant
-can release; on a rules-only tool the judgment stands on what was read.
-Keeping the two apart is what stops a parser from quietly holding
-policy.
+**And doubt is reported by source, never priced.** A token no matcher
+can read, a declared value-taking flag with nothing after it, a name
+whose identity an in-line `cd` has unsettled: each is a `Doubt` on the
+invocation, and what one *costs* is §3.2's business at `009`. The
+sources are kept apart because §4.2 does not scope them alike — one is
+stated on gated invocations and two are stated flat — and because §6.2
+owes an operator the token that did it, not the word "unproven".
 """
 
 from __future__ import annotations
 
+import enum
 from dataclasses import dataclass, field
 
 from .matchers import NO_CONTEXT, MatchContext, Value
 from .registry import Entry, Registry
+
+
+class Doubt(enum.Enum):
+    """Why reading could not establish an invocation's shape (§3.3).
+
+    Three members rather than one boolean, because §4.2 does not scope
+    them alike and `009` has to be able to tell them apart. The
+    unreadable-token rule is stated **on gated invocations** — "a token
+    a gated invocation carries that the engine cannot read as a plain
+    word" — while a malformed invocation and an unresolved name are
+    stated flat: "a declared value-taking flag with nothing after it
+    makes the invocation malformed, which is unproven, not safe". Priced
+    through one boolean, a malformed `git -C` on a rules-only tool would
+    read as silence, which is the direction §3.3 forbids.
+
+    They are also what §6.2's citation will want: an operator told a
+    line is unproven is owed which token did it.
+    """
+
+    #: A token no matcher can read as a plain word: whitespace, a glob
+    #: character, or a shell variable reference (§4.2).
+    #:
+    #: Recorded on **gated invocations only**, because that is where
+    #: §4.2 states it — "a token a gated invocation carries that the
+    #: engine cannot read as a plain word" — and because what a strange
+    #: token defeats is a grant. A rules-only tool has none, and
+    #: `git commit -m 'a plain message'` is silent (corpus). The scope
+    #: lives here rather than at `009` so that every doubt this layer
+    #: reports is one, and nothing downstream has to remember which
+    #: ones to ignore.
+    UNREADABLE = "unreadable"
+    #: A declared value-taking flag with nothing after it (§4.2).
+    MALFORMED = "malformed"
+    #: A relative spelling of a path-declared tool after an in-line
+    #: `cd`: recognition degrades stricter, like any path match (§4.2).
+    UNRESOLVED_PATH = "unresolved-path"
 
 
 @dataclass(frozen=True)
@@ -96,13 +133,26 @@ class Invocation:
     #: What the rest of the line says about this invocation's matches —
     #: today, whether an earlier `cd` has poisoned relative paths (§3.2).
     context: MatchContext = NO_CONTEXT
-    #: Reading could not establish this invocation's shape with
-    #: certainty (§3.3). Four sources: a token that is not a plain word
-    #: (whitespace, a glob character), a dynamic reference, a declared
-    #: value-taking flag with nothing after it, and a relative
-    #: path-declared name after an in-line `cd`. What it costs is
-    #: §3.2's: on a gated tool no grant can release it.
-    unproven: bool = False
+    #: True where the command word is a variable the line cannot name —
+    #: `$RUNNER deploy` (§4.2). `entry` is None as for any unregistered
+    #: word, and this is what separates the two: a wrapper that loses
+    #: its walk on an unnameable command asks, where a literal unknown
+    #: word is silence. Recorded here so `010` reads a parse fact rather
+    #: than re-parsing the name.
+    dynamic_name: bool = False
+    #: Everything reading could not establish about this invocation
+    #: (§3.3), by source. Empty is a clean reading.
+    doubts: tuple[Doubt, ...] = ()
+
+    @property
+    def unproven(self) -> bool:
+        """Reading left something unestablished — see `doubts` for what.
+
+        The convenience over `doubts`, and never the whole answer: what
+        an unproven invocation *costs* is §3.2's, and it differs by
+        source, which is why the sources are kept.
+        """
+        return bool(self.doubts)
 
 
 @dataclass(frozen=True)

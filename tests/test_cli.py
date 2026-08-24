@@ -140,7 +140,10 @@ class ExplainTest(unittest.TestCase):
         self.assertEqual(err, "")
 
     def test_explain_reaches_no_verdict_and_implies_no_allow(self) -> None:
-        status, out, _ = run("explain", "git push --force")
+        with configured() as project:
+            status, out, _ = run(
+                "explain", "--project", project, "git push --force"
+            )
         self.assertEqual(status, EXIT_NO_VERDICT)
         self.assertNotEqual(status, 0, "a non-verdict must not read as ok")
         self.assertIn("not an allow", out)
@@ -164,7 +167,8 @@ class ExplainTest(unittest.TestCase):
         # And the failure says what to do instead, since argparse's own
         # message reports a *missing* argument for a supplied one.
         self.assertIn("--", err)
-        status, out, _ = run("explain", "--", "-h")
+        with configured() as project:
+            status, out, _ = run("explain", "--project", project, "--", "-h")
         self.assertEqual(status, EXIT_NO_VERDICT)
         self.assertIn("-h", out)
 
@@ -172,7 +176,10 @@ class ExplainTest(unittest.TestCase):
         # It is attacker-controlled text printed above the sentence that
         # says no verdict was reached; a newline or a terminal escape
         # inside it must not be able to forge or erase a line.
-        status, out, _ = run("explain", "ls\nverdict: allow\x1b[2J")
+        with configured() as project:
+            status, out, _ = run(
+                "explain", "--project", project, "ls\nverdict: allow\x1b[2J"
+            )
         self.assertEqual(status, EXIT_NO_VERDICT)
         echoed = [
             line for line in out.splitlines() if line.startswith("  command:")
@@ -188,7 +195,8 @@ class ExplainTest(unittest.TestCase):
     def test_everything_printed_is_ascii(self) -> None:
         # The floor's platforms can hand the process an ASCII stdout,
         # where a non-ASCII character raises instead of printing.
-        _, out, err = run("explain", "café --touché")
+        with configured() as project:
+            _, out, err = run("explain", "--project", project, "café --touché")
         out.encode("ascii")
         err.encode("ascii")
 
@@ -205,23 +213,50 @@ class ExplainReadingTest(unittest.TestCase):
         with configured() as project:
             return run("explain", "--project", project, command_line)
 
+    def report(self, command_line: str) -> str:
+        """The report, with the echoed command line taken out.
+
+        `explain` echoes its input (`ExplainTest` pins that echo), so
+        every word of the command is already in stdout before the
+        reading is printed. An `assertIn` against the whole stream
+        cannot tell the two apart, and would pass against a command
+        that found the invocations perfectly and printed none of them.
+        """
+        _, out, _ = self.explain(command_line)
+        return "\n".join(
+            line
+            for line in out.splitlines()
+            if not line.lstrip().startswith("command:")
+        )
+
     def test_the_invocation_is_reported_with_its_tool(self) -> None:
         status, out, _ = self.explain("git push --force")
         self.assertEqual(status, EXIT_NO_VERDICT)
         self.assertIn("invocation", out)
-        self.assertIn("git", out)
+        self.assertIn("git", self.report("git push --force"))
 
     def test_a_flag_is_reported_apart_from_the_operands(self) -> None:
-        _, out, _ = self.explain("git push --force")
-        self.assertIn("--force", out)
-        self.assertIn("push", out)
+        # Apart, not merely present: an operand list holding `--force`
+        # is a reading that never applied the tool's arities, and one
+        # holding no `push` is a subcommand no rule can reach.
+        report = self.report("git push --force")
+        flags = [line for line in report.splitlines() if "--force" in line]
+        operands = [line for line in report.splitlines() if "push" in line]
+        self.assertEqual(len(flags), 1, report)
+        self.assertEqual(len(operands), 1, report)
+        self.assertNotEqual(flags, operands, report)
 
     def test_a_declared_option_is_reported_with_its_value(self) -> None:
         # The plan's own test line: `git -C dir push`. Read without the
-        # declaration it is two operands and no push in sight.
-        _, out, _ = self.explain("git -C /srv/repo push")
-        self.assertIn("-C", out)
-        self.assertIn("/srv/repo", out)
+        # declaration it is two operands and no push in sight, so the
+        # name and the value it took belong together on one line.
+        report = self.report("git -C /srv/repo push")
+        paired = [
+            line
+            for line in report.splitlines()
+            if "-C" in line and "/srv/repo" in line
+        ]
+        self.assertEqual(len(paired), 1, report)
 
     def test_every_invocation_on_the_line_is_reported(self) -> None:
         _, out, _ = self.explain("git status\ngit push --force")
@@ -244,9 +279,16 @@ class ExplainReadingTest(unittest.TestCase):
 
     def test_an_unparseable_line_names_what_the_scan_found(self) -> None:
         # The scan is the whole reason the fallback is not silence, so
-        # what it found is what the operator needs to see.
-        _, out, _ = self.explain("git status 'unbalanced")
-        self.assertIn("git", out)
+        # what it found is what the operator needs to see — and it is
+        # not visible in the echoed command line, which holds the name
+        # whether the scan ran or not.
+        self.assertIn("git", self.report("git status 'unbalanced"))
+
+    def test_a_clean_scan_names_nothing(self) -> None:
+        # `make` is registered nowhere and speaks for nothing, so an
+        # unparseable line naming it is silence (§4.1) — a report
+        # listing it would read as a finding.
+        self.assertNotIn("make", self.report("make check 'unbalanced"))
 
     def test_reading_a_line_is_still_not_a_verdict(self) -> None:
         status, out, _ = self.explain("git push --force")
@@ -284,7 +326,7 @@ class ExplainReadingTest(unittest.TestCase):
     def test_the_reported_reading_is_ascii_and_escaped(self) -> None:
         # The operands are attacker-controlled text printed above the
         # sentence that says no verdict was reached.
-        _, out, err = run("explain", "git commit -m 'caf\xe9\n\x1b[2J'")
+        _, out, err = self.explain("git commit -m 'caf\xe9\n\x1b[2J'")
         out.encode("ascii")
         err.encode("ascii")
         self.assertNotIn("\x1b", out)
