@@ -213,16 +213,19 @@ class ExplainReadingTest(unittest.TestCase):
         with configured() as project:
             return run("explain", "--project", project, command_line)
 
-    def report(self, command_line: str) -> str:
-        """The report, with the echoed command line taken out.
+    def body(self, out: str) -> str:
+        """`out` with the echoed command line taken out of it.
 
         `explain` echoes its input (`ExplainTest` pins that echo), so
         every word of the command is already in stdout before the
         reading is printed. An `assertIn` against the whole stream
         cannot tell the two apart, and would pass against a command
         that found the invocations perfectly and printed none of them.
+
+        A function of the output and not of a command line, so that a
+        case reading both the status and the report runs `explain`
+        once, in a line the case itself carries.
         """
-        _, out, _ = self.explain(command_line)
         return "\n".join(
             line
             for line in out.splitlines()
@@ -230,33 +233,35 @@ class ExplainReadingTest(unittest.TestCase):
         )
 
     def test_the_invocation_is_reported_with_its_tool(self) -> None:
-        status, out, _ = self.explain("git push --force")
-        self.assertEqual(status, EXIT_NO_VERDICT)
-        self.assertIn("invocation", out)
-        self.assertIn("git", self.report("git push --force"))
+        _, out, _ = self.explain("git push --force")
+        body = self.body(out)
+        self.assertIn("invocation", body)
+        self.assertIn("git", body)
 
     def test_a_flag_is_reported_apart_from_the_operands(self) -> None:
         # Apart, not merely present: an operand list holding `--force`
         # is a reading that never applied the tool's arities, and one
         # holding no `push` is a subcommand no rule can reach.
-        report = self.report("git push --force")
-        flags = [line for line in report.splitlines() if "--force" in line]
-        operands = [line for line in report.splitlines() if "push" in line]
-        self.assertEqual(len(flags), 1, report)
-        self.assertEqual(len(operands), 1, report)
-        self.assertNotEqual(flags, operands, report)
+        _, out, _ = self.explain("git push --force")
+        body = self.body(out)
+        flags = [line for line in body.splitlines() if "--force" in line]
+        operands = [line for line in body.splitlines() if "push" in line]
+        self.assertEqual(len(flags), 1, body)
+        self.assertEqual(len(operands), 1, body)
+        self.assertNotEqual(flags, operands, body)
 
     def test_a_declared_option_is_reported_with_its_value(self) -> None:
         # The plan's own test line: `git -C dir push`. Read without the
         # declaration it is two operands and no push in sight, so the
         # name and the value it took belong together on one line.
-        report = self.report("git -C /srv/repo push")
+        _, out, _ = self.explain("git -C /srv/repo push")
+        body = self.body(out)
         paired = [
             line
-            for line in report.splitlines()
+            for line in body.splitlines()
             if "-C" in line and "/srv/repo" in line
         ]
-        self.assertEqual(len(paired), 1, report)
+        self.assertEqual(len(paired), 1, body)
 
     def test_every_invocation_on_the_line_is_reported(self) -> None:
         _, out, _ = self.explain("git status\ngit push --force")
@@ -268,8 +273,9 @@ class ExplainReadingTest(unittest.TestCase):
         # Silence is a real answer (§3.2) and the operator has to be
         # able to see that frisk knows nothing about a name.
         _, out, _ = self.explain("make check")
-        self.assertIn("make", out)
-        self.assertIn("unregistered", out)
+        body = self.body(out)
+        self.assertIn("make", body)
+        self.assertIn("unregistered", body)
 
     def test_an_unparseable_line_says_so(self) -> None:
         # §4.1: unproven, "never silent approval of whatever it might
@@ -282,13 +288,15 @@ class ExplainReadingTest(unittest.TestCase):
         # what it found is what the operator needs to see — and it is
         # not visible in the echoed command line, which holds the name
         # whether the scan ran or not.
-        self.assertIn("git", self.report("git status 'unbalanced"))
+        _, out, _ = self.explain("git status 'unbalanced")
+        self.assertIn("git", self.body(out))
 
     def test_a_clean_scan_names_nothing(self) -> None:
         # `make` is registered nowhere and speaks for nothing, so an
         # unparseable line naming it is silence (§4.1) — a report
         # listing it would read as a finding.
-        self.assertNotIn("make", self.report("make check 'unbalanced"))
+        _, out, _ = self.explain("make check 'unbalanced")
+        self.assertNotIn("make", self.body(out))
 
     def test_reading_a_line_is_still_not_a_verdict(self) -> None:
         status, out, _ = self.explain("git push --force")
