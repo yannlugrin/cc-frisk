@@ -1416,3 +1416,41 @@ Detail in git history.
   where it would bite next (steps `010` and `012`).
 - **Approved by:** operator, 2026-08-24 — rename §4.1's predicate,
   no behaviour change.
+
+### D-048 — A newline is `\r\n`, `\n` or a lone `\r`
+
+- **Date:** 2026-08-25
+- **Step:** `008`
+- **Context:** §4.1 lists the separators a compound command is split at
+  and names "newlines" without saying which characters. The cases for
+  the step exercised `\n` alone, which left two shapes unread. A `\r\n`
+  split only at the `\n` leaves the carriage return on the last token of
+  the preceding line, so `git push --force\r\ngit status` carries the
+  flag `--force\r` — matching no declaration, firing no rule, and
+  answering silence about a line that reads as a forced push. A lone
+  `\r`, which bash treats as an ordinary character, hides a whole
+  invocation: `git status\rgit push --force` is one `git status`.
+  Neither is exotic — a command string is not always authored on the
+  platform that runs it, and CRLF in a multiline string is a transport
+  artifact far more often than an operand.
+- **Decision:** all three spellings are line endings, and the engine's
+  separator set is named (`reading.SEPARATORS`) so the suite can iterate
+  what the engine actually uses rather than a copy of it. The lone `\r`
+  is a deliberate over-read of the shell, and it is the only one:
+  where bash would have treated the character as data, frisk splits and
+  may produce an invocation bash would not run. That direction is
+  §3.3's — the cost is a prompt on the rare line that meant the
+  character, against a rule that would otherwise not fire.
+- **Alternatives considered:** *`\r\n` and `\n` only, leaving a lone
+  `\r` as data* — closer to the shell, and it fixes the common case;
+  rejected because the lone-`\r` residue is the worse of the two (a
+  hidden invocation, not a mangled flag) and because the resulting rule
+  — "a carriage return is a line ending here and data there" — is one
+  nobody could predict from the outside. *`\n` only, faithful to bash,
+  with the gap named in §4.4's declared blind spots* — defensible, since
+  bash and git would both error on `--force\r` rather than force-push,
+  so nothing bad happens in the world; rejected because frisk's answer
+  would be silence about a line that spells a forced push, and §4.4 is
+  for gaps that cannot be closed cheaply, not for ones that cost a
+  tuple entry.
+- **Approved by:** operator, 2026-08-25 — all three spellings.

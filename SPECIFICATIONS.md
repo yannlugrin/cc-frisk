@@ -667,12 +667,23 @@ silent gap becomes an unprompted destructive command.
   `git commit -m 'fix the --amend bug'` is not an amend, and a flag hidden
   in a quoted substitution is invisible to any regex that respects quotes.
 - **Compound commands are split at every separator** — `&&`, `||`, `;`,
-  `|`, `|&`, `&` and **newlines**, including runs of them and blank lines.
+  `|`, `|&`, `&` and **newlines in all three spellings** (`\r\n`, `\n`
+  and a lone `\r`), including runs of them and blank lines.
   The newline is load-bearing, not an afterthought: multiline command
   strings are routine, and an engine that misses it reads
   `git status\ngit push --force` as a single `git status` invocation with
   extra operands — no push rule can fire. A separator inside quotes is
   data, not a separator: a multiline commit message is one argument.
+  Three spellings, because a command string is not always authored on
+  the platform that runs it. A `\r\n` left as data puts the carriage
+  return on the last token of every line — `git push --force\r\ngit
+  status` carries the flag `--force\r`, which matches no declaration and
+  fires no rule — and a lone `\r` left as data hides a whole invocation,
+  reading `git status\rgit push --force` as one `git status`. The lone
+  `\r` is the one place this deliberately over-reads the shell, which
+  treats a carriage return as an ordinary character; the cost is a
+  prompt on the rare line that meant the character, against a rule that
+  would otherwise not fire (§3.3).
 - **Backslash-line continuations are joined before splitting**, as the
   shell joins them — otherwise `git push \`⏎`--force` hides the flag
   inside a mangled operand.
