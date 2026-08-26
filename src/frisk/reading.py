@@ -785,8 +785,14 @@ def _matched(
     return values
 
 
-def _readable(value: Value) -> bool:
-    """Whether a matcher can read this as the plain word grants prove."""
+def readable(value: Value) -> bool:
+    """Whether a matcher can read this as the plain word grants prove.
+
+    Public because the report needs it: an invocation told it is
+    unproven is owed the token that did it (§6.2), and the printer
+    asking this is the alternative to the printer re-deriving the rule
+    and getting a different answer.
+    """
     if value.dynamic:
         return False
     return not any(
@@ -803,7 +809,7 @@ def _doubts(
 ) -> tuple[Doubt, ...]:
     """What reading could not establish, in a fixed order (§3.3)."""
     doubts: list[Doubt] = []
-    if entry is not None and entry.gated and not all(map(_readable, values())):
+    if entry is not None and entry.gated and not all(map(readable, values())):
         doubts.append(Doubt.UNREADABLE)
     if malformed:
         doubts.append(Doubt.MALFORMED)

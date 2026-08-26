@@ -53,7 +53,7 @@ from . import __version__
 from .config import config_path, deprecation, load, locate
 from .errors import ConfigurationError
 from .matchers import Value
-from .reading import Flag, Invocation, Reading, read
+from .reading import Doubt, Flag, Invocation, Reading, read, readable
 from .registry import Cases, Registry, engine_defaults, printable
 
 PROGRAM = "frisk"
@@ -331,8 +331,23 @@ def _invocation_lines(position: int, invocation: Invocation) -> list[str]:
     for operand in invocation.operands:
         lines.append(f"    operand:    {_value_shown(operand)}")
     for doubt in invocation.doubts:
-        lines.append(f"    unproven:   {printable(doubt.value)}")
+        lines.append(f"    unproven:   {_DOUBTS[doubt]}")
     return lines
+
+
+#: What each source of doubt means, said rather than named. The bare
+#: enum value is a category, and §6.2 owes an operator the reason their
+#: line could not be proven — the token itself is marked on the field
+#: above, by `_value_shown`.
+_DOUBTS = {
+    Doubt.UNREADABLE: (
+        "a value above is not a plain word, so no grant can prove it"
+    ),
+    Doubt.MALFORMED: "a declared value-taking flag has nothing after it",
+    Doubt.UNRESOLVED_PATH: (
+        "a relative name, after an in-line `cd` moved what it hangs off"
+    ),
+}
 
 
 def _registration(invocation: Invocation) -> str:
@@ -359,8 +374,18 @@ def _flag_shown(flag: Flag) -> str:
 
 
 def _value_shown(value: Value) -> str:
-    """A value as the engine holds it, with the unknown marked."""
-    return render(value.text) + (" (dynamic)" if value.dynamic else "")
+    """A value as the engine holds it, with the unknown marked.
+
+    A value no matcher can read is marked wherever it appears, not only
+    where it cost something: on a gated tool it is what the `unproven:`
+    line below points at, and on a rules-only tool its absence from
+    that line is the reader learning it was seen and did not matter.
+    """
+    if value.dynamic:
+        return f"{render(value.text)} (expanded by the shell)"
+    if not readable(value):
+        return f"{render(value.text)} (not a plain word)"
+    return render(value.text)
 
 
 #: The three lines that open a printed registry, before the entry

@@ -107,13 +107,35 @@ class VersionTest(unittest.TestCase):
 #: is `tests/test_composition.py`'s subject, and what a *line* holds is
 #: `tests/test_reading.py`'s. This is the door between them.
 PROJECT_CONFIG = """\
-from frisk.declare import api_generation, ask, deny, takes_value, tool
+from frisk.declare import (
+    any_flag,
+    api_generation,
+    ask,
+    bare,
+    deny,
+    grant,
+    takes_value,
+    tool,
+)
 
 api_generation(1)
 
 tool(
+    "deploy",
+    default=ask(reason="deploy changes infrastructure."),
+    flags=[bare("--syntax-check")],
+    grants=[
+        grant(
+            when=any_flag("--syntax-check"),
+            reason="A local question: nothing is applied.",
+        ),
+    ],
+)
+
+tool(
     "git",
     options=[takes_value("-C")],
+    flags=[takes_value("-m")],
     rules=[
         deny(
             "push",
@@ -280,6 +302,30 @@ class ExplainReadingTest(unittest.TestCase):
         body = self.body(out)
         self.assertIn("make", body)
         self.assertIn("unregistered", body)
+
+    def test_an_unprovable_invocation_says_which_value_did_it(self) -> None:
+        # §6.2 owes the operator the reason their line could not be
+        # proven, and a category name is not one: `unproven: unreadable`
+        # names neither the token nor what it cost. The value is marked
+        # where it is printed, and the summary points at it.
+        _, out, _ = self.explain("deploy --syntax-check 'my file.yml'")
+        body = self.body(out)
+        marked = [line for line in body.splitlines() if "my file.yml" in line]
+        self.assertEqual(len(marked), 1, body)
+        self.assertIn("not a plain word", marked[0])
+        self.assertIn("unproven:", body)
+
+    def test_a_value_seen_and_harmless_is_marked_without_a_doubt(
+        self,
+    ) -> None:
+        # git is registered and not gated, so a strange token costs
+        # nothing — §4.2 scopes the rule to gated tools. Marking it
+        # anyway, with no `unproven:` line beside it, is what tells the
+        # reader it was seen and did not matter.
+        _, out, _ = self.explain("git commit -m 'a plain message'")
+        body = self.body(out)
+        self.assertIn("not a plain word", body)
+        self.assertNotIn("unproven:", body)
 
     def test_an_unparseable_line_says_so(self) -> None:
         # §4.1: unproven, "never silent approval of whatever it might
