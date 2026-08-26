@@ -16,6 +16,12 @@ are `017`, behind open fact (c) at `015`: a rule may declare `allow`
 today, but no line answers one, so the cases here pin the withholding
 rather than a release (`D-051`).
 
+A fifth is narrower and named for the same reason: how secure mode
+meets the **engine's default layers** — every wrapper, shell and
+interpreter, all registered with no declared default — is deferred to
+`010`, where a wrapper's own contribution to a line is designed
+(`D-057`). Nothing here asserts it either way.
+
 The corpus is therefore reproduced in part: the context B rulings this
 step can reach, and no more. `014` is where all three contexts are
 reproduced end to end; what stands here is the subset that judging
@@ -142,8 +148,22 @@ def shapes() -> Registry:
                 ),
             ],
         )
-        # §3.2's other two quantifier forms, and the closed world
-        # declared without a grant.
+        # `D-056`'s shape: a closed world, no grants, no declared
+        # default. The flag list is the opt-in list an operator steers
+        # by editing, so it has to change an outcome.
+        tool(
+            "closed",
+            flags=[bare("--check", "--verbose")],
+            closed_world=True,
+            rules=[
+                deny(
+                    "wipe",
+                    reason="Wiping destroys state.",
+                    label="closed wipe",
+                ),
+            ],
+        )
+        # §3.2's other two quantifier forms.
         tool(
             "shaped",
             default=ask(reason="shaped changes state unless proven local."),
@@ -439,6 +459,29 @@ class GrantTests(Shaped):
         # quieter". The grant would hold on `--dry-run` alone.
         self.assertVerdict("unsetgated --dry-run --unknown", Verdict.ASK)
 
+    def test_a_flag_outside_the_closed_world_asks_in_its_own_right(
+        self,
+    ) -> None:
+        # `D-056`(b). Without this the closed world can only reach the
+        # default verdict, so on a tool with no grants — nothing that
+        # could ever release it — the declared flag list would change
+        # no verdict at all and `closed_world=True` would be a keyword
+        # that does nothing. Taking `--check` out of the list is how an
+        # operator makes `--check` ask; that only works if the breach
+        # is a contribution.
+        self.assertVerdict("closed --unknown", Verdict.ASK)
+        # And it is stricter, never stronger than what a rule decided.
+        self.assertVerdict("closed --unknown wipe", Verdict.DENY)
+
+    def test_the_breach_names_the_flag_that_caused_it(self) -> None:
+        # §6.2: no declaration reached this verdict, so the citation
+        # has to name the token and say the engine's own reason.
+        judgment = judge(read("closed --unknown", SHAPES), SHAPES)
+        self.assertIs(judgment.verdict, Verdict.ASK)
+        self.assertEqual(self.phrases(judgment), ["flag --unknown"])
+        self.assertIsNone(judgment.citations[0].label)
+        self.assertTrue(judgment.citations[0].reason.strip())
+
     def test_no_operands_is_the_empty_case_spelled_deliberately(
         self,
     ) -> None:
@@ -531,6 +574,17 @@ class DefaultVerdictTests(Shaped):
     def test_a_granted_tool_with_no_declared_default_asks(self) -> None:
         # "ask for a granted tool".
         self.assertVerdict("unsetgated", Verdict.ASK)
+
+    def test_a_closed_world_without_grants_is_silent_by_default(
+        self,
+    ) -> None:
+        # `D-056`(a): §3.2's enumeration verbatim — ask where the tool
+        # declares *grants*, silent otherwise. `closed` declares a
+        # closed world and no grant, so an accounted invocation is the
+        # rules-only silence, not an ask.
+        self.assertVerdict("closed --check", Verdict.SILENT)
+        self.assertVerdict("closed --check --verbose", Verdict.SILENT)
+        self.assertVerdict("closed wipe", Verdict.DENY)
 
     def test_an_explicit_verdict_stands_on_its_own(self) -> None:
         # "'every use of this one is the operator's' is a tool with a

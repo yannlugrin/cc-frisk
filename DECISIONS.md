@@ -1672,31 +1672,76 @@ Detail in git history.
 - **Approved by:** implementer (within latitude: §9 leaves the numbers
   to the implementation and requires only that they be usable).
 
-### D-056 — a gated tool with no declared default asks
+### D-056 — what a closed world does, and what an ungranted tool defaults to
 
-- **Date:** 2026-08-26
+- **Date:** 2026-08-27
 - **Step:** `009`
 - **Context:** §3.2 enumerates the per-tool defaults as "silent for a
-  rules-only tool, ask for a granted tool, or an explicit verdict",
-  which leaves one shape unnamed: a tool that declares a closed world
-  and no grants and no default. `D-049` describes such a tool as
-  asking on an unaccounted flag; §3.2's closed-world sentence says an
-  unaccounted flag "gets the tool's default verdict", which would be
-  silence under the rules-only reading — and a closed world would then
-  be a declaration with no effect at all.
-- **Decision:** the implicit default is **ask for any gated tool** —
-  grants declared, closed world declared, or both — and silence
-  otherwise. `Entry.gated` is the question asked, which is the same
-  property everything else in the closed world keys on. An unaccounted
-  flag therefore reaches the default verdict exactly as §3.2 says, and
-  for the unnamed shape that default is ask, which is what `D-049`
-  described.
-- **Alternatives considered:** *`bool(entry.grants)`, following §3.2's
-  word "granted" literally* — rejected: it makes `closed_world=True`
-  with no grant a no-op, and contradicts `D-049`'s reading of the same
-  shape. *An explicit verdict required on any gated tool* — rejected as
-  ceremony: §3.2 defines implicit defaults precisely so a declaration
-  need not repeat the obvious one.
-- **Approved by:** implementer (within latitude: §3.2 does not name
-  this shape; the choice is the stricter of the two readings and the
-  one `D-049` already assumed).
+  rules-only tool, ask for a granted tool, or an explicit verdict", and
+  says separately that an invocation failing a gated tool's closed
+  world "gets the tool's default verdict". Between them sits a shape
+  neither sentence names: a tool declaring `closed_world=True` with no
+  grants and no default. `D-049` (step `008`) described exactly that
+  shape as one that "asks on an unaccounted flag", and `tool()`'s own
+  docstring says `closed_world` "closes the tool's flag list without
+  granting anything" — both of which promise the flag list changes an
+  outcome. Under the two sentences alone it cannot: nothing releases a
+  tool with no grants, so every invocation reaches the default and the
+  declared list is decorative.
+- **Decision:** two parts, and the second is what makes the first
+  meaningful. **(a)** The implicit default is §3.2's enumeration
+  verbatim: **ask where the tool declares grants, silent otherwise** —
+  `bool(entry.grants)`, not `entry.gated`. **(b)** A flag outside a
+  gated tool's closed world defeats every grant *and contributes an
+  **ask** of its own*, cited by name. The flag list is therefore an
+  opt-in list an operator can steer by editing: taking a flag out of it
+  makes that flag ask. On every gated tool §3.2 actually describes —
+  ask-default (`stubtool --syntax-check deploy.yml --unknown` → ask)
+  and deny-default (`osmp subnet set --gateway … default` → deny) —
+  this answers exactly what the corpus adjudicates, because the breach
+  ask is absorbed by a default at least as strong. It differs only on
+  the silent-default shape §3.2 never contemplated, and there it gives
+  `D-049`'s sentence.
+- **Alternatives considered:** *ask for any gated tool (`entry.gated`),
+  the breach reaching only the default* — the implementer's first
+  draft, rejected by the operator at the case gate: a closed-world-only
+  tool would then ask on **every** invocation, which is what
+  `default=ask(...)` already spells, and the flag list would still
+  change no verdict. *§3.2 to the letter, no breach contribution* —
+  rejected: `closed_world=True` without grants becomes a keyword that
+  does nothing, indistinguishable from `closed_world=False`, and
+  `D-049`'s sentence would have to be struck as wrong.
+- **Approved by:** operator, 2026-08-27 — "the more flexible and
+  natural for the user; if the user wants an ask on `--check`, they
+  remove it from the flags list (that is an opt-in list)".
+
+### D-057 — secure mode meets the engine's default layers: deferred to `010`
+
+- **Date:** 2026-08-27
+- **Step:** `009`
+- **Context:** §3.2 says secure mode's global default replaces the
+  verdict of "registered tools whose default verdict was left unset",
+  and the same paragraph says the engine's default layers "keep their
+  declared default verdicts: `cat foo` stays silent". Every entry in
+  `defaults.py` — every wrapper, shell and interpreter — is registered
+  with **no** declared default, so the two sentences pull opposite ways
+  on `sudo ls` in secure mode: the first makes it the global default,
+  the second reads as an exemption. `test-reviewer` raised it at the
+  case gate, because the cases freeze.
+- **Decision:** `009` writes no case either way, and the suite's
+  docstring names it as a scope boundary alongside the other four. A
+  wrapper's own contribution to a line is designed at `010` ("Registered
+  wrappers contributing their own verdict and the walk continuing to
+  what they run"), and a case frozen here would pin wrapper behaviour
+  against a build that does not walk one. The tool cases of secure mode
+  stand as written; only the default-layer entries are unaddressed.
+- **Alternatives considered:** *declare `silent()` on every
+  default-layer entry now*, making §3.2's sentence true by construction
+  — plausible, and still open at `010`, but it commits `007`'s
+  deliverable to a claim about wrappers before the step that judges one.
+  *Case it as "unset is unset"* — literal, but it makes every
+  wrapper-led line carry a deny from the wrapper itself in secure mode,
+  including where the wrapped command is registered and silent, and
+  that is exactly the trade `010` should make with the walk in front of
+  it.
+- **Approved by:** operator, 2026-08-27 — defer to `010`.
