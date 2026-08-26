@@ -45,7 +45,8 @@ from typing import NoReturn
 from . import __version__
 from .config import config_path, deprecation, load, locate
 from .errors import ConfigurationError
-from .reading import Reading, read
+from .matchers import Value
+from .reading import Flag, Invocation, Reading, read
 from .registry import Cases, engine_defaults, printable
 
 PROGRAM = "frisk"
@@ -230,9 +231,93 @@ def explain_command(args: argparse.Namespace) -> int:
     return EXIT_NO_VERDICT
 
 
+#: The closing paragraph of every `explain`. It is what a caller who
+#: reads stdout instead of the exit status must not be able to
+#: misread, so it says the two things that are true of this build: the
+#: line was read, and nothing judged it.
+_NO_VERDICT = """\
+Nothing was judged: this build reads the line and reports what it found.
+This is not an allow: read a frisk of this version as absent from the
+permission path.\
+"""
+
+
 def _reported(command_line: str, reading: Reading) -> str:
-    """The whole report for one command line."""
-    raise NotImplementedError
+    """The whole report for one command line.
+
+    Every field goes through `printable`, because the command line is
+    attacker-controlled text printed above the sentence that says no
+    verdict was reached: a newline or a terminal escape inside an
+    operand must not be able to forge a line of frisk's own output or
+    erase one.
+    """
+    lines = ["", f"  command: {render(command_line)}", ""]
+    if reading.unparseable:
+        lines.extend(_unparseable_lines(reading))
+    else:
+        for position, invocation in enumerate(reading.invocations, start=1):
+            lines.extend(_invocation_lines(position, invocation))
+            lines.append("")
+    if not reading.unparseable and not reading.invocations:
+        lines.extend(["  no command runs on this line.", ""])
+    lines.append(_NO_VERDICT)
+    return "\n".join(lines)
+
+
+def _unparseable_lines(reading: Reading) -> list[str]:
+    """§4.1's fallback, said so an operator can act on it."""
+    named = ", ".join(printable(name) for name in reading.speaking)
+    return [
+        "  this line could not be parsed, so nothing was read from it.",
+        "  it is unproven, not approved (§4.1).",
+        "",
+        "  tools with rules or grants named on the raw line: "
+        + (named if named else "none"),
+        "",
+    ]
+
+
+def _invocation_lines(position: int, invocation: Invocation) -> list[str]:
+    """One invocation, with everything that bound to it (§4.2)."""
+    lines = [
+        f"  invocation {position}: {render(invocation.name)} "
+        f"({_registration(invocation)})"
+    ]
+    for assigned in invocation.assignments:
+        lines.append(
+            f"    assignment: {printable(assigned.name)}"
+            f" = {_value_shown(assigned.value)}"
+        )
+    for option in invocation.options:
+        lines.append(f"    option:     {_flag_shown(option)}")
+    for flag in invocation.flags:
+        lines.append(f"    flag:       {_flag_shown(flag)}")
+    for operand in invocation.operands:
+        lines.append(f"    operand:    {_value_shown(operand)}")
+    for doubt in invocation.doubts:
+        lines.append(f"    unproven:   {printable(doubt.value)}")
+    return lines
+
+
+def _registration(invocation: Invocation) -> str:
+    """What the engine knows this command word to be."""
+    if invocation.entry is None:
+        return "unregistered" + (
+            ", a name the line cannot show" if invocation.dynamic_name else ""
+        )
+    entry = invocation.entry
+    return f"{entry.kind.value} {printable(entry.name)}"
+
+
+def _flag_shown(flag: Flag) -> str:
+    if flag.value is None:
+        return printable(flag.name)
+    return f"{printable(flag.name)} = {_value_shown(flag.value)}"
+
+
+def _value_shown(value: Value) -> str:
+    """A value as the engine holds it, with the unknown marked."""
+    return render(value.text) + (" (dynamic)" if value.dynamic else "")
 
 
 #: The three lines that open a printed registry, before the entry

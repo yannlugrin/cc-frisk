@@ -365,7 +365,15 @@ class ModuleDoorTest(unittest.TestCase):
         self.assertEqual(completed.stderr, "")
 
     def test_python_m_frisk_carries_the_exit_status_out(self) -> None:
-        completed = run_out_of_process("explain", "ls")
+        # Configured, because stderr carries what is *not* the answer
+        # and §5.4's "this project gates nothing" is one of those: run
+        # against the repository, which has no configuration of its own,
+        # the note would be the only thing on the stream this case is
+        # here to prove stays empty.
+        with configured() as project:
+            completed = run_out_of_process(
+                "explain", "--project", project, "ls"
+            )
         self.assertEqual(completed.returncode, EXIT_NO_VERDICT)
         # Through a real process boundary, where the streams are the
         # operating system's rather than two StringIO objects.

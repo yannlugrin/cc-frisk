@@ -72,6 +72,14 @@ def policy() -> Registry:
         tool(
             "git",
             options=[takes_value("-C", "--git-dir", "--exec-path")],
+            # `-m` is context A's too: git's hedged allow is `commit`
+            # with `-m/--message`, so the corpus declares it
+            # value-taking. Without it here, §4.1's own example
+            # (`git commit -m 'fix the --amend bug'`) reads the message
+            # as an operand — correctly, since an undeclared flag is
+            # presumed bare, which is why the omission was a fixture
+            # defect and not a case one.
+            flags=[takes_value("-m", "--message")],
             rules=[
                 deny(
                     "push",
