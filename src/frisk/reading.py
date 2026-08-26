@@ -40,6 +40,35 @@ from dataclasses import dataclass, field
 from .matchers import NO_CONTEXT, MatchContext, Value
 from .registry import Entry, Registry
 
+#: Every token that ends one invocation and begins another (§4.1).
+#:
+#: Longest first, and the order is load-bearing rather than tidy: `&&`
+#: has to be tried before `&` and `|&` and `||` before `|`, or
+#: `a && b` reads as two separators around an empty segment. The
+#: newline is in the same list because §4.1 puts it there — "including
+#: runs of them and blank lines" — and an engine that treated it as
+#: whitespace would read `git status\ngit push --force` as one
+#: `git status` with extra operands. It appears in all three of §4.1's
+#: spellings (`D-048`), `\r\n` before `\n` for the same
+#: longest-first reason, so no token is left carrying a carriage
+#: return.
+#:
+#: Named rather than inlined so the suite can iterate what the engine
+#: actually uses: one case checks that every separator §4.1 lists is
+#: handled, and another that every separator declared here splits
+#: cleanly, so a member added later cannot arrive unexercised.
+SEPARATORS: tuple[str, ...] = (
+    "&&",
+    "||",
+    "|&",
+    ";",
+    "|",
+    "&",
+    "\r\n",
+    "\n",
+    "\r",
+)
+
 
 class Doubt(enum.Enum):
     """Why reading could not establish an invocation's shape (§3.3).

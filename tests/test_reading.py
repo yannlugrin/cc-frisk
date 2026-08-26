@@ -42,7 +42,15 @@ from frisk.declare import (
     tool,
 )
 from frisk.matchers import Value
-from frisk.reading import Assigned, Doubt, Flag, Invocation, Reading, read
+from frisk.reading import (
+    SEPARATORS,
+    Assigned,
+    Doubt,
+    Flag,
+    Invocation,
+    Reading,
+    read,
+)
 from frisk.registry import Registry, collecting
 from tests.corpus import context_b
 
@@ -241,6 +249,44 @@ class SplittingTests(Reads):
         self.assertEqual(self.operands(reading.invocations[1]), ["push"])
         self.assertEqual(self.flags(reading.invocations[1]), {"--force": None})
 
+    def test_a_carriage_return_newline_splits_and_leaves_no_return(
+        self,
+    ) -> None:
+        # `D-048`. Split at the `\n` alone, the carriage return stays on
+        # the last token of the line before it: `--force\r` matches no
+        # declaration, so the deny rule does not fire and a line
+        # spelling a forced push answers silence.
+        reading = self.read("git status\r\ngit push --force")
+        self.assertEqual(len(reading.invocations), 2)
+        self.assertEqual(self.operands(reading.invocations[0]), ["status"])
+        self.assertEqual(self.flags(reading.invocations[1]), {"--force": None})
+
+    def test_a_lone_carriage_return_splits(self) -> None:
+        # `D-048`, the deliberate over-read of the shell: bash runs one
+        # `git` here, with `status\rgit` and `push` as operands. Read
+        # that way an invocation is hidden outright, which is worse than
+        # the prompt this costs on the rare line that meant the
+        # character (§3.3).
+        reading = self.read("git status\rgit push --force")
+        self.assertEqual(len(reading.invocations), 2)
+        self.assertEqual(self.operands(reading.invocations[0]), ["status"])
+        self.assertEqual(self.operands(reading.invocations[1]), ["push"])
+
+    def test_a_reversed_line_ending_splits_once(self) -> None:
+        # `\n\r` needs no member of its own: the `\n` splits, then the
+        # `\r` splits again, and the empty segment between them is
+        # dropped like any other. Pinned rather than deduced, because
+        # the deduction rests on empty segments being dropped.
+        reading = self.read("git status\n\rgit push --force")
+        self.assertEqual(len(reading.invocations), 2)
+        self.assertEqual(self.operands(reading.invocations[1]), ["push"])
+
+    def test_a_carriage_return_inside_quotes_is_data(self) -> None:
+        # A line ending is a separator, and §4.1's rule for separators
+        # inside quotes holds for every spelling of one.
+        invocation = self.one("echo 'a\rb'")
+        self.assertEqual(self.operands(invocation), ["a\rb"])
+
     def test_runs_of_newlines_and_blank_lines_split_once(self) -> None:
         # Corpus, a multiline command with a blank run between the two
         # lines → ask, so both invocations must be found and no empty
@@ -303,6 +349,35 @@ class SplittingTests(Reads):
             [invocation.name for invocation in reading.invocations],
             ["a", "b", "c", "d", "e", "f"],
         )
+
+    def test_every_separator_the_engine_declares_splits_cleanly(
+        self,
+    ) -> None:
+        # The roll-up, and the other direction of
+        # `test_every_separator_splits`. That one asks whether every
+        # separator §4.1 lists is handled; this one asks whether every
+        # separator the engine actually uses does what a separator must
+        # — so one added later cannot arrive unexercised, and one that
+        # is a prefix of another cannot be matched in the wrong order.
+        # `|` tried before `||` leaves an empty segment between two
+        # invocations, and `&` before `&&` does the same.
+        #
+        # It reads as a conclusion and it is written last, but unittest
+        # runs a class's methods in alphabetical order, so this may well
+        # fail before the dedicated cases below it. The `subTest` label
+        # is what to read: it names the separator that failed.
+        for separator in SEPARATORS:
+            with self.subTest(separator=separator):
+                reading = self.read(
+                    f"stubtool a.yml {separator} stubtool b.yml"
+                )
+                self.assertEqual(
+                    [
+                        self.operands(invocation)
+                        for invocation in reading.invocations
+                    ],
+                    [["a.yml"], ["b.yml"]],
+                )
 
 
 class ContinuationTests(Reads):
@@ -698,8 +773,18 @@ class ArityTests(Reads):
         self.assertEqual(invocation.doubts, (Doubt.MALFORMED,))
 
     def test_a_malformed_flag_at_the_end_of_a_segment(self) -> None:
-        # The segment ends at the separator, so the next command's word
-        # is never eaten as a value.
+        # `--mode` is declared value-required, and the command being run
+        # is `stubtool apply --mode`: the `&&` ends it, so `git` belongs
+        # to the next command and `--mode` has nothing after it. That is
+        # §4.2's malformed invocation, and the corpus rules on the same
+        # shape standing alone — `stubtool apply --mode` → ask, because
+        # the grant on `apply` needs `--mode` valued `dry-run` or
+        # `check` and there is no value to prove.
+        #
+        # What this case is for is the hazard it excludes: consume flag
+        # values before splitting and `--mode` eats `git`, leaving one
+        # invocation with an invented value that satisfies nothing and
+        # a second command that vanished.
         reading = self.read("stubtool apply --mode && git status")
         self.assertEqual(len(reading.invocations), 2)
         self.assertEqual(reading.invocations[0].doubts, (Doubt.MALFORMED,))
@@ -736,6 +821,40 @@ class ArityTests(Reads):
         # `D-039`'s other half: no declared default, so a condition on
         # the value can be neither proven nor ruled out.
         invocation = self.one("stubopt --plain --check")
+        self.assertIsNone(self.flags(invocation)["--plain"])
+
+    def test_a_value_optional_flag_takes_an_attached_value(self) -> None:
+        # The `--flag=value` spelling is the declaration's other form
+        # (§4.2) and it is not scoped to one arity: attached, the value
+        # is present whatever the next token looks like, so there is no
+        # judgement to make about it.
+        invocation = self.one("stubopt --argument=custom --check")
+        self.assertEqual(
+            self.flags(invocation), {"--argument": "custom", "--check": None}
+        )
+
+    def test_an_attached_empty_value_is_not_the_declared_default(
+        self,
+    ) -> None:
+        # `D-039`'s default is what the *tool* uses when the flag is
+        # bare. `--argument=` is not bare: it is the empty string, said
+        # explicitly. Reading it as `check` would let a condition
+        # written as `flag("--argument", one_of("check"))` be satisfied
+        # by a value the operator can see is not that.
+        invocation = self.one("stubopt --argument= --check")
+        self.assertEqual(self.flags(invocation)["--argument"], "")
+
+    def test_a_bare_value_optional_flag_at_the_end_without_a_default(
+        self,
+    ) -> None:
+        # The two halves that the case below proves separately, met at
+        # once: nothing follows the flag, and its declaration named no
+        # default. Nothing is missing — the arity says the value may be
+        # absent, so this is not malformed — and nothing is known
+        # either, so a condition on the value stays unprovable rather
+        # than being answered with an invented one.
+        invocation = self.one("stubopt --check --plain")
+        self.assertEqual(invocation.doubts, ())
         self.assertIsNone(self.flags(invocation)["--plain"])
 
     def test_a_value_optional_flag_at_the_end_is_not_malformed(self) -> None:

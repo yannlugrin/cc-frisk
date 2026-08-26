@@ -210,14 +210,26 @@ class Entry:
 
     @property
     def speaking(self) -> bool:
-        """Can produce a non-silent verdict on its own (§3.2, `D-047`).
+        """Carries rules, grants, or a non-silent default (§3.2, `D-047`).
 
-        Wider than `rule_bearing`, narrower than being registered at
-        all: rules, grants, or a default verdict that is not silence.
-        §4.1's raw scan of an unparseable line is what needs it, and it
-        is why the two are separate predicates — a grants-only tool
+        §4.1's raw scan of an unparseable line is the only consumer,
+        and the definition is this enumeration rather than a principle:
+        it is what that scan looks for on a line nothing could parse.
+
+        Wider than `rule_bearing` and narrower than being registered at
+        all, and both bounds are load-bearing. A grants-only tool
         carries no rule, so a scan asking `rule_bearing` would answer
         an unparseable line naming `ansible-playbook` with silence.
+        And registered is too wide the other way: the engine's wrappers
+        sit on ordinary lines, and §4.1 excludes them outright because
+        scanning for them "would make the fallback fire constantly".
+
+        Deliberately *not* "can produce a non-silent verdict". That
+        reading is both wrong and useless here: a tool declaring only a
+        closed world — no grants, no rules, silent default — is gated
+        and not speaking, while §3.2 makes assignments closed-world for
+        **every registered tool**, which would make every registered
+        name speaking and swallow the exclusion above.
         """
         if self.rules or self.grants:
             return True
