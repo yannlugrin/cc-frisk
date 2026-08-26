@@ -1454,3 +1454,34 @@ Detail in git history.
   for gaps that cannot be closed cheaply, not for ones that cost a
   tuple entry.
 - **Approved by:** operator, 2026-08-25 — all three spellings.
+
+### D-049 — `speaking` is its enumeration, not a principle
+
+- **Date:** 2026-08-26
+- **Step:** `008`
+- **Context:** `D-047` added §3.2's fourth term as "*speaking* (able to
+  produce a non-silent verdict on its own: carrying rules, grants, or a
+  non-silent default verdict)". The half before the colon does not
+  describe the half after it, in both directions. **Too wide:** §3.2
+  makes environment assignments closed-world for *every registered
+  tool*, so any registered name can produce a non-silent verdict —
+  wrappers included, which §4.1's scan excludes outright because
+  scanning for them "would make the fallback fire constantly". **Too
+  narrow:** a tool declaring only a closed world — no rules, no grants,
+  silent default — asks on an unaccounted flag and is not speaking.
+  The engine's own `Entry.speaking` docstring says the gloss is "both
+  wrong and useless here"; the specification kept it, of a term the
+  same sentence binds "throughout".
+- **Decision:** the gloss is deleted. §3.2 defines *speaking* as the
+  enumeration alone — rules, grants, or a non-silent default verdict —
+  and says explicitly that it is not the wider property, naming the
+  assignment world as the reason. No behaviour changes: the enumeration
+  is what `D-047` decided and what the engine has always implemented.
+- **Alternatives considered:** *keep the gloss and bend the docstrings
+  to match* — rejected: §3.2 binds these terms throughout, so a gloss
+  there is not informal, and it would leave the specification and the
+  engine disagreeing about a word both use. *Widen the enumeration to
+  match the gloss* — that is `D-047`'s rejected alternative arriving by
+  the back door, and it changes §4.1's scan into one that fires on
+  every registered name.
+- **Approved by:** operator, 2026-08-26 — delete the gloss.

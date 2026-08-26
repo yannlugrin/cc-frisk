@@ -456,10 +456,12 @@ section's summary and that table could be read apart.
   enumerated, values constrained — and anything else gets the tool's
   default verdict. A tool is **gated** exactly when it declares grants
   and/or closed worlds — distinct from *registered* (known to the engine
-  at all), *rule-bearing* (carrying any rule) and *speaking* (able to
-  produce a non-silent verdict on its own: carrying rules, grants, or a
-  non-silent default verdict); the four terms are used with these
-  meanings throughout. The closed world is the
+  at all), *rule-bearing* (carrying any rule) and *speaking* (carrying
+  rules, grants, or a non-silent default verdict); the four terms are
+  used with these meanings throughout, and *speaking* is that
+  enumeration and nothing wider — a tool can produce a non-silent
+  verdict without being one, since the assignment world below is closed
+  for every registered tool. The closed world is the
   load-bearing property: a flag or value nobody considered can only move
   a verdict *toward* the stricter outcome, never away from it.
   **Environment assignments are closed-world for every registered
