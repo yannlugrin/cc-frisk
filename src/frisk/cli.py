@@ -18,6 +18,13 @@ where importing `frisk` itself costs nothing measurable. A per-call
 decision budget is single-digit milliseconds (§4.5), so the hook path
 must reach the engine without coming through here.
 
+That import is the whole of the cost: reading a line is nowhere near
+it — a typical line takes tens of microseconds — so nothing about the
+budget lives in this module's own work. Re-measure either half by
+timing `frisk explain` against a bare `python3 -c pass`; the numbers
+are a machine's, not a fact about the engine, which is why none is
+recorded as one.
+
 Two invariants hold for every path through this module, and both are
 asserted in the suite rather than left to argparse's defaults:
 
@@ -47,7 +54,7 @@ from .config import config_path, deprecation, load, locate
 from .errors import ConfigurationError
 from .matchers import Value
 from .reading import Flag, Invocation, Reading, read
-from .registry import Cases, engine_defaults, printable
+from .registry import Cases, Registry, engine_defaults, printable
 
 PROGRAM = "frisk"
 
@@ -210,25 +217,55 @@ def explain_command(args: argparse.Namespace) -> int:
     """
     found = _configuration(args.project)
     if found is None:
-        where = args.project or "here or any directory above it"
-        print(
-            f"{PROGRAM}: no configuration in {printable(str(where))}. "
-            "An enabled frisk with no configuration gates nothing; what "
-            "follows was read against the engine's default layers alone.",
-            file=sys.stderr,
+        _unconfigured(
+            args.project,
+            "; what follows was read against the engine's default "
+            "layers alone.",
         )
         registry = engine_defaults()
     else:
-        try:
-            registry = load(found)
-        except ConfigurationError as failure:
-            print(f"{PROGRAM}: {printable(str(failure))}", file=sys.stderr)
+        loaded = _loaded(found)
+        if loaded is None:
             return EXIT_CONFIG_ERROR
-        nudge = deprecation(registry.generation())
-        if nudge is not None:
-            print(f"{PROGRAM}: {printable(nudge)}", file=sys.stderr)
+        registry = loaded
     print(_reported(args.command_line, read(args.command_line, registry)))
     return EXIT_NO_VERDICT
+
+
+def _unconfigured(project: str | None, consequence: str) -> None:
+    """§5.4's "this project gates nothing", said unmissably.
+
+    On stderr, which is the channel that is not the answer, so a caller
+    reading stdout for a verdict never finds a sentence of prose in it.
+    """
+    where = project or "here or any directory above it"
+    print(
+        f"{PROGRAM}: no configuration in {printable(str(where))}. "
+        f"An enabled frisk with no configuration gates nothing{consequence}",
+        file=sys.stderr,
+    )
+
+
+def _loaded(found: Path) -> Registry | None:
+    """The registry at this path, or None having already said why.
+
+    §7.1's fail-loud lives here once. Both commands need it and both
+    answer it the same way — a configuration that will not load is not
+    an empty registry standing in for a boundary that failed — and two
+    copies of that is one copy that can drift quiet.
+    """
+    try:
+        registry = load(found)
+    except ConfigurationError as failure:
+        print(f"{PROGRAM}: {printable(str(failure))}", file=sys.stderr)
+        return None
+    nudge = deprecation(registry.generation())
+    if nudge is not None:
+        # §3.5's middle tier: the configuration loaded and every rule in
+        # it holds, so this is not a failure and the status stays 0 —
+        # but stderr, never stdout.
+        print(f"{PROGRAM}: {printable(nudge)}", file=sys.stderr)
+    return registry
 
 
 #: The closing paragraph of every `explain`. It is what a caller who
@@ -254,12 +291,11 @@ def _reported(command_line: str, reading: Reading) -> str:
     lines = ["", f"  command: {render(command_line)}", ""]
     if reading.unparseable:
         lines.extend(_unparseable_lines(reading))
-    else:
-        for position, invocation in enumerate(reading.invocations, start=1):
-            lines.extend(_invocation_lines(position, invocation))
-            lines.append("")
-    if not reading.unparseable and not reading.invocations:
+    elif not reading.invocations:
         lines.extend(["  no command runs on this line.", ""])
+    for position, invocation in enumerate(reading.invocations, start=1):
+        lines.extend(_invocation_lines(position, invocation))
+        lines.append("")
     lines.append(_NO_VERDICT)
     return "\n".join(lines)
 
@@ -285,7 +321,7 @@ def _invocation_lines(position: int, invocation: Invocation) -> list[str]:
     ]
     for assigned in invocation.assignments:
         lines.append(
-            f"    assignment: {printable(assigned.name)}"
+            f"    assignment: {render(assigned.name)}"
             f" = {_value_shown(assigned.value)}"
         )
     for option in invocation.options:
@@ -310,9 +346,16 @@ def _registration(invocation: Invocation) -> str:
 
 
 def _flag_shown(flag: Flag) -> str:
+    """A flag as written, and the value it took.
+
+    `render` rather than `printable`, like every other field taken from
+    the command line: a flag *name* is attacker-controlled text too, and
+    one escaping rule for line-derived text is one rule to get right.
+    `printable` stays for text the configuration supplied.
+    """
     if flag.value is None:
-        return printable(flag.name)
-    return f"{printable(flag.name)} = {_value_shown(flag.value)}"
+        return render(flag.name)
+    return f"{render(flag.name)} = {_value_shown(flag.value)}"
 
 
 def _value_shown(value: Value) -> str:
@@ -343,25 +386,11 @@ def registry_command(args: argparse.Namespace) -> int:
     """
     found = _configuration(args.project)
     if found is None:
-        where = args.project or "here or any directory above it"
-        print(
-            f"{PROGRAM}: no configuration in {printable(str(where))}. "
-            "An enabled frisk with no configuration gates nothing.",
-            file=sys.stderr,
-        )
+        _unconfigured(args.project, ".")
         return EXIT_NO_CONFIG
-    try:
-        registry = load(found)
-    except ConfigurationError as failure:
-        print(f"{PROGRAM}: {printable(str(failure))}", file=sys.stderr)
+    registry = _loaded(found)
+    if registry is None:
         return EXIT_CONFIG_ERROR
-    nudge = deprecation(registry.generation())
-    if nudge is not None:
-        # §3.5's middle tier: the configuration loaded and every rule
-        # in it holds, so this is not a failure and the status stays 0
-        # — but stderr, never stdout, so a script reading the registry
-        # never finds a sentence of prose in it.
-        print(f"{PROGRAM}: {printable(nudge)}", file=sys.stderr)
     print(
         REGISTRY_HEADER.format(
             program=PROGRAM,

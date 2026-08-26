@@ -12,9 +12,16 @@ it is the whole reason this module exists rather than a regular
 expression: `git commit -m 'fix the --amend bug'` is not an amend, and
 a flag inside a quoted substitution is invisible to any pattern that
 respects quotes. The tokenizer is therefore the load-bearing part, and
-it keeps more than the shell would — which token was quoted, and how —
-because §4.2's dynamic-value rule and §4.3's substitutions both turn on
-exactly that.
+it keeps more than the shell would: whether a token would be *expanded*,
+which §4.2 makes a decision rather than a string, and the form it was
+written in, which is what decides whether a leading token is an
+assignment at all.
+
+What it does not yet carry out of the module is which *region* of a
+token was quoted. `011` needs that — an unquoted substitution is a
+command and a quoted one is a value — and will either widen `Value` or
+re-scan the token it is judging. Nothing here should be read as having
+settled that.
 
 **Three things are deliberately not done here.** What lives behind
 another program — a wrapper's command, a shell's `-c` payload, an
@@ -37,8 +44,8 @@ from __future__ import annotations
 import enum
 import os
 import re
-from collections.abc import Mapping
-from dataclasses import dataclass, field
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 
 from .declare import Arity
 from .matchers import NO_CONTEXT, MatchContext, Value
@@ -166,12 +173,15 @@ class Invocation:
     #: What the rest of the line says about this invocation's matches —
     #: today, whether an earlier `cd` has poisoned relative paths (§3.2).
     context: MatchContext = NO_CONTEXT
-    #: True where the command word is a variable the line cannot name —
-    #: `$RUNNER deploy` (§4.2). `entry` is None as for any unregistered
-    #: word, and this is what separates the two: a wrapper that loses
-    #: its walk on an unnameable command asks, where a literal unknown
-    #: word is silence. Recorded here so `010` reads a parse fact rather
-    #: than re-parsing the name.
+    #: True where the command word carries an expansion the line cannot
+    #: resolve — `$RUNNER deploy` (§4.2). It says nothing about `entry`:
+    #: `$HOME/bin/git` still recognizes as git, because the basename is
+    #: textually `git` whatever `$HOME` holds, while a bare `$RUNNER`
+    #: reaches nothing. What it separates is a *name that cannot be
+    #: read* from an ordinary unregistered word, which §4.2 answers
+    #: differently — a wrapper losing its walk on the first asks, on the
+    #: second stays silent. Recorded here so `010` reads a parse fact
+    #: instead of re-parsing the name.
     dynamic_name: bool = False
     #: Everything reading could not establish about this invocation
     #: (§3.3), by source. Empty is a clean reading.
@@ -204,7 +214,7 @@ class Reading:
     #: §3.2's vocabulary (`D-047`) — appearing as whole
     #: whitespace-delimited words, compared by basename so `/usr/bin/git`
     #: does not evade the scan. Empty on a line that parsed.
-    speaking: tuple[str, ...] = field(default_factory=tuple)
+    speaking: tuple[str, ...] = ()
 
 
 def read(command_line: str, registry: Registry) -> Reading:
@@ -264,6 +274,12 @@ _DOUBLE_QUOTE_ESCAPES = ("$", "`", '"', "\\")
 _NAME = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
 _NAME_REST = _NAME + "0123456789"
 
+#: The parameters that expand without being named variables — the
+#: positional ones and the shell's own. `$1` is as unknowable as `$FOO`
+#: and §4.2's rule is about what the engine cannot read, not about how
+#: the shell spells it.
+_SPECIAL_PARAMETERS = "0123456789@*?$!#-"
+
 #: A leading environment assignment (§4.2). Matched against the word as
 #: *written*: `FOO=bar` is one and `FOO'='bar` is not, and only the raw
 #: form can tell them apart once quoting has been resolved away.
@@ -321,8 +337,13 @@ def _segments(command_line: str) -> list[list[_Word]]:
             # A comment opens only where a word begins. Inside one, `#`
             # is an ordinary character and dropping the rest of the line
             # would lose real operands (§4.1).
+            #
+            # It ends at the *line*, not at the next separator: `;`, `|`
+            # and `&` are ordinary text once a comment has opened, and
+            # stopping at one would read `git status # then ; git push`
+            # as containing a push that cannot run.
             while (
-                index < length and _separator_at(command_line, index) is None
+                index < length and _line_ending_at(command_line, index) is None
             ):
                 index += 1
             continue
@@ -383,6 +404,14 @@ def _separator_at(command_line: str, index: int) -> str | None:
     return None
 
 
+def _line_ending_at(command_line: str, index: int) -> str | None:
+    """The line ending starting here, or None (`D-048`)."""
+    for ending in _LINE_ENDINGS:
+        if command_line.startswith(ending, index):
+            return ending
+    return None
+
+
 def _continuation_at(command_line: str, index: int) -> str | None:
     """A backslash-line continuation starting here, or None (§4.1)."""
     for ending in _LINE_ENDINGS:
@@ -394,25 +423,65 @@ def _continuation_at(command_line: str, index: int) -> str | None:
 def _reference_at(command_line: str, index: int) -> str | None:
     """The variable reference starting at this `$`, or None (§4.2).
 
-    `$(` is not one: an unquoted substitution is a *command*, split out
-    and judged as what it is at `011`, and calling it a dynamic value
-    here would leave `deploy --syntax-check $(git rev-parse HEAD).yml`
-    unproven where the corpus rules it silent.
+    `$NAME`, `${NAME}`, and the special parameters — `$1`, `$@`, `$?`,
+    `$$` and kin — which expand exactly as a named variable does and
+    are unknowable here for the same reason.
+
+    A **substitution** (`$(`) is not one, and the difference is
+    quoting. §4.2: an unquoted substitution "never reaches a matcher
+    position at all — §4.3 splits it out and judges it as the command
+    it is", so calling it a dynamic value here would leave
+    `deploy --syntax-check $(git rev-parse HEAD).yml` unproven where
+    the corpus rules it silent. A *quoted* one is the opposite case,
+    and `_double_quoted` handles it: it "survives inside a token and is
+    the dynamic-token case".
     """
     following = index + 1
     if following >= len(command_line):
         return None
-    if command_line[following] == "{":
+    character = command_line[following]
+    if character == "{":
         closing = command_line.find("}", following)
         if closing < 0:
             return None
         return command_line[index : closing + 1]
-    if command_line[following] not in _NAME:
+    if character in _SPECIAL_PARAMETERS:
+        return command_line[index : following + 1]
+    if character not in _NAME:
         return None
     end = following
     while end < len(command_line) and command_line[end] in _NAME_REST:
         end += 1
     return command_line[index:end]
+
+
+def _expansion_at(command_line: str, index: int) -> str | None:
+    """A substitution starting at this `$` or backtick, or None (§4.2).
+
+    Only ever consulted inside double quotes, where §4.2 says a
+    substitution "survives inside a token and is the dynamic-token case
+    above". Unquoted it is a command, and `011` splits it out.
+
+    The text is taken to the closing delimiter without parsing what is
+    inside it: this exists to mark the token unknowable, and `011` is
+    what reads the command in there. An unclosed one leaves the rest of
+    the token to the ordinary scan, which is the stricter direction —
+    the token stays whatever it is and the quote must still close.
+    """
+    if command_line.startswith("`", index):
+        closing = command_line.find("`", index + 1)
+        return None if closing < 0 else command_line[index : closing + 1]
+    if not command_line.startswith("$(", index):
+        return None
+    depth = 0
+    for position in range(index + 1, len(command_line)):
+        if command_line[position] == "(":
+            depth += 1
+        elif command_line[position] == ")":
+            depth -= 1
+            if depth == 0:
+                return command_line[index : position + 1]
+    return None
 
 
 def _double_quoted(
@@ -443,13 +512,17 @@ def _double_quoted(
                 raw.append(command_line[index : following + 1])
                 index += 2
                 continue
-        if character == "$":
-            reference = _reference_at(command_line, index)
-            if reference is not None:
+        if character in "$`":
+            # Order matters: `$(` is a substitution, `$F` a reference,
+            # and only the first two characters tell them apart.
+            found = _expansion_at(command_line, index) or _reference_at(
+                command_line, index
+            )
+            if found is not None:
                 referenced = True
-                text.append(reference)
-                raw.append(reference)
-                index += len(reference)
+                text.append(found)
+                raw.append(found)
+                index += len(found)
                 continue
         text.append(character)
         raw.append(character)
@@ -516,11 +589,14 @@ def _invocation(
         dynamic_name=command.dynamic,
         doubts=_doubts(
             entry=entry,
-            values=_matched(assignments, options, flags, operands),
+            # A thunk: the readability check is scoped to gated tools,
+            # and most invocations on a line are not one.
+            values=lambda: _matched(assignments, options, flags, operands),
             malformed=malformed,
-            unresolved=by_path
-            and not command.text.startswith("/")
-            and context.relative_paths_unproven,
+            # No absolute test: a path declaration is refused unless it
+            # is project-relative, so `by_path` cannot be true for an
+            # absolute command word (`declare.tool`).
+            unresolved=by_path and context.relative_paths_unproven,
         ),
     )
 
@@ -574,6 +650,15 @@ def _bound(
         if attached is not None:
             target_list.append(Flag(name, attached))
             continue
+        bundled, remainder = _bundled(name, table)
+        for carried in bundled[:-1]:
+            target_list.append(Flag(carried))
+        name = bundled[-1]
+        if remainder is not None:
+            target_list.append(
+                Flag(name, Value(remainder, dynamic=word.dynamic))
+            )
+            continue
         arity = table.get(name, Arity.BARE)
         if arity is Arity.VALUE:
             if index < len(words):
@@ -597,6 +682,49 @@ def _bound(
         else:
             target_list.append(Flag(name))
     return tuple(options), tuple(flags), tuple(operands), malformed
+
+
+def _bundled(
+    name: str, table: Mapping[str, Arity]
+) -> tuple[list[str], str | None]:
+    """`-fu` as `-f -u`, where the tool declares both (§4.2, §3.3).
+
+    A single-dash run of letters is one token to the engine and several
+    flags to the program, and the difference costs a rule: `git push
+    -fu origin main` carries `-f`, and a deny keyed on it never fires.
+    That is a *missed deny* on a rules-only tool, not merely a missed
+    prompt, which is why this exists at all.
+
+    It splits **only where every letter is a declared flag of this
+    tool**, and otherwise hands the token back whole. That is the whole
+    safety property: splitting a token the declaration does not account
+    for could manufacture a flag the operator never wrote — and a rule
+    firing on an invented flag is a *wrong deny*, the one outcome §4.3
+    says never to produce. Left whole, the token stays one unaccounted
+    flag, which on a gated tool is already the stricter answer.
+
+    A letter that takes a value ends the run and takes the rest of the
+    token as its value, as getopt does: `-vi prod` is `-v` then `-i`
+    taking `prod`, and `-viprod` is `-v` then `-i` valued `prod`.
+
+    The residue is a bundle mixing declared and undeclared letters —
+    `-fq` where only `-f` is declared — which stays whole and so keeps
+    the gap this closes. Declaring the letters a rule cares about is
+    what shuts it, and §8.2's case-per-rule coverage is what shows a
+    rule that never fires.
+    """
+    if not name.startswith("-") or name.startswith("--") or len(name) < 3:
+        return [name], None
+    carried: list[str] = []
+    for position, letter in enumerate(name[1:], start=1):
+        spelled = "-" + letter
+        arity = table.get(spelled)
+        if arity is None:
+            return [name], None
+        carried.append(spelled)
+        if arity is not Arity.BARE:
+            return carried, name[position + 1 :] or None
+    return carried, None
 
 
 def _flag_shaped(text: str) -> bool:
@@ -662,14 +790,13 @@ def _readable(value: Value) -> bool:
 def _doubts(
     *,
     entry: Entry | None,
-    values: list[Value],
+    values: Callable[[], list[Value]],
     malformed: bool,
     unresolved: bool,
 ) -> tuple[Doubt, ...]:
     """What reading could not establish, in a fixed order (§3.3)."""
     doubts: list[Doubt] = []
-    gated = entry is not None and entry.gated
-    if gated and not all(_readable(value) for value in values):
+    if entry is not None and entry.gated and not all(map(_readable, values())):
         doubts.append(Doubt.UNREADABLE)
     if malformed:
         doubts.append(Doubt.MALFORMED)
@@ -681,8 +808,16 @@ def _doubts(
 def _changes_directory(invocation: Invocation) -> bool:
     """Whether this invocation is the `cd` that poisons what follows.
 
-    Textual, and by basename like any other recognition: `cd` is a shell
-    builtin, so no registration can ever stand for it.
+    Textual, on the command word, and by basename like any other
+    recognition: `cd` is a shell builtin, so no registration can ever
+    stand for it. The basename reading also catches `/usr/bin/cd`,
+    which cannot really change the invoking shell's directory — an
+    over-read, and §3.3's safe direction.
+
+    §3.2's own discriminating example, `(cd build && make) && tool ./x`,
+    is *not* caught: the command word here is `(cd`, and bare `(...)`
+    is `011`'s. The interim direction is the looser one, which is why
+    it is written down rather than left to be noticed.
     """
     return os.path.basename(invocation.name) == "cd"
 

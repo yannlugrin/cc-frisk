@@ -97,7 +97,8 @@ def policy() -> Registry:
             "stubopt",
             default=ask(reason="stubopt changes state unless proven local."),
             flags=[
-                bare("--check"),
+                bare("--check", "-c", "-k"),
+                takes_value("-a"),
                 may_take_value("--argument", default="check"),
                 may_take_value("--plain"),
             ],
@@ -246,6 +247,21 @@ class SplittingTests(Reads):
                     f"stubtool a.yml {separator} stubtool b.yml"
                 )
                 self.assertEqual(len(reading.invocations), 2, separator)
+
+    def test_no_separator_hides_a_longer_one(self) -> None:
+        # The invariant `SEPARATORS` documents and neither splitting
+        # case can observe, because empty segments are dropped: matched
+        # in the wrong order, `&&` reads as two `&` and `\r\n` as two
+        # line endings, and the only visible trace is a segment that was
+        # dropped anyway. Asserted over the tuple, where it is true or
+        # false on its own.
+        for position, separator in enumerate(SEPARATORS):
+            for longer in SEPARATORS[position + 1 :]:
+                with self.subTest(separator=separator, longer=longer):
+                    self.assertFalse(
+                        longer.startswith(separator),
+                        f"{separator!r} is tried before {longer!r}",
+                    )
 
     def test_a_newline_splits(self) -> None:
         # §4.1: "The newline is load-bearing, not an afterthought" —
@@ -425,6 +441,13 @@ class ContinuationTests(Reads):
         invocation = self.one("echo 'a \\\nb'")
         self.assertEqual(self.operands(invocation), ["a \\\nb"])
 
+    def test_a_continuation_inside_double_quotes_is_joined(self) -> None:
+        # Double quotes stop word splitting, not line continuation: the
+        # backslash-newline is removed there as it is anywhere else,
+        # unlike inside single quotes where it is data.
+        invocation = self.one('echo "one\\\ntoken"')
+        self.assertEqual(self.operands(invocation), ["onetoken"])
+
     def test_a_backslash_at_the_very_end_ends_the_line(self) -> None:
         invocation = self.one("git status \\\n")
         self.assertEqual(self.operands(invocation), ["status"])
@@ -471,6 +494,14 @@ class UnparseableLineTests(Reads):
         # Corpus: `stubtool 'unbalanced` → ask.
         reading = self.read("stubtool 'unbalanced")
         self.assertTrue(reading.unparseable)
+
+    def test_an_unbalanced_double_quote_is_unparseable_too(self) -> None:
+        # A different branch of the tokenizer from the single-quoted
+        # one, and §4.1 does not distinguish them: a quote that never
+        # closes is a line nothing read.
+        reading = self.read('stubtool "unbalanced')
+        self.assertTrue(reading.unparseable)
+        self.assertEqual(reading.speaking, ("stubtool",))
 
     def test_an_unparseable_line_yields_no_invocations(self) -> None:
         # Half a reading is worse than none: it would let a grant hold
@@ -616,6 +647,17 @@ class AssignmentTests(Reads):
         invocation = self.one("stubtool --syntax-check STUB_DANGER=1")
         self.assertEqual(self.assignments(invocation), {})
         self.assertEqual(self.operands(invocation), ["STUB_DANGER=1"])
+
+    def test_an_assignment_is_judged_on_the_form_it_was_written_in(
+        self,
+    ) -> None:
+        # §4.2: "names are the shell's". `FOO'='bar` is not an
+        # assignment to the shell — the `=` is quoted, so the whole
+        # token is one command word — and only the *written* form can
+        # say so once quoting has been resolved away.
+        invocation = self.one("FOO'='bar stubtool wipe")
+        self.assertEqual(invocation.name, "FOO=bar")
+        self.assertEqual(self.assignments(invocation), {})
 
     def test_an_assignment_with_no_command_runs_nothing(self) -> None:
         self.assertEqual(self.read("STUB_QUIET=1").invocations, ())
@@ -766,6 +808,10 @@ class ArityTests(Reads):
         # Corpus: `stubtool deploy.yml --limit` → ask.
         invocation = self.one("stubtool deploy.yml --limit")
         self.assertEqual(invocation.doubts, (Doubt.MALFORMED,))
+        # §4.2 calls it "unproven, not safe", and that word is the
+        # property `009` reads: a predicate narrowed to one doubt would
+        # price this as a clean reading with the tuple still intact.
+        self.assertTrue(invocation.unproven)
         self.assertEqual(self.flags(invocation), {"--limit": None})
 
     def test_a_malformed_option_on_a_rules_only_tool_is_malformed_too(
@@ -870,6 +916,49 @@ class ArityTests(Reads):
         invocation = self.one("stubopt --check --argument")
         self.assertFalse(invocation.unproven)
         self.assertEqual(self.flags(invocation)["--argument"], "check")
+
+    def test_a_bundle_of_declared_letters_splits(self) -> None:
+        # A single-dash run is one token to the engine and several flags
+        # to the program, and the difference costs a rule: `git push -fu
+        # origin main` carries `-f`, and a deny keyed on it never fires.
+        # On a rules-only tool nothing downstream catches that, so it is
+        # a missed deny rather than a missed prompt.
+        invocation = self.one("stubopt --argument custom -ck")
+        self.assertEqual(
+            self.flags(invocation),
+            {"--argument": "custom", "-c": None, "-k": None},
+        )
+
+    def test_a_bundle_ending_in_a_value_flag_takes_the_next_token(
+        self,
+    ) -> None:
+        # getopt's rule: the value-taking letter ends the run.
+        invocation = self.one("stubopt -ca prod")
+        self.assertEqual(self.flags(invocation), {"-c": None, "-a": "prod"})
+        self.assertEqual(self.operands(invocation), [])
+
+    def test_a_bundle_ending_in_a_value_flag_takes_the_remainder(
+        self,
+    ) -> None:
+        invocation = self.one("stubopt -caprod")
+        self.assertEqual(self.flags(invocation), {"-c": None, "-a": "prod"})
+
+    def test_a_bundle_with_an_undeclared_letter_stays_whole(self) -> None:
+        # The safety property, and the reason splitting is conservative:
+        # splitting a token the declaration does not account for could
+        # manufacture a flag the operator never wrote, and a rule firing
+        # on an invented flag is a *wrong deny* — the one outcome §4.3
+        # says never to produce. Left whole it is one unaccounted flag,
+        # which on a gated tool is already the stricter answer.
+        invocation = self.one("stubopt -cz --check")
+        self.assertEqual(
+            self.flags(invocation), {"-cz": None, "--check": None}
+        )
+
+    def test_a_long_flag_is_never_a_bundle(self) -> None:
+        # `--check` is not `-c -h -e -c -k`, whatever the tool declares.
+        invocation = self.one("stubopt --check")
+        self.assertEqual(self.flags(invocation), {"--check": None})
 
     def test_an_undeclared_flag_is_read_as_bare(self) -> None:
         # Corpus: `stubtool --syntax-check deploy.yml --unknown` → ask,
@@ -1070,6 +1159,15 @@ class LineContextTests(Reads):
             reading.invocations[-1].context.relative_paths_unproven
         )
 
+    def test_two_doubts_come_back_in_a_fixed_order(self) -> None:
+        # `009` cites them, so the order is output, not an accident of
+        # which check ran first.
+        reading = self.read('cd /srv && ./tools/deploy.py "$FOO"')
+        self.assertEqual(
+            reading.invocations[-1].doubts,
+            (Doubt.UNREADABLE, Doubt.UNRESOLVED_PATH),
+        )
+
     def test_a_cd_as_an_operand_poisons_nothing(self) -> None:
         # Only a command word changes a directory.
         reading = self.read("echo cd && stubtool clean .scratch/x")
@@ -1085,6 +1183,7 @@ class LineContextTests(Reads):
         invocation = reading.invocations[-1]
         self.assertIs(invocation.entry, POLICY.lookup_path("tools/deploy.py"))
         self.assertEqual(invocation.doubts, (Doubt.UNRESOLVED_PATH,))
+        self.assertTrue(invocation.unproven)
 
 
 class UnreadableTokenTests(Reads):
@@ -1148,6 +1247,56 @@ class UnreadableTokenTests(Reads):
         invocation = self.one("echo $FOO")
         self.assertEqual(invocation.operands, (Value("$FOO", dynamic=True),))
         self.assertEqual(invocation.doubts, ())
+
+    def test_a_dynamic_flag_value_leaves_the_invocation_unproven(
+        self,
+    ) -> None:
+        # §4.2 names three positions, not one: "A value carrying `$FOO`
+        # or `${FOO}` (in a flag value, an assignment, an operand)
+        # cannot prove a grant condition — on a gated tool it leaves the
+        # invocation unproven." The grant here would otherwise hold on
+        # `--syntax-check` alone.
+        invocation = self.one("stubtool --tags $FOO --syntax-check a.yml")
+        self.assertEqual(invocation.doubts, (Doubt.UNREADABLE,))
+
+    def test_a_dynamic_assignment_leaves_the_invocation_unproven(
+        self,
+    ) -> None:
+        # The third position of the same sentence.
+        invocation = self.one(
+            "STUB_TARGET=$HOME/x stubtool --syntax-check a.yml"
+        )
+        self.assertEqual(invocation.doubts, (Doubt.UNREADABLE,))
+
+    def test_a_double_quoted_variable_is_dynamic(self) -> None:
+        # The spelling an agent actually writes, and a different branch
+        # of the tokenizer from the bare one: quoting stops word
+        # splitting, never expansion.
+        invocation = self.one('stubtool clean "$FOO"')
+        self.assertEqual(invocation.operands[-1], Value("$FOO", dynamic=True))
+
+    def test_a_quoted_substitution_is_dynamic(self) -> None:
+        # §4.2: an unquoted substitution "never reaches a matcher
+        # position at all — §4.3 splits it out", *while a quoted one*
+        # "survives inside a token and is the dynamic-token case above".
+        # Read as literal text it proves `every_operand(matching(...))`
+        # over a value the line does not show.
+        for line in (
+            'stubtool "$(hostname)/validate.yml"',
+            'stubtool "`hostname`/validate.yml"',
+        ):
+            with self.subTest(line=line):
+                invocation = self.one(line)
+                self.assertTrue(invocation.operands[-1].dynamic, line)
+                self.assertEqual(invocation.doubts, (Doubt.UNREADABLE,))
+
+    def test_a_special_parameter_is_dynamic(self) -> None:
+        # `$1` is as unknowable as `$FOO`; §4.2's rule is about what the
+        # engine cannot read, not how the shell spells it.
+        for spelling in ("$1", "$@", "$?"):
+            with self.subTest(spelling=spelling):
+                invocation = self.one(f"stubtool clean {spelling}")
+                self.assertTrue(invocation.operands[-1].dynamic, spelling)
 
     def test_a_plain_line_is_proven(self) -> None:
         # Corpus: `stubtool --syntax-check site.yml` → silent, which no

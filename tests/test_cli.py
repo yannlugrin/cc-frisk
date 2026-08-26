@@ -239,16 +239,19 @@ class ExplainReadingTest(unittest.TestCase):
         self.assertIn("git", body)
 
     def test_a_flag_is_reported_apart_from_the_operands(self) -> None:
-        # Apart, not merely present: an operand list holding `--force`
-        # is a reading that never applied the tool's arities, and one
-        # holding no `push` is a subcommand no rule can reach.
+        # Apart, and each under its own label. Counting lines proves
+        # only that they are on different lines — a report that called
+        # `--force` an operand and `push` a flag would pass that, and
+        # tell the operator the opposite of what was read. §6.2's
+        # citation grows from this printer.
         _, out, _ = self.explain("git push --force")
         body = self.body(out)
         flags = [line for line in body.splitlines() if "--force" in line]
         operands = [line for line in body.splitlines() if "push" in line]
         self.assertEqual(len(flags), 1, body)
         self.assertEqual(len(operands), 1, body)
-        self.assertNotEqual(flags, operands, body)
+        self.assertRegex(flags[0], r"^\s*flag:")
+        self.assertRegex(operands[0], r"^\s*operand:")
 
     def test_a_declared_option_is_reported_with_its_value(self) -> None:
         # The plan's own test line: `git -C dir push`. Read without the
@@ -262,6 +265,7 @@ class ExplainReadingTest(unittest.TestCase):
             if "-C" in line and "/srv/repo" in line
         ]
         self.assertEqual(len(paired), 1, body)
+        self.assertRegex(paired[0], r"^\s*option:")
 
     def test_every_invocation_on_the_line_is_reported(self) -> None:
         _, out, _ = self.explain("git status\ngit push --force")

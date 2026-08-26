@@ -332,10 +332,11 @@ own tree, whose paths `PLAN.md` `021` confirms rather than assumes;
 - **World state:** the harness (`just setup/check/test/verify`) runs
   the same checks locally, in the commit hook and in CI, green.
   `src/frisk/` carries the config-facing API, the three-valued
-  matchers, composition and `frisk registry`, reading
-  `.claude/frisk/config.py` (`D-033`); nothing judges a command line
-  yet. The permission boundary — guard plus `.claude/settings.json` —
-  is live, untracked, unchanged since `002`. `origin` is
+  matchers, composition, `frisk registry`, and §4.1/§4.2's reading of
+  a command line into invocations behind `frisk explain`, reading
+  `.claude/frisk/config.py` (`D-033`); nothing judges one yet. The
+  permission boundary — guard plus `.claude/settings.json` — is
+  live, untracked, unchanged since `002`. `origin` is
   `github.com/yannlugrin/cc-frisk`, **public**, and carries the
   guard's backup branch (`D-028`). **Every write under
   `.claude/` prompts** — no setting removes it.
