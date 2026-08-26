@@ -276,40 +276,23 @@ behaviour done.
   one (`D-042`). Nothing judges a command line yet. Detail in git
   history between tags `step-006` and `step-007`.
 
-### 008 — Reading the line — `awaiting test`
+### 008 — Reading the line — `done`
 
-**Objective.** Turn a command string into the set of invocations it
-contains, correctly, with everything that binds to each one.
-
-**Spec sections.** §4.1 (all of it), §4.2 (assignments, pre-subcommand
-options, flag arities in use, tool recognition by basename and by
-project-relative path, dynamic tokens), §3.3 (fail directions), §4.5 (the
-latency budget).
-
-**Deliverables.** Tokenization that resolves quoting rather than
-pattern-matching raw strings; splitting at every separator including
-newlines, runs of them and blank lines, with separators inside quotes
-treated as data; backslash-line continuations joined before splitting;
-comments excluded; the unparseable-line fallback (§4.1) with its
-rule-bearing-name raw scan compared **by basename**. Leading environment
-assignments bound as conditions in their own right (`FOO=bar`, `FOO+=bar`,
-quoted values, lower-case names, case-sensitive matching), with
-assignment-shaped tokens after the command name read as operands. The
-three declared arities parsed, with the asymmetric fail directions of
-§4.2 — **within a gated tool's accounted flags, arity must be declared
-complete**, because an accounted value-taking flag whose arity is
-under-declared lets its value look operative and a safe-marker flag
-swallowed as another flag's value falsely satisfies a grant. Tool
-recognition on the whole basename, never a prefix or substring, with
-aliases and project-relative-path declarations, and the interpreter-run
-form deferred to `010` with the walked-interpreter layer. Dynamic tokens
-(`$FOO`, `${FOO}`) and the wider unreadable-token rule on gated
-invocations. `frisk explain` begins showing the invocations it found.
-
-**How the operator tests it.** `frisk explain` on a handful of lines from
-the corpus and from the operator's own shell history — multiline strings,
-continuations, quoted separators, `git -C dir push` — and read the
-invocation list. `just verify` green. Local and free.
+- **Outcome (approved 2026-08-26, tag `step-008`):** a command string
+  becomes the invocations it holds. Tokenization resolving quoting,
+  splitting at every separator with all three line endings (`D-048`),
+  continuations joined first, comments excluded, and §4.1's
+  unparseable fallback scanning the raw line for a *speaking* tool —
+  the fourth term `D-047` named and `D-049` reduced to its
+  enumeration. Then what binds: leading assignments judged on the form
+  they were written in, options and flags in their two namespaces, the
+  three arities, short-flag bundling declared per tool and on by
+  default (`D-050`), recognition by whole basename and by
+  project-relative path, the `cd` poisoning, and doubt reported by
+  source rather than as one boolean. `frisk explain` shows all of it,
+  naming the value that could not be read rather than a category.
+  Nothing judges a line yet. Detail in git history between tags
+  `step-007` and `step-008`.
 
 ### 009 — Judging and combining — `pending`
 
