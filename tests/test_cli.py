@@ -21,8 +21,11 @@ from pathlib import Path
 
 from frisk import __version__
 from frisk.cli import (
+    EXIT_ASK,
     EXIT_CONFIG_ERROR,
-    EXIT_NO_VERDICT,
+    EXIT_DENY,
+    EXIT_NO_CONFIG,
+    EXIT_SILENT,
     EXIT_USAGE,
     main,
 )
@@ -157,18 +160,9 @@ class ExplainTest(unittest.TestCase):
             status, out, err = run(
                 "explain", "--project", project, "git push --force"
             )
-        self.assertEqual(status, EXIT_NO_VERDICT)
+        self.assertEqual(status, EXIT_DENY)
         self.assertIn("git push --force", out)
         self.assertEqual(err, "")
-
-    def test_explain_reaches_no_verdict_and_implies_no_allow(self) -> None:
-        with configured() as project:
-            status, out, _ = run(
-                "explain", "--project", project, "git push --force"
-            )
-        self.assertEqual(status, EXIT_NO_VERDICT)
-        self.assertNotEqual(status, 0, "a non-verdict must not read as ok")
-        self.assertIn("not an allow", out)
 
     def test_explain_needs_a_command_line(self) -> None:
         status, out, err = run("explain")
@@ -191,18 +185,20 @@ class ExplainTest(unittest.TestCase):
         self.assertIn("--", err)
         with configured() as project:
             status, out, _ = run("explain", "--project", project, "--", "-h")
-        self.assertEqual(status, EXIT_NO_VERDICT)
+        # `-h` is a command line nothing registers, so the answer is
+        # silence — a verdict, reached, and printed.
+        self.assertEqual(status, EXIT_SILENT)
         self.assertIn("-h", out)
 
     def test_the_echoed_command_line_cannot_forge_output(self) -> None:
-        # It is attacker-controlled text printed above the sentence that
-        # says no verdict was reached; a newline or a terminal escape
-        # inside it must not be able to forge or erase a line.
+        # It is attacker-controlled text printed above frisk's own
+        # verdict line; a newline or a terminal escape inside it must
+        # not be able to forge or erase one.
         with configured() as project:
             status, out, _ = run(
                 "explain", "--project", project, "ls\nverdict: allow\x1b[2J"
             )
-        self.assertEqual(status, EXIT_NO_VERDICT)
+        self.assertEqual(status, EXIT_SILENT)
         echoed = [
             line for line in out.splitlines() if line.startswith("  command:")
         ]
@@ -224,11 +220,11 @@ class ExplainTest(unittest.TestCase):
 
 
 class ExplainReadingTest(unittest.TestCase):
-    """`explain` begins showing the invocations it found (§9, `008`).
+    """`explain` shows the invocations it found (§9, `008`).
 
-    There is still no verdict — judging is `009` — so every case here
-    checks the *reading* the command reports and the invariant that
-    survives the whole build: no path out of `explain` returns 0.
+    The verdict is `ExplainVerdictTest`'s subject; every case here
+    checks the *analysis* printed beside it, which §9 requires because
+    "why did this ask?" is answered by the reading, not the verdict.
     """
 
     def explain(self, command_line: str) -> tuple[int, str, str]:
@@ -348,10 +344,14 @@ class ExplainReadingTest(unittest.TestCase):
         _, out, _ = self.explain("make check 'unbalanced")
         self.assertNotIn("make", self.body(out))
 
-    def test_reading_a_line_is_still_not_a_verdict(self) -> None:
+    def test_the_analysis_is_shown_beside_the_verdict(self) -> None:
+        # §9: `explain` "should also show its work — which invocations
+        # were found through which walls of §4.3 — because 'why did
+        # this ask?' is the maintenance loop's opening question and the
+        # answer is the analysis, not just the verdict."
         status, out, _ = self.explain("git push --force")
-        self.assertEqual(status, EXIT_NO_VERDICT)
-        self.assertIn("not an allow", out)
+        self.assertEqual(status, EXIT_DENY)
+        self.assertIn("invocation", self.body(out))
 
     def test_an_unconfigured_project_is_said_out_loud(self) -> None:
         # §5.4: an enabled frisk with no configuration gates nothing,
@@ -361,12 +361,14 @@ class ExplainReadingTest(unittest.TestCase):
         # channel that is not the answer, and the status stays the one
         # true thing about this build: no verdict was reached. `registry`
         # answers 4 here because it has nothing at all to print; this
-        # command does.
+        # command does — and answers 4 with it, because a verdict
+        # reached against no boundary is not one a script may trust
+        # (`D-055`).
         with tempfile.TemporaryDirectory() as empty:
             status, out, err = run(
                 "explain", "--project", empty, "git push --force"
             )
-        self.assertEqual(status, EXIT_NO_VERDICT)
+        self.assertEqual(status, EXIT_NO_CONFIG)
         self.assertIn("no configuration", err)
         self.assertIn("invocation", out)
 
@@ -382,12 +384,90 @@ class ExplainReadingTest(unittest.TestCase):
         self.assertNotEqual(err, "")
 
     def test_the_reported_reading_is_ascii_and_escaped(self) -> None:
-        # The operands are attacker-controlled text printed above the
-        # sentence that says no verdict was reached.
+        # The operands are attacker-controlled text printed beside
+        # frisk's own verdict.
         _, out, err = self.explain("git commit -m 'caf\xe9\n\x1b[2J'")
         out.encode("ascii")
         err.encode("ascii")
         self.assertNotIn("\x1b", out)
+
+
+class ExplainVerdictTest(unittest.TestCase):
+    """`explain` answers with the verdict, its reason and its citation.
+
+    §9: "given a command line, the verdict the guard would return, with
+    the reason and citation of §6.2, against the project's actual
+    configuration; exit status usable from scripts."
+    """
+
+    def explain(self, command_line: str) -> tuple[int, str, str]:
+        with configured() as project:
+            return run("explain", "--project", project, command_line)
+
+    def test_a_denied_line_says_deny_and_why(self) -> None:
+        status, out, err = self.explain("git push --force")
+        self.assertEqual(status, EXIT_DENY)
+        self.assertIn("deny", out)
+        self.assertIn("A forced push rewrites remote history.", out)
+        self.assertEqual(err, "")
+
+    def test_an_asked_line_says_ask_and_why(self) -> None:
+        status, out, _ = self.explain("deploy site.yml")
+        self.assertEqual(status, EXIT_ASK)
+        self.assertIn("ask", out)
+        self.assertIn("deploy changes infrastructure.", out)
+
+    def test_a_silent_line_says_frisk_has_no_opinion(self) -> None:
+        # §3.2: "silence means 'no opinion' and hands the call to the
+        # permission rules and mode". A status of 0 is that answer, and
+        # the text must not let it read as approval.
+        status, out, _ = self.explain("deploy --syntax-check site.yml")
+        self.assertEqual(status, EXIT_SILENT)
+        self.assertIn("silent", out)
+        self.assertIn("not an allow", out)
+
+    def test_the_citation_names_the_declaration_that_fired(self) -> None:
+        # §6.2: "Without the citation, a wrong verdict is a sentence
+        # with nothing to grep for, and the maintenance loop starves."
+        _, out, _ = self.explain("git push --force")
+        self.assertIn("forced push", out)
+        self.assertIn("config.py:", out)
+
+    def test_the_citation_names_what_was_read(self) -> None:
+        # "the tool, the subcommand path, the specific flag,
+        # assignment, value or operand that matched".
+        _, out, _ = self.explain("git push --force")
+        self.assertIn("git", out)
+        self.assertIn("push", out)
+
+    def test_every_declaration_at_the_deciding_rank_is_printed(self) -> None:
+        # "the citation names every declaration at the deciding rank
+        # *across the whole line*, embedded invocations included
+        # (`git push -f && git reset --hard` cites both)".
+        _, out, _ = self.explain("git push && git push --force")
+        self.assertEqual(out.count("forced push"), 2, out)
+
+    def test_a_silent_line_cites_nothing(self) -> None:
+        # §5.3: "a declared silence refuses nothing and so has nothing
+        # to explain".
+        _, out, _ = self.explain("git status")
+        self.assertNotIn("forced push", out)
+
+    def test_the_statuses_are_distinct(self) -> None:
+        # A caller distinguishing deny from ask has only the status.
+        self.assertEqual(
+            len(
+                {
+                    EXIT_SILENT,
+                    EXIT_ASK,
+                    EXIT_USAGE,
+                    EXIT_DENY,
+                    EXIT_NO_CONFIG,
+                    EXIT_CONFIG_ERROR,
+                }
+            ),
+            6,
+        )
 
 
 class UsageTest(unittest.TestCase):
@@ -422,12 +502,13 @@ class ModuleDoorTest(unittest.TestCase):
         # here to prove stays empty.
         with configured() as project:
             completed = run_out_of_process(
-                "explain", "--project", project, "ls"
+                "explain", "--project", project, "git push --force"
             )
-        self.assertEqual(completed.returncode, EXIT_NO_VERDICT)
+        # A status a caller can act on: `|| refuse` must refuse here.
+        self.assertEqual(completed.returncode, EXIT_DENY)
         # Through a real process boundary, where the streams are the
         # operating system's rather than two StringIO objects.
-        self.assertIn("not an allow", completed.stdout)
+        self.assertIn("deny", completed.stdout)
         self.assertEqual(completed.stderr, "")
 
 

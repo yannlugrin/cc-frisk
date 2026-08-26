@@ -1528,3 +1528,175 @@ Detail in git history.
 - **Approved by:** operator, 2026-08-26 — "`bundled=` on tool(),
   default True", after the single-dash long-flag class was raised by
   the operator and the `-vvv` bug demonstrated.
+
+### D-051 — `allow` is earned per invocation and withheld at the line
+
+- **Date:** 2026-08-26
+- **Step:** `009`
+- **Context:** §6.1's combination table has three allow rows and three
+  withholding rows, and every one of them turns on conditions this
+  build cannot evaluate: `examined` needs the baseline read tools
+  (`017`), `placed` needs substitution analysis (`011`), and the
+  release itself needs open fact (c) — whether Claude Code still
+  prompts on substitutions — which `015` measures and which may retire
+  the verdict altogether. `PLAN.md` `009` therefore names "§6.1's
+  combination table (every row except the allow rows)". But `allow()`
+  is already in the configuration vocabulary, so a rule can declare one
+  today and the engine has to answer for it.
+- **Decision:** an invocation earns `allow` exactly as it earns any
+  other verdict — the rule fires, the per-invocation verdict is
+  `ALLOW`, `frisk explain` shows it — and the **line** answers
+  `SILENT`. That is not an interim invention: it is what §6.1's own
+  withholding rows say ("the line falls back to genuine silence"), and
+  every condition that would release the allow is unmeasured, so every
+  row that could apply is a withholding one. Nothing has to be undone
+  at `017`; the release is added.
+- **Alternatives considered:** *refuse an `allow` declaration until
+  `017`* — rejected: the vocabulary is the stability boundary of §3.5,
+  and a constructor that raises is a breaking change to add and another
+  to remove. *Return the allow at line level and let the hedges arrive
+  later* — rejected outright: an allow is assumed to lift the
+  working-directory sandbox (§6.3), so shipping the release before the
+  hedges is shipping the one verdict whose failure direction is
+  unrecoverable.
+- **Approved by:** implementer (within latitude: `PLAN.md` `009` stages
+  the allow rows at `017`; this entry records how the verdict behaves
+  in the meantime).
+
+### D-052 — the default verdict is what no grant released, not what no rule matched
+
+- **Date:** 2026-08-26
+- **Step:** `009`
+- **Context:** §3.2 says a tool's default verdict is "the defined
+  outcome for 'no rule matched, no grant held'". Read literally, a
+  fired rule suppresses the default — so a gated tool with a `deny`
+  default on which an `ask` rule matched and no grant held would answer
+  **ask**, weaker than the same invocation with no rule at all. That
+  inverts §3.3: a rule firing is not evidence of safety, and the only
+  thing §3.2 gives that releases a gated tool is a grant.
+- **Decision:** the invocation's base contribution is computed always:
+  **silence where a grant holds, the tool's default verdict
+  otherwise**. Rules combine on top of it by rank. The three worked
+  corpus rulings agree with both readings, and this one additionally
+  cannot answer weaker than the tool's declared posture. It also states
+  §3.2's "rules hold even where a grant would otherwise release"
+  directly: the grant sets the base to silence, and the rule outranks
+  it (`stubtool touch --syntax-check` → ask).
+- **Alternatives considered:** *the literal reading — no default where
+  a rule fired* — rejected for the inversion above; the wording is
+  describing the common case (a rules-only tool), not licensing a
+  weaker answer on a gated one. *Make the default a floor only for
+  gated tools* — same behaviour with a special case in it, and a
+  rules-only tool's default is silence, which floors nothing.
+- **Approved by:** implementer (within latitude: §3.3's stated
+  principle decides a §3.2 wording ambiguity; no ruling separates the
+  two readings).
+
+### D-053 — a malformed invocation costs an ask on every tool
+
+- **Date:** 2026-08-26
+- **Step:** `009`
+- **Context:** §4.2 states the malformed case flat — "a declared
+  value-taking flag with nothing after it makes the invocation
+  malformed, which is unproven, not safe" — not scoped to gated tools
+  the way the unreadable-token rule beside it is. On a gated tool the
+  cost is visible anyway: no grant can hold, so the default applies
+  (corpus: `stubtool deploy.yml --limit` → ask). On a rules-only tool
+  whose default is silence there is nothing for "unproven, not safe" to
+  attach to, and `git -C` would answer silence — the direction §3.3
+  forbids. No corpus ruling adjudicates it.
+- **Decision:** a malformed invocation contributes an **ask** of its
+  own, whatever the tool, and releases no grant. The citation names the
+  flag that was left without a value.
+- **Alternatives considered:** *scope it to gated tools, like the
+  unreadable-token rule* — rejected: §4.2 scopes that rule explicitly
+  and this one deliberately not, and the reading layer already records
+  the two separately for exactly this reason (`008`). *Leave it silent
+  on rules-only tools and document the gap* — a declared blind spot
+  (§4.4) is for gaps that cannot be closed cheaply; this one costs a
+  contribution.
+- **Approved by:** implementer (within latitude: §3.3's principle
+  applied where §4.2 states a fact without a cost).
+
+### D-054 — an unproven tool identity caps the invocation at ask
+
+- **Date:** 2026-08-26
+- **Step:** `009`
+- **Context:** §4.2: "After an in-line `cd`, a relative spelling of a
+  path-declared tool is unproven and recognition degrades stricter,
+  like any path match." The analogy is the instruction: an unproven
+  path match releases no grant and fires a deny or ask rule at **ask**
+  strength (§3.2). Applied to identity rather than to a value, that
+  means the engine cannot prove this file *is* the declared tool.
+- **Decision:** where reading recorded an unresolved path, the
+  invocation releases no grant and its verdict is capped at **ask** — a
+  deny it would otherwise have earned becomes an ask, and a silence
+  stays a silence, since the tool is silent either way. Producing the
+  deny would be the wrong deny §4.3 forbids: the command may well be a
+  different file entirely.
+- **Alternatives considered:** *treat the tool as recognized and let
+  its rules fire in full* — rejected: it denies on a file the line does
+  not identify. *Treat it as unregistered* — rejected the other way: it
+  is the quieter direction, and §4.2 says recognition degrades
+  *stricter*, not away.
+- **Approved by:** implementer (within latitude: §4.2's own analogy to
+  the path matchers of §3.2).
+
+### D-055 — `explain`'s exit statuses, and what an unconfigured project answers
+
+- **Date:** 2026-08-26
+- **Step:** `009`
+- **Context:** §9 requires an "exit status usable from scripts" and
+  leaves the numbers free. `006` reserved 2 for argparse, 4 for "no
+  configuration" and 5 for "configuration would not load", and used 3
+  as the interim "nothing was judged".
+- **Decision:** `0` silent, `1` ask, `2` usage, `3` deny, `4` no
+  configuration, `5` configuration error. **Silence is 0** because
+  silence is a real answer — frisk has no opinion and the permission
+  rules decide (§3.2) — so `frisk explain "$cmd" || refuse` refuses
+  exactly where frisk objected or could not answer. `allow` gets no
+  status until `017`, since no line returns one (`D-051`). An
+  **unconfigured project answers 4 from `explain` too**, not the
+  verdict it reached against the engine's default layers: that verdict
+  is real but it was reached against no boundary, and §5.4 requires the
+  inertness be unmissable rather than inferable. The reading and the
+  verdict are still printed; only the status says "no boundary
+  answered".
+- **Alternatives considered:** *silence non-zero, so any status but a
+  hypothetical allow means "do not proceed"* — rejected: it makes every
+  ordinary command a failure and the caller has to special-case the
+  common answer. *`explain` returning the verdict on an unconfigured
+  project* — rejected as above; it is the one case where the status
+  would say "no opinion" about a project frisk has not been told
+  anything about, which reads as a boundary having answered.
+- **Approved by:** implementer (within latitude: §9 leaves the numbers
+  to the implementation and requires only that they be usable).
+
+### D-056 — a gated tool with no declared default asks
+
+- **Date:** 2026-08-26
+- **Step:** `009`
+- **Context:** §3.2 enumerates the per-tool defaults as "silent for a
+  rules-only tool, ask for a granted tool, or an explicit verdict",
+  which leaves one shape unnamed: a tool that declares a closed world
+  and no grants and no default. `D-049` describes such a tool as
+  asking on an unaccounted flag; §3.2's closed-world sentence says an
+  unaccounted flag "gets the tool's default verdict", which would be
+  silence under the rules-only reading — and a closed world would then
+  be a declaration with no effect at all.
+- **Decision:** the implicit default is **ask for any gated tool** —
+  grants declared, closed world declared, or both — and silence
+  otherwise. `Entry.gated` is the question asked, which is the same
+  property everything else in the closed world keys on. An unaccounted
+  flag therefore reaches the default verdict exactly as §3.2 says, and
+  for the unnamed shape that default is ask, which is what `D-049`
+  described.
+- **Alternatives considered:** *`bool(entry.grants)`, following §3.2's
+  word "granted" literally* — rejected: it makes `closed_world=True`
+  with no grant a no-op, and contradicts `D-049`'s reading of the same
+  shape. *An explicit verdict required on any gated tool* — rejected as
+  ceremony: §3.2 defines implicit defaults precisely so a declaration
+  need not repeat the obvious one.
+- **Approved by:** implementer (within latitude: §3.2 does not name
+  this shape; the choice is the stricter of the two readings and the
+  one `D-049` already assumed).

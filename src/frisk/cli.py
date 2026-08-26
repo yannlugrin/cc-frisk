@@ -58,15 +58,28 @@ from .registry import Cases, Registry, engine_defaults, printable
 
 PROGRAM = "frisk"
 
-#: Exit statuses. `explain` will eventually answer with the verdict it
-#: reached, and those statuses are chosen when there are verdicts to
-#: report; 2 is argparse's own usage failure and is left to it.
+#: Exit statuses. `explain` answers with the verdict it reached, so
+#: three of these are verdicts and the rest are failures to reach one.
+#: 2 is argparse's own usage failure and is left to it.
+#:
+#: **Silence is 0**, because silence is a real answer: frisk has no
+#: opinion and the permission rules decide (§3.2). Every other status
+#: is non-zero, so `frisk explain "$command" || refuse` refuses exactly
+#: where frisk objected or could not answer. `allow` has no status yet:
+#: no line returns one before `017`.
+EXIT_SILENT = 0
+EXIT_ASK = 1
 EXIT_USAGE = 2
-EXIT_NO_VERDICT = 3
+EXIT_DENY = 3
 #: `registry` found no configuration: the plugin is enabled and gates
 #: nothing, which §5.4 requires be said unmissably rather than answered
 #: with an empty registry.
 EXIT_NO_CONFIG = 4
+#: The interim status of `explain` while judging is being built: it is
+#: deliberately none of the verdict statuses above, so that a case
+#: expecting a verdict cannot pass against a build that reaches none.
+#: It retires with the last commit of `009`.
+_UNJUDGED = 6
 #: The configuration exists and could not be loaded (§7.1). Loud, and
 #: never an empty registry standing in for a boundary that failed.
 EXIT_CONFIG_ERROR = 5
@@ -210,7 +223,7 @@ def explain_command(args: argparse.Namespace) -> int:
     refusal to answer, because the report is still worth having.
     Everything else reports the reading.
 
-    The status is `EXIT_NO_VERDICT` in both reading cases, and it is the
+    The status is `_UNJUDGED` in both reading cases, and it is the
     one true thing about this build: nothing here judges yet. `registry`
     answers `EXIT_NO_CONFIG` for the unconfigured project because it has
     nothing at all to print; this command does.
@@ -229,7 +242,7 @@ def explain_command(args: argparse.Namespace) -> int:
             return EXIT_CONFIG_ERROR
         registry = loaded
     print(_reported(args.command_line, read(args.command_line, registry)))
-    return EXIT_NO_VERDICT
+    return _UNJUDGED
 
 
 def _unconfigured(project: str | None, consequence: str) -> None:

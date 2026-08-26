@@ -23,7 +23,7 @@ from pathlib import Path
 from unittest import mock
 
 from frisk import __version__, config
-from frisk.cli import EXIT_CONFIG_ERROR, EXIT_NO_CONFIG
+from frisk.cli import EXIT_CONFIG_ERROR, EXIT_NO_CONFIG, EXIT_USAGE
 from frisk.config import CURRENT_GENERATION, config_path
 from tests.test_cli import run
 
@@ -117,33 +117,18 @@ class RegistryCommandTests(unittest.TestCase):
         self.assertEqual(out, "")
         self.assertTrue(err.strip())
 
-    def test_a_value_shows_what_each_matcher_answers(self) -> None:
+    def test_the_value_probe_is_retired(self) -> None:
+        # `--value` existed because `007` had no verdict to observe and
+        # the three-valued model needed a window. `frisk explain` on a
+        # real command line is that window from here on, with the
+        # line's context the flag could never have (`D-046`).
         self.write(CONFIG)
-        _, out, _ = run(
+        status, out, err = run(
             "registry", "--project", str(self.root), "--value", "destroy"
         )
-        self.assertIn("[satisfied]", out)
-        _, other, _ = run(
-            "registry", "--project", str(self.root), "--value", "check"
-        )
-        self.assertIn("[unsatisfied]", other)
-        self.assertNotIn("[satisfied]", other)
-
-    def test_a_value_with_nothing_to_answer_says_so(self) -> None:
-        # `--value` narrows to what can answer, so a registry where
-        # nothing reads a value prints nothing — a real answer, and one
-        # an empty page states badly (`D-046`).
-        self.write(
-            f"from frisk.declare import api_generation, ask, tool\n\n"
-            f"api_generation({CURRENT_GENERATION})\n\n"
-            'tool("stubtool", default=ask(reason="Everything it does."))\n'
-        )
-        status, out, err = run(
-            "registry", "--project", str(self.root), "--value", "anything"
-        )
-        self.assertEqual(status, 0)
-        self.assertNotIn("tool(stubtool)", out)
-        self.assertIn("nothing for this one to answer", err)
+        self.assertEqual(status, EXIT_USAGE)
+        self.assertEqual(out, "")
+        self.assertIn("--value", err)
 
     def test_the_flags_reach_the_registry(self) -> None:
         # The three the layout contract defines: cases hidden until
