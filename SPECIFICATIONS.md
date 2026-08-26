@@ -759,6 +759,26 @@ silent gap becomes an unprompted destructive command.
   fail stricter on their own; and for wrappers and handoffs the
   directions invert (an unknown value-taking option loses the walk,
   which asks — §4.3, §4.4). The tests must cover the declared set.
+- **A run of short flags behind one dash is several flags**, on the
+  tools that bundle them: `git push -fu origin main` carries `-f`, and
+  a deny naming it must fire. Splitting is driven by the declaration
+  and deliberately narrow. A token that is *itself* a declared flag is
+  never split — `-vvv` is one flag, not three — and a run splits only
+  where **every** letter is a declared flag of that tool, so no flag
+  the operator never wrote can be manufactured and no rule can fire on
+  an invented one. A letter that takes a value ends the run and takes
+  the remainder of the token, or the next one, as getopt does. Tools
+  that do not follow the convention — those whose long options carry a
+  single dash, `-name`, `-cp` — **declare that they do not bundle**,
+  and nothing on them is ever split; bundling is the default, because
+  it is the dominant convention and because the two failures are not
+  equally visible: an over-split shows as a refusal the operator can
+  see and correct, while an unsplit `-fu` is a rule that silently never
+  fires. On a *gated* tool the direction reverses — split letters are
+  accounted where the whole run was not, so a grant can hold where the
+  unsplit token left the invocation unproven — and that is accepted
+  rather than overlooked: the closed world exists for flags nobody
+  considered, and every letter here is one the operator declared.
 - **A tool is recognized by the basename of its command word**, on the
   whole name only, never a prefix or substring — `git` and `/usr/bin/git`
   are the same tool, `.venv/bin/ansible-playbook` is `ansible-playbook`;

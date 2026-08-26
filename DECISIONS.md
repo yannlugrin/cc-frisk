@@ -1485,3 +1485,46 @@ Detail in git history.
   the back door, and it changes §4.1's scan into one that fires on
   every registered name.
 - **Approved by:** operator, 2026-08-26 — delete the gloss.
+
+### D-050 — Short-flag bundling, declared per tool and on by default
+
+- **Date:** 2026-08-26
+- **Step:** `008`
+- **Context:** §4.2 said nothing about a run of short flags behind one
+  dash, and the engine read `-fu` as a single unknown flag. On a
+  rules-only tool that is a **missed deny**, not a missed prompt:
+  `git push -fu origin main` matches no rule naming `-f`, so a forced
+  push answers silence. A first fix split any run whose letters were
+  all declared, and two problems surfaced. It never asked whether the
+  *token itself* was declared, so the corpus's own
+  `ansible-playbook -vvv` split into `-v -v -v` and `java -cp lib.jar`
+  lost its value — a straight bug. And a whole class of tools does not
+  bundle at all: those whose long options carry one dash (`find -name`,
+  `go -run`, `java -cp`), where splitting is simply wrong.
+- **Decision:** three parts. A token that is itself a declared flag is
+  never split. A run splits only where every letter is a declared flag,
+  so no flag the operator never wrote is manufactured — a rule firing
+  on an invented flag would be the wrong deny §4.3 forbids. And
+  `tool(..., bundled=False)` turns it off for a tool that does not
+  follow the convention. **The default is on**, because getopt bundling
+  is the dominant convention and because the two failures differ in
+  visibility: an over-split is a refusal the operator sees and corrects
+  by declaring the flag, while an unsplit `-fu` is a rule that never
+  fires and says nothing. The loosening on gated tools — split letters
+  are accounted where the run was not, so a grant can hold — is
+  accepted in the amendment's own words rather than left to be found.
+- **Alternatives considered:** *default off, opt in* — over-splitting
+  becomes impossible, and rejected because it leaves the missed deny in
+  every configuration whose author never thought about bundling, which
+  is most of them; a safe default that is only safe when someone
+  remembers it is not one. *Infer it from the declaration* — a tool
+  declaring any single-dash multi-character flag is not a getopt tool,
+  which needs no API at all and uses a signal the operator already
+  gives; rejected as action at a distance, since adding `-name` would
+  silently change how every other flag on that tool is read. *Defer to
+  `010`*, where `PLAN.md` already promises combined-flag spellings for
+  a shell's `-c`; rejected because it leaves the hole open across
+  `009`, the step where verdicts start being produced.
+- **Approved by:** operator, 2026-08-26 — "`bundled=` on tool(),
+  default True", after the single-dash long-flag class was raised by
+  the operator and the `-vvv` bug demonstrated.
