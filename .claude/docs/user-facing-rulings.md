@@ -5,6 +5,14 @@ implementation settled that a *user* has to be told about, and where the
 ruling is written down. Read it when writing any §12 deliverable; it is
 the list of things a reader of the specification alone would not know.
 
+One standing lesson, learned when `explain` printed `unproven:
+unreadable` and the operator had to ask what it meant: **an internal
+name is never an explanation**. Every word frisk prints is read by
+someone deciding whether to allow something, and they do not know the
+engine's vocabulary. A category tells them which bucket; they need what
+was wrong and what would fix it. This binds §6.2's reasons and
+citations as much as any §12 page.
+
 Nothing here restates a reason — `DECISIONS.md` holds those, and the
 contracts hold the rest. An entry that stops being true is deleted, not
 corrected: the source it points at is the copy that matters.
