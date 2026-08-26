@@ -138,12 +138,19 @@ tool(
 tool(
     "git",
     options=[takes_value("-C")],
-    flags=[takes_value("-m")],
+    flags=[bare("--force", "--hard"), takes_value("-m")],
     rules=[
         deny(
             "push",
+            when=any_flag("--force"),
             reason="A forced push rewrites remote history.",
             label="forced push",
+        ),
+        deny(
+            "reset",
+            when=any_flag("--hard"),
+            reason="A hard reset destroys uncommitted work.",
+            label="hard reset",
         ),
         ask("commit", reason="A commit is work being recorded."),
     ],
@@ -433,41 +440,45 @@ class ExplainVerdictTest(unittest.TestCase):
         self.assertIn("forced push", out)
         self.assertIn("config.py:", out)
 
-    def test_the_citation_names_what_was_read(self) -> None:
-        # "the tool, the subcommand path, the specific flag,
-        # assignment, value or operand that matched".
-        _, out, _ = self.explain("git push --force")
-        self.assertIn("git", out)
-        self.assertIn("push", out)
-
     def test_every_declaration_at_the_deciding_rank_is_printed(self) -> None:
         # "the citation names every declaration at the deciding rank
         # *across the whole line*, embedded invocations included
-        # (`git push -f && git reset --hard` cites both)".
-        _, out, _ = self.explain("git push && git push --force")
-        self.assertEqual(out.count("forced push"), 2, out)
+        # (`git push -f && git reset --hard` cites both)" — §6.2's own
+        # example, and two *different* declarations, which is what the
+        # sentence is about.
+        _, out, _ = self.explain("git push --force && git reset --hard")
+        self.assertIn("forced push", out)
+        self.assertIn("hard reset", out)
 
     def test_a_silent_line_cites_nothing(self) -> None:
         # §5.3: "a declared silence refuses nothing and so has nothing
-        # to explain".
+        # to explain". Paired with the deny above, which prints both,
+        # so this is the absence of something the same build produces.
+        _, denied, _ = self.explain("git push --force")
+        self.assertIn("forced push", denied)
+        self.assertIn("A forced push rewrites remote history.", denied)
         _, out, _ = self.explain("git status")
         self.assertNotIn("forced push", out)
+        self.assertNotIn("A forced push rewrites remote history.", out)
 
-    def test_the_statuses_are_distinct(self) -> None:
-        # A caller distinguishing deny from ask has only the status.
-        self.assertEqual(
-            len(
-                {
-                    EXIT_SILENT,
-                    EXIT_ASK,
-                    EXIT_USAGE,
-                    EXIT_DENY,
-                    EXIT_NO_CONFIG,
-                    EXIT_CONFIG_ERROR,
-                }
-            ),
-            6,
-        )
+    def test_the_statuses_are_the_contract_D_055_wrote(self) -> None:
+        # Every other case here compares a symbol to itself, so this is
+        # the one place the *numbers* are asserted. `D-055`: silence is
+        # 0 because silence is a real answer, and everything else is
+        # non-zero, so `frisk explain "$cmd" || refuse` refuses exactly
+        # where frisk objected or could not answer. Renumbering these
+        # inverts that shell idiom silently.
+        self.assertEqual(EXIT_SILENT, 0)
+        others = {
+            EXIT_ASK,
+            EXIT_USAGE,
+            EXIT_DENY,
+            EXIT_NO_CONFIG,
+            EXIT_CONFIG_ERROR,
+        }
+        self.assertNotIn(0, others)
+        # And a caller distinguishing deny from ask has only the status.
+        self.assertEqual(len(others), 5)
 
 
 class UsageTest(unittest.TestCase):

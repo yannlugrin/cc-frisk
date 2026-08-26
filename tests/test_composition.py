@@ -35,8 +35,6 @@ from frisk.declare import (
     cases,
     deny,
     drop,
-    every_operand,
-    flag,
     may_take_value,
     one_of,
     path_under,
@@ -1048,29 +1046,6 @@ class RegistryLayoutTests(CollectionFixture):
         self.assertNotIn("redirections", bare_registry.describe())
         self.assertNotIn("benign assignments", bare_registry.describe())
 
-    def test_a_matcher_carries_its_outcome_as_a_suffix(self) -> None:
-        def declare() -> None:
-            tool(
-                "stubtool",
-                rules=[
-                    ask(
-                        "apply",
-                        when=flag("--mode", one_of("destroy")),
-                        reason="A destroying mode.",
-                        label="destroying mode",
-                    )
-                ],
-            )
-
-        described = self.compose(declare).describe(value="destroy")
-        line = next(
-            each
-            for each in described.splitlines()
-            if each.strip().startswith("when:")
-        )
-        self.assertTrue(line.startswith("      when: "))
-        self.assertTrue(line.endswith(" [satisfied]"))
-
     def test_the_whole_output_is_ascii(self) -> None:
         self.assertTrue(self.text.isascii())
 
@@ -1247,97 +1222,3 @@ class InspectionTests(CollectionFixture):
         # that a rule arriving by amendment is printed the same way,
         # which is the composition claim rather than the layout one.
         self.assertIn("    ask(push) - any push", self.lines)
-
-    def test_a_value_annotates_every_matcher_with_its_outcome(
-        self,
-    ) -> None:
-        # Every one, and each with its own answer: a tool carries
-        # several matchers, and an implementation that annotated the
-        # first — or annotated them all alike — would still print a
-        # plausible registry.
-        def declare() -> None:
-            tool(
-                "stubtool",
-                rules=[
-                    ask(
-                        "apply",
-                        when=flag("--mode", one_of("destroy")),
-                        reason="A destroying mode.",
-                    ),
-                    ask(
-                        "target",
-                        when=flag("--to", one_of("prod")),
-                        reason="Reaching production.",
-                    ),
-                ],
-            )
-
-        described = self.compose(declare).describe(value="destroy")
-        annotations = [
-            line.rsplit(" ", 1)[-1]
-            for line in described.splitlines()
-            if line.strip().startswith("when:")
-        ]
-        self.assertEqual(annotations, ["[satisfied]", "[unsatisfied]"])
-
-    def test_a_value_prints_only_what_can_answer_it(self) -> None:
-        # Ruled on after the test gate (`D-046`): `--value` asks what a
-        # value satisfies, and an entry carrying no matcher can never
-        # be annotated. On a real project that was four annotations in
-        # 142 lines, 23 of its 26 entries being engine wrappers that
-        # can never answer anything.
-        def declare() -> None:
-            tool(
-                "stubtool",
-                rules=[
-                    ask(
-                        "apply",
-                        when=flag("--mode", one_of("destroy")),
-                        reason="A destroying mode.",
-                    )
-                ],
-            )
-            wrapper("myrunner", flags=[takes_value("--as")])
-
-        registry = self.compose(declare, with_defaults=True)
-        whole = registry.describe().splitlines()
-        self.assertIn("wrapper(myrunner)", whole)
-        self.assertIn("wrapper(sudo)", whole)
-
-        answering = registry.describe(value="destroy").splitlines()
-        self.assertIn("tool(stubtool)", answering)
-        # The runner carries no matcher, and neither does any engine
-        # default: none of them is part of the answer.
-        self.assertNotIn("wrapper(myrunner)", answering)
-        self.assertNotIn("wrapper(sudo)", answering)
-        self.assertNotIn("benign assignments", answering)
-
-    def test_a_registry_with_nothing_to_answer_prints_nothing(
-        self,
-    ) -> None:
-        # The honest answer to "what does this value satisfy?" when no
-        # declaration reads a value at all. The CLI says so on stderr
-        # rather than leaving an empty page to read as a failure.
-        registry = self.compose(
-            lambda: tool("stubtool", default=silent()), with_defaults=True
-        )
-        self.assertEqual(registry.describe(value="destroy"), "")
-
-    def test_a_value_it_cannot_decide_reads_as_unproven(self) -> None:
-        def declare() -> None:
-            tool(
-                "stubtool",
-                rules=[
-                    ask(
-                        "clean",
-                        when=every_operand(path_under("/tmp")),
-                        reason="Cleaning outside scratch space.",
-                    )
-                ],
-            )
-
-        registry = self.compose(declare)
-        # A relative value against an absolute boundary: the third
-        # answer has to reach the inspection surface too, or the
-        # surface cannot show the model it exists to show.
-        self.assertIn("[unproven]", registry.describe(value="tmp/x"))

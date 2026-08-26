@@ -110,8 +110,15 @@ def shapes() -> Registry:
             ],
         )
         # §3.2's "an explicit verdict": every use of this one is the
-        # operator's.
-        tool("always", default=deny(reason="Every use of always is yours."))
+        # operator's — and one ask rule on it, which is the shape that
+        # separates `D-052`'s reading from §3.2's literal sentence.
+        tool(
+            "always",
+            default=deny(reason="Every use of always is yours."),
+            rules=[
+                ask("burn", reason="Burning destroys state.", label="burn"),
+            ],
+        )
         # A declared silence — §3.2's "an explicitly declared silent
         # default", which secure mode must keep.
         tool("mute", default=silent(reason="Nothing to say."))
@@ -406,7 +413,11 @@ class RuleTests(Shaped):
         # and inside a named handoff". Nothing here is inside one, so
         # the host rule decides and the inside rule stays silent — an
         # ask, never the deny the inside rule declares.
-        self.assertVerdict("scoped run", Verdict.ASK)
+        judgment = judge(read("scoped run", SHAPES), SHAPES)
+        self.assertIs(judgment.verdict, Verdict.ASK)
+        # The verdict alone cannot tell a correct host rule from an
+        # `inside` rule wrongly fired at ask strength.
+        self.assertEqual(self.labels(judgment), ["host only"])
 
 
 class GrantTests(Shaped):
@@ -416,7 +427,10 @@ class GrantTests(Shaped):
         self.assertVerdict("unsetgated --dry-run", Verdict.SILENT)
 
     def test_an_invocation_matching_no_grant_gets_the_default(self) -> None:
-        self.assertVerdict("unsetgated", Verdict.ASK)
+        # §3.2: "anything else gets the tool's default verdict."
+        # `shaped` declares one, so this says nothing about what an
+        # *undeclared* default resolves to — that is `D-056`'s case.
+        self.assertVerdict("shaped nothing-matches-this", Verdict.ASK)
 
     def test_a_flag_outside_the_closed_world_defeats_every_grant(
         self,
@@ -481,6 +495,19 @@ class AssignmentWorldTests(Shaped):
         # should not appear because of a harmless `DEBUG=1`."
         self.assertVerdict("DEBUG=1 make check", Verdict.SILENT)
 
+    def test_the_unregistered_posture_is_the_global_default_in_secure_mode(
+        self,
+    ) -> None:
+        # The other half of the same sentence: "silence in the default
+        # posture, the global default in secure mode". The answer must
+        # be the global default, not the assignment's own ask — the
+        # wrong reason would carry the wrong citation.
+        secure = deny(reason="Secure mode: say what this command is.")
+        judgment = self.judgment("DEBUG=1 make check", secure)
+        self.assertIs(judgment.verdict, Verdict.DENY)
+        self.assertEqual(len(judgment.citations), 1)
+        self.assertIn("Secure mode", judgment.citations[0].reason)
+
     def test_an_assignment_after_the_command_name_is_an_operand(
         self,
     ) -> None:
@@ -511,6 +538,18 @@ class DefaultVerdictTests(Shaped):
         # at all` → **deny**.
         self.assertVerdict("always", Verdict.DENY)
         self.assertVerdict("always --anything at all", Verdict.DENY)
+
+    def test_a_weaker_rule_never_undercuts_a_stronger_default(self) -> None:
+        # `D-052`: the default is what no grant released, not what no
+        # rule matched. Read §3.2's "no rule matched, no grant held"
+        # literally and a matching *ask* rule suppresses the deny
+        # default, so the tool the operator locked hardest answers
+        # weaker than the tool with no rule at all — the inversion §3.3
+        # forbids. Nothing released `always`, so it denies.
+        self.assertVerdict("always burn", Verdict.DENY)
+        # And the weaker rule is not what was cited.
+        judgment = self.judgment("always burn")
+        self.assertNotIn("burn", self.labels(judgment))
 
     def test_a_declared_silence_refuses_nothing(self) -> None:
         # §5.3: "a declared silence refuses nothing and so has nothing
@@ -768,7 +807,10 @@ class CitationTests(Judges):
         judgment = self.judgment("stubtool deploy.yml")
         self.assertIs(judgment.verdict, Verdict.ASK)
         self.assertEqual(len(judgment.citations), 1)
-        self.assertIn("local question", judgment.citations[0].reason)
+        # A phrase unique to the *default* declaration: grant (1)'s
+        # reason also says "local question", so that substring would
+        # pass against an engine citing the grant that failed.
+        self.assertIn("changes infrastructure", judgment.citations[0].reason)
         self.assertEqual(judgment.citations[0].tool, "stubtool")
 
     def test_an_operand_that_matched_is_named(self) -> None:
