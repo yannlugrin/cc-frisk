@@ -395,7 +395,10 @@ wrapper rulings. Local and free.
 **Spec sections.** §4.3 (substitutions and subshells; heredocs).
 
 **Deliverables.** Unquoted `$(…)`, `<(…)`, `>(…)` and bare `(…)` judged
-as commands, with `>(…)` never misread as a redirection; double-quoted
+as commands, with `>(…)` never misread as a redirection; §3.2's
+subshell clause closed with them — `(cd build && make) && tool ./x`
+must poison `./x`, which `008` left open because the command word there
+is `(cd` and the interim direction is the looser one; double-quoted
 substitutions and backticks judged even though tokenization hid them in a
 single token; single-quoted substitution text **not** judged; nesting
 resolved. Heredocs on both axes: who consumes the body (a shell's body is

@@ -18,9 +18,9 @@ each segment's command word to the registry; nothing here looks through
 one.
 
 The fourth boundary is the verdict itself. Reading reports what it
-found and what it could not establish (`Invocation.unproven`); what an
-unproven invocation *costs* is §3.2's business at `009`, where a gated
-tool's grants are what the flag releases or withholds.
+found and what it could not establish (`Invocation.doubts`); what a
+doubt *costs* is §3.2's business at `009`, where a gated tool's grants
+are what it releases or withholds.
 """
 
 from __future__ import annotations
@@ -808,10 +808,6 @@ class ArityTests(Reads):
         # Corpus: `stubtool deploy.yml --limit` → ask.
         invocation = self.one("stubtool deploy.yml --limit")
         self.assertEqual(invocation.doubts, (Doubt.MALFORMED,))
-        # §4.2 calls it "unproven, not safe", and that word is the
-        # property `009` reads: a predicate narrowed to one doubt would
-        # price this as a clean reading with the tuple still intact.
-        self.assertTrue(invocation.unproven)
         self.assertEqual(self.flags(invocation), {"--limit": None})
 
     def test_a_malformed_option_on_a_rules_only_tool_is_malformed_too(
@@ -914,7 +910,7 @@ class ArityTests(Reads):
     def test_a_value_optional_flag_at_the_end_is_not_malformed(self) -> None:
         # Nothing is missing: the arity says the value may be absent.
         invocation = self.one("stubopt --check --argument")
-        self.assertFalse(invocation.unproven)
+        self.assertEqual(invocation.doubts, ())
         self.assertEqual(self.flags(invocation)["--argument"], "check")
 
     def test_a_bundle_of_declared_letters_splits(self) -> None:
@@ -1183,7 +1179,6 @@ class LineContextTests(Reads):
         invocation = reading.invocations[-1]
         self.assertIs(invocation.entry, POLICY.lookup_path("tools/deploy.py"))
         self.assertEqual(invocation.doubts, (Doubt.UNRESOLVED_PATH,))
-        self.assertTrue(invocation.unproven)
 
 
 class UnreadableTokenTests(Reads):
@@ -1202,8 +1197,9 @@ class UnreadableTokenTests(Reads):
         # characters, or the like". Grants prove ordinary shapes.
         for operand in ("*.yml", "site?.yml", "[ab].yml"):
             with self.subTest(operand=operand):
-                self.assertTrue(
-                    self.one(f"stubtool --syntax-check {operand}").unproven
+                self.assertEqual(
+                    self.one(f"stubtool --syntax-check {operand}").doubts,
+                    (Doubt.UNREADABLE,),
                 )
 
     def test_a_variable_reference_is_dynamic(self) -> None:
@@ -1223,7 +1219,10 @@ class UnreadableTokenTests(Reads):
 
     def test_a_dynamic_token_leaves_the_invocation_unproven(self) -> None:
         # §4.2: "on a gated tool it leaves the invocation unproven".
-        self.assertTrue(self.one("stubtool --syntax-check $FOO").unproven)
+        self.assertEqual(
+            self.one("stubtool --syntax-check $FOO").doubts,
+            (Doubt.UNREADABLE,),
+        )
 
     def test_a_single_quoted_variable_is_literal(self) -> None:
         # Single quotes stop expansion, so there is nothing unknown.
@@ -1301,13 +1300,15 @@ class UnreadableTokenTests(Reads):
     def test_a_plain_line_is_proven(self) -> None:
         # Corpus: `stubtool --syntax-check site.yml` → silent, which no
         # unproven reading of it could reach.
-        self.assertFalse(self.one("stubtool --syntax-check site.yml").unproven)
+        self.assertEqual(
+            self.one("stubtool --syntax-check site.yml").doubts, ()
+        )
 
     def test_ordinary_path_and_value_shapes_stay_readable(self) -> None:
         # Corpus: `stubtool clean /tmp/x /tmp/y` → silent;
         # `stubtool apply --mode dry-run` → silent.
-        self.assertFalse(self.one("stubtool clean /tmp/x /tmp/y").unproven)
-        self.assertFalse(self.one("stubtool apply --mode dry-run").unproven)
+        self.assertEqual(self.one("stubtool clean /tmp/x /tmp/y").doubts, ())
+        self.assertEqual(self.one("stubtool apply --mode dry-run").doubts, ())
 
     def test_a_dollar_that_names_nothing_is_not_dynamic(self) -> None:
         # A bare `$` is a literal character to the shell.

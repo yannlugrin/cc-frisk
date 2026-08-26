@@ -185,17 +185,13 @@ class Invocation:
     dynamic_name: bool = False
     #: Everything reading could not establish about this invocation
     #: (§3.3), by source. Empty is a clean reading.
+    #:
+    #: No `unproven` convenience beside it, deliberately: what a doubt
+    #: *costs* differs by source (§4.2 scopes one of the three and
+    #: states two flat), so the one-line answer would be the one thing
+    #: `009` must not read. It can come back the moment something needs
+    #: it.
     doubts: tuple[Doubt, ...] = ()
-
-    @property
-    def unproven(self) -> bool:
-        """Reading left something unestablished — see `doubts` for what.
-
-        The convenience over `doubts`, and never the whole answer: what
-        an unproven invocation *costs* is §3.2's, and it differs by
-        source, which is why the sources are kept.
-        """
-        return bool(self.doubts)
 
 
 @dataclass(frozen=True)
@@ -210,8 +206,8 @@ class Reading:
     #: grant hold over tokens nobody finished reading.
     unparseable: bool = False
     #: What §4.1's raw scan found on an unparseable line: the registered
-    #: names that can produce a non-silent verdict — *speaking*, in
-    #: §3.2's vocabulary (`D-047`) — appearing as whole
+    #: names carrying rules, grants or a non-silent default — *speaking*,
+    #: in §3.2's vocabulary (`D-047`) — appearing as whole
     #: whitespace-delimited words, compared by basename so `/usr/bin/git`
     #: does not evade the scan. Empty on a line that parsed.
     speaking: tuple[str, ...] = ()
