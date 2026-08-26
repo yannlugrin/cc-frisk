@@ -977,6 +977,7 @@ def tool(
     grants: Sequence[Grant] = (),
     handoffs: Sequence[Handoff] = (),
     closed_world: bool | None = None,
+    bundled: bool = True,
     cases: Sequence[Case] = (),
 ) -> None:
     """Register a tool: what it is called, what it takes, what it may do.
@@ -1034,6 +1035,7 @@ def tool(
         grants=grants,
         handoffs=handoffs,
         closed_world=closed_world,
+        bundled=bundled,
         cases=cases,
     )
 
@@ -1226,6 +1228,7 @@ def amend(
     grants: Sequence[Grant | Drop] = (),
     handoffs: Sequence[Handoff | Drop] = (),
     closed_world: bool | None = None,
+    bundled: bool | None = None,
     cases: Sequence[Case] = (),
 ) -> None:
     """Amend the declaration beneath instead of replacing it (§3.4).
@@ -1271,6 +1274,7 @@ def amend(
         grants=grants,
         handoffs=handoffs,
         closed_world=closed_world,
+        bundled=bundled,
         cases=cases,
     )
 
@@ -1373,6 +1377,7 @@ class Entity:
     grants: Sequence[object] = ()
     handoffs: Sequence[object] = ()
     closed_world: bool | None = None
+    bundled: bool | None = None
     cases: Sequence[Case] = ()
     keeps_operands: int = 0
     operands_from_stdin: bool = False
@@ -1565,6 +1570,7 @@ def _entity(
     grants: Sequence[object] = (),
     handoffs: Sequence[object] = (),
     closed_world: bool | None = None,
+    bundled: bool | None = None,
     cases: Sequence[Case] = (),
     keeps_operands: int = 0,
     operands_from_stdin: bool = False,
@@ -1641,6 +1647,7 @@ def _entity(
             grants=tuple(grants),
             handoffs=tuple(handoffs),
             closed_world=closed_world,
+            bundled=bundled,
             cases=tuple(cases),
             keeps_operands=keeps_operands,
             operands_from_stdin=operands_from_stdin,

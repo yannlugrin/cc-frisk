@@ -44,5 +44,5 @@ specification. This file is what accumulated *beside* it.
 | That a regular expression a configuration declares is run against agent-supplied text with no backtracking bound, since the configuration is trusted code (§5.1) | `matchers.compiled`; §12's blind-spot list |
 | That a configuration which will not load denies rather than proceeds | §7.1; `config.load` |
 | That a rule naming one spelling of a flag misses the other — `flag("--force")` does not match `-f` — because a `FlagSet` groups names by *arity*, never by identity, and `any_flag("-f", "--force")` is how either spelling is written | `declare.any_flag`; `Entry.flags` |
-| That bundled short flags split only where the tool declares every letter, so `-fu` is `-f -u` but `-fq` with `-q` undeclared stays one unaccounted flag — declaring the letters a rule cares about is what closes it | `reading._bundled`; §8.2's coverage gate |
+| That bundling is on by default and `bundled=False` turns it off, and that the residue is a run mixing declared and undeclared letters — `-fq` with `-q` undeclared stays one unaccounted flag, so declaring the letters a rule cares about is what closes it | `D-050`; `declare.tool`; §8.2's coverage gate |
 | That `explain` on a project with no configuration still reads the line, says on stderr that nothing is gated, and never returns 0 | §5.4; `cli.explain_command` |

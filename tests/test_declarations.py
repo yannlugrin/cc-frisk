@@ -116,6 +116,35 @@ class ReasonTests(unittest.TestCase):
         self.assertIn("stash drop", str(raised.exception))
 
 
+class BundlingTests(unittest.TestCase):
+    """Whether a run of short flags is several flags (§4.2, `D-050`)."""
+
+    def test_a_tool_bundles_unless_it_says_otherwise(self) -> None:
+        registry = compose(lambda: tool("git", flags=[bare("-f")]))
+        entry = registry.lookup("git")
+        assert entry is not None
+        self.assertTrue(entry.bundled)
+
+    def test_a_tool_may_declare_that_it_does_not(self) -> None:
+        registry = compose(
+            lambda: tool("java", flags=[bare("-c")], bundled=False)
+        )
+        entry = registry.lookup("java")
+        assert entry is not None
+        self.assertFalse(entry.bundled)
+
+    def test_the_registry_prints_it_only_when_it_is_off(self) -> None:
+        # §3.4: composition may not hide what it decided, and off
+        # changes how every short flag on the tool is read. On is the
+        # default, and a column of "yes" is one a reader learns to skip.
+        def declare() -> None:
+            tool("git", flags=[bare("-f")])
+            tool("java", flags=[bare("-c")], bundled=False)
+
+        described = compose(declare).describe()
+        self.assertEqual(described.count("bundles short flags: no"), 1)
+
+
 class FlagArityTests(unittest.TestCase):
     """Three arities, declared and kept apart (§4.2)."""
 

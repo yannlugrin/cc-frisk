@@ -170,6 +170,12 @@ class Entry:
     #: kept rather than resolved into `gated` because §9's output has
     #: to say *why* a tool is gated, and only the declaration knows.
     closed_world: bool | None = None
+    #: Whether a run of short flags behind one dash is several flags
+    #: (§4.2, `D-050`). True for the tools that follow the getopt
+    #: convention, which is most of them; False for the ones whose long
+    #: options carry a single dash — `find -name`, `java -cp` — where
+    #: splitting is simply wrong.
+    bundled: bool = True
 
     @property
     def path_declared(self) -> bool:
@@ -541,6 +547,7 @@ class _Building:
     kind: str
     name: str
     source: Source
+    bundled: bool = True
     aliases: list[str] = field(default_factory=list)
     default: PlacedRule | None = None
     flags: dict[str, Arity] = field(default_factory=dict)
@@ -864,6 +871,8 @@ def _applied(building: _Building, entity: Entity) -> None:
         )
     if entity.closed_world is not None:
         building.closed_world = entity.closed_world
+    if entity.bundled is not None:
+        building.bundled = entity.bundled
     if building.closed_world is False and building.grants:
         raise ConfigurationError(
             f"'{building.name}' declares grants and an open world: a "
@@ -991,6 +1000,7 @@ def _finished(building: _Building) -> Entry:
         operands_from_stdin=building.operands_from_stdin,
         joins_operands=building.joins_operands,
         closed_world=building.closed_world,
+        bundled=building.bundled,
     )
 
 
@@ -1242,6 +1252,13 @@ def _entry_lines(
     lines.append(f"  source: {_source_text(entry.source)}")
     if entry.kind is Kind.TOOL:
         lines.append(f"  gated: {_gating(entry)}")
+    if not entry.bundled:
+        # Only when it is off. Bundling is the default (`D-050`), and a
+        # line saying so on every entry would be a column of "yes" the
+        # reader learns to skip — but *off* changes how every short flag
+        # on this tool is read, and §3.4 does not let composition hide
+        # what it decided.
+        lines.append("  bundles short flags: no")
     # Only the aliases that still reach this entry. One a later layer
     # claimed is an override like any other (`D-043`) — a `tool("sudo")`
     # over the engine's wrapper is not annotated either, and the word's

@@ -211,6 +211,18 @@ class CollectionFixture(unittest.TestCase):
 class ShadowingTests(CollectionFixture):
     """Per-name shadowing, in both required forms (§3.4)."""
 
+    def test_an_amendment_can_turn_short_flag_bundling_off(self) -> None:
+        # `D-050`: whether short flags bundle is a fact about the tool,
+        # so a project that finds a layer beneath it wrong must be able
+        # to correct that fact without re-declaring the entry.
+        self.assertTrue(self.beneath("sudo").bundled)
+        registry = self.compose(
+            lambda: amend("sudo", bundled=False), with_defaults=True
+        )
+        entry = registry.lookup("sudo")
+        assert entry is not None
+        self.assertFalse(entry.bundled)
+
     def test_a_redeclaration_replaces_what_was_beneath(self) -> None:
         # Promoting a wrapper to a rule-bearing tool is the need
         # prototyping demonstrated; the old declaration must not

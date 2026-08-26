@@ -646,7 +646,9 @@ def _bound(
         if attached is not None:
             target_list.append(Flag(name, attached))
             continue
-        bundled, remainder = _bundled(name, table)
+        bundled, remainder = _bundled(
+            name, table, entry is not None and entry.bundled
+        )
         for carried in bundled[:-1]:
             target_list.append(Flag(carried))
         name = bundled[-1]
@@ -681,7 +683,7 @@ def _bound(
 
 
 def _bundled(
-    name: str, table: Mapping[str, Arity]
+    name: str, table: Mapping[str, Arity], bundles: bool
 ) -> tuple[list[str], str | None]:
     """`-fu` as `-f -u`, where the tool declares both (§4.2, §3.3).
 
@@ -703,12 +705,21 @@ def _bundled(
     token as its value, as getopt does: `-vi prod` is `-v` then `-i`
     taking `prod`, and `-viprod` is `-v` then `-i` valued `prod`.
 
+    Two things stop it, and both are the operator's declaration
+    speaking. A token that is **itself** a declared flag is never
+    split: `-vvv` is one flag of ansible's, not three of `-v`, and
+    `-cp` is java's classpath rather than `-c -p`. And a tool whose
+    long options carry a single dash — `find -name`, `go -run` — says
+    `bundled=False` and nothing on it is ever split (`D-050`).
+
     The residue is a bundle mixing declared and undeclared letters —
     `-fq` where only `-f` is declared — which stays whole and so keeps
     the gap this closes. Declaring the letters a rule cares about is
     what shuts it, and §8.2's case-per-rule coverage is what shows a
     rule that never fires.
     """
+    if not bundles or name in table:
+        return [name], None
     if not name.startswith("-") or name.startswith("--") or len(name) < 3:
         return [name], None
     carried: list[str] = []

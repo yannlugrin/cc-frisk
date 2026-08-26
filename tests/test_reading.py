@@ -97,7 +97,7 @@ def policy() -> Registry:
             "stubopt",
             default=ask(reason="stubopt changes state unless proven local."),
             flags=[
-                bare("--check", "-c", "-k"),
+                bare("--check", "-c", "-k", "-ckk"),
                 takes_value("-a"),
                 may_take_value("--argument", default="check"),
                 may_take_value("--plain"),
@@ -138,6 +138,14 @@ def policy() -> Registry:
                     reason="A scratch target is not production.",
                 ),
             ],
+        )
+        # The same short flags as `stubopt`, declaring that they do not
+        # bundle (`D-050`) — the `find -name` / `java -cp` class.
+        tool(
+            "stubflat",
+            default=ask(reason="stubflat changes state unless proven local."),
+            flags=[bare("-c", "-k")],
+            bundled=False,
         )
         # Registered, silent by declaration, carrying nothing else: the
         # case that separates *registered* from *speaking* (§3.2).
@@ -938,6 +946,34 @@ class ArityTests(Reads):
     ) -> None:
         invocation = self.one("stubopt -caprod")
         self.assertEqual(self.flags(invocation), {"-c": None, "-a": "prod"})
+
+    def test_a_declared_token_is_never_taken_apart(self) -> None:
+        # `D-050`'s first guard, and the bug that earned it: the corpus
+        # declares `-v`, `-vv`, `-vvv` and `-vvvv` as four accounted
+        # flags of ansible-playbook, and a splitter that never asked
+        # whether the token itself was declared read `-vvv` as three
+        # uses of `-v`. The same guard keeps `java -cp lib.jar` from
+        # losing its value to `-c -p`.
+        invocation = self.one("stubopt -ck")
+        self.assertEqual(self.flags(invocation), {"-c": None, "-k": None})
+        invocation = self.one("stubopt -ckk")
+        self.assertEqual(self.flags(invocation), {"-ckk": None})
+
+    def test_a_tool_that_does_not_bundle_keeps_its_runs_whole(self) -> None:
+        # `D-050`: a tool whose long options carry one dash — `find
+        # -name`, `go -run`, `java -cp` — declares `bundled=False`, and
+        # nothing on it is ever split, however its letters are declared.
+        invocation = self.one("stubflat -ck")
+        self.assertEqual(self.flags(invocation), {"-ck": None})
+
+    def test_bundling_is_on_unless_a_tool_says_otherwise(self) -> None:
+        # The default is the dominant convention, and the reason is
+        # asymmetry: an over-split is a refusal the operator sees and
+        # corrects, while an unsplit `-fu` is a rule that never fires
+        # and says nothing (`D-050`).
+        entry = POLICY.lookup("stubopt")
+        assert entry is not None
+        self.assertTrue(entry.bundled)
 
     def test_a_bundle_with_an_undeclared_letter_stays_whole(self) -> None:
         # The safety property, and the reason splitting is conservative:
