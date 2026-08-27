@@ -1745,3 +1745,41 @@ Detail in git history.
   that is exactly the trade `010` should make with the walk in front of
   it.
 - **Approved by:** operator, 2026-08-27 — defer to `010`.
+
+### D-058 — `/review-step`, the file-by-file review loop
+
+- **Date:** 2026-08-27
+- **Step:** `009`
+- **Context:** the handover rituals cover the two ends of a step —
+  `/handover-step` puts it in front of the operator, `/approve-step`
+  closes it — and nothing covered what happens between them when the
+  operator wants to read the work themselves rather than only test its
+  behaviour. Step `009` is the first where they did: a step with a
+  1,000-line case file, six decision entries and a spec-reading
+  question inside it is not reviewable in one pass. Improvised, the
+  loop lost its own state — which files had been validated — the moment
+  the conversation grew.
+- **Decision:** a fourth ritual, `.claude/skills/review-step/`. One
+  cycle per file the operator picks: they give feedback, we discuss and
+  **nothing changes**, they say they are finished, everything agreed is
+  implemented **without committing**, they validate, and only then does
+  it commit. It holds a ledger of every file the step touched with four
+  states, written to the session scratchpad as well as restated in the
+  conversation, because a ledger held only in context does not survive
+  a compaction and the operator would have to remember what they had
+  validated. Validating a file is explicitly **not** approving the
+  step: approval stays a separate act at the end of the whole review,
+  and `/approve-step` is still what closes.
+- **Alternatives considered:** *fold it into `/handover-step`* —
+  rejected: that ritual is a sequence run once, this one is a loop run
+  as many times as there are files, and the do-nothing-until-told rule
+  at its centre contradicts a handover's job of arriving finished.
+  *Keep it as prose in `CLAUDE.md`* — rejected under rule 3's budget
+  and rule 11: it is a ritual invoked at a trigger, which is what a
+  skill is for, and `CLAUDE.md` is at 366 of 390 lines. *Track the
+  ledger in `.claude/docs/`* — rejected: it is per-step transient
+  state, not a durable lesson a future session needs, and rule 3 keeps
+  that directory for the latter.
+- **Approved by:** operator, 2026-08-27 — requested during `009`'s case
+  review, "to enable this mode easily on any step, that could also be
+  for my final review of a non-code step".
