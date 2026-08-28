@@ -294,7 +294,7 @@ behaviour done.
   Nothing judges a line yet. Detail in git history between tags
   `step-007` and `step-008`.
 
-### 009 — Judging and combining — `awaiting test`
+### 009 — Judging and combining — `in progress`
 
 **Objective.** Verdicts: per invocation, then over the line.
 
