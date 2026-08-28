@@ -729,12 +729,29 @@ silent gap becomes an unprompted destructive command.
   as something harmless.
 - **Options that precede a subcommand are recognized per the tool's
   declaration and stripped**, so the subcommand lands where rules expect
-  it — undeclared, `git -C dir push` parses as operands `dir push` and no
-  push rule matches. Which were used, *and with what values*, is
-  remembered: the allow hedges (§6.3) need the former, and rule and grant
-  conditions must be able to constrain the latter like any flag value —
-  "pushing is fine only for repositories under this directory" is a rule
-  on `-C`'s value.
+  it. An *undeclared* option or flag is presumed bare — the guess that
+  keeps a dangerous operand from hiding in a flag's value — but a
+  presumption is not a reading the engine may rest on alone: an
+  undeclared dashed token followed by another token leaves the operand
+  alignment **ambiguous**, and §3.3 gives an ambiguity one direction.
+  Rules and grants are therefore evaluated against **every alignment the
+  ambiguity admits** — the presumed-bare one, and the one in which each
+  undeclared token consumed the word after it — and the **strictest**
+  verdict any of them reaches is the invocation's. `git -C dir push
+  --force` denies whether or not `-C` was declared; the cost of
+  declaring nothing is a prompt, never a lost deny. The alternatives are
+  bounded by the number of undeclared tokens on the invocation, never by
+  their combinations. Declaring the options stays the right thing to do,
+  and is what makes an answer exact rather than the strictest of several
+  readings: an undeclared option whose *value* is literally a gated
+  subcommand word (`tool --output push`) will reach that subcommand's
+  verdict. That direction is accepted deliberately — the reverse, a
+  forced push read as an operand and answered with silence, is the
+  failure this document exists to prevent. Which options were used,
+  *and with what values*, is remembered: the allow hedges (§6.3) need
+  the former, and rule and grant conditions must be able to constrain
+  the latter like any flag value — "pushing is fine only for
+  repositories under this directory" is a rule on `-C`'s value.
 - **Flags are found wherever they sit** — the deciding token is often
   last, because that is where the agent tends to put it. Three arities
   are declarable and parsed: bare (a switch), value-required

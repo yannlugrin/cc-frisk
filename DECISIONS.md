@@ -1825,3 +1825,52 @@ Detail in git history.
   for something `ask()` already spells, rejected under rule 11.
 - **Approved by:** operator, 2026-08-27 — "default is for what is not
   matched by any rules/grants".
+
+### D-060 — an undeclared token's arity is an ambiguity, not a guess to rest on
+
+- **Date:** 2026-08-28
+- **Step:** `009`
+- **Context:** §4.2 stated the consequence of an undeclared option as a
+  fact and offered declaration as the remedy: "undeclared, `git -C dir
+  push` parses as operands `dir push` and no push rule matches." The
+  operator met it while reviewing the cases —
+  `aws --region eu-west-1 s3 rb s3://logs` answering ask against a
+  declaration that denies `s3 rb` — and rejected the reasoning: the
+  deny is lost because the tokenizer misplaced an operand, and that is
+  a defect whatever the sentence says. On a **gated** tool the closed
+  world degrades it to an ask; on a **rules-only** tool nothing catches
+  it at all, so `git -C /repo push -f` with `-C` undeclared answers
+  **silence** — a forced push, unremarked.
+- **Decision:** amend §4.2. Reading still presumes an undeclared token
+  bare — that guess is right, and it is what stops a dangerous operand
+  hiding in a flag's value — but the presumption is one reading, not
+  the only one the engine owes. An undeclared dashed token followed by
+  another token leaves the operand alignment ambiguous; rules and
+  grants are evaluated against every alignment the ambiguity admits,
+  and the strictest verdict stands. The alternatives are bounded by the
+  number of undeclared tokens, not by their combinations, so §4.5's
+  budget holds.
+  The alternative alignment fires at **full declared strength**, not at
+  the ask strength §3.2 gives an unproven condition. The engine already
+  fires full-strength denies on a guessed alignment — the presumed-bare
+  one — so refusing the other guess was not caution, only a preference
+  for one of two guesses. The accepted cost is stated in the amendment
+  rather than left to be found: a flag whose value is literally a gated
+  subcommand word (`tool --output push`) reaches that subcommand's
+  verdict. That line already denies today under the bare reading, so
+  this adds the mirror of an error the engine had, not a new class of
+  one.
+- **Alternatives considered:** *fire the alternative alignment at ask
+  strength*, by analogy with §3.2's unproven conditions — defensible,
+  and rejected because it leaves the hole half-open exactly where it is
+  worst: on a rules-only tool an ask is all it could ever produce, so a
+  forced push behind an undeclared `-C` would still never deny.
+  *Record it as a §4.4 declared blind spot* and keep "declare your
+  options" as the remedy — rejected by the operator: a blind spot is
+  for a gap that cannot be closed cheaply, and this one costs an
+  alternative alignment. *Leave §4.2 and record the question for later*
+  — rejected for the same reason, and because `009` is the step where
+  rules begin firing, so shipping it would ship the hole.
+- **Approved by:** operator, 2026-08-28 — "§4.2 is no sense, of course
+  we have to amend that", after proposing the both-hypotheses
+  evaluation and the strictest-verdict rule.
