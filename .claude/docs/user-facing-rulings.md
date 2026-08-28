@@ -41,7 +41,6 @@ specification. This file is what accumulated *beside* it.
 | That a collection may adopt another, and composes *over* what it adopted — whoever adopts decides, the same rule that puts the operator last | `Recording.adopt`; `registry.py` module docstring |
 | What `frisk registry` prints, field by field — and that `gated:` says *why* | `Registry.describe` |
 | That the registry's cases are hidden until `--cases`, and `--no-wrap` exists for whatever parses the output | `D-036`; `cli.py` |
-| That `--value` prints only the declarations that could answer the value, and that it is a temporary window on three-valued matching which retires when `explain` returns verdicts | `D-046`; `Registry.describe` |
 | Which programs the engine walks as wrappers, shells and interpreters, and that the set is a floor | `D-038`; `defaults.py`; the defaults suite |
 | That the display and locale variables are excused for every tool, and that nothing which can direct execution is | §3.2; `declare.benign_assignments` |
 | That a `drop(...)` naming something no layer beneath declares is refused, exactly as an `amend` of an undeclared name is — a removal that silently does nothing is a boundary the operator believes they have | `registry.py` composition; the composition suite |
@@ -53,4 +52,14 @@ specification. This file is what accumulated *beside* it.
 | That a configuration which will not load denies rather than proceeds | §7.1; `config.load` |
 | That a rule naming one spelling of a flag misses the other — `flag("--force")` does not match `-f` — because a `FlagSet` groups names by *arity*, never by identity, and `any_flag("-f", "--force")` is how either spelling is written | `declare.any_flag`; `Entry.flags` |
 | That bundling is on by default and `bundled=False` turns it off, and that the residue is a run mixing declared and undeclared letters — `-fq` with `-q` undeclared stays one unaccounted flag, so declaring the letters a rule cares about is what closes it | `D-050`; `declare.tool`; §8.2's coverage gate |
-| That `explain` on a project with no configuration still reads the line, says on stderr that nothing is gated, and never returns 0 | §5.4; `cli.explain_command` |
+| That `explain` on a project with no configuration still reads the line and prints a verdict, says on stderr that nothing is gated, and answers 4 rather than the verdict's own status — a verdict reached against no boundary is not one a script may trust | `D-055`; §5.4; `cli.explain_command` |
+| What each `explain` exit status means, and that **silence is 0** because silence is a real answer — so `frisk explain "$cmd" \|\| refuse` refuses exactly where frisk objected or could not answer | `D-055`; `cli.py` |
+| That an `ask` or `deny` reason is steering text the *model* reads, so it names the acceptable path and not only the objection | §6.2; `judging.py` module docstring |
+| That a verdict names every declaration at the deciding rank across the whole line, and never the weaker matches beneath it | §6.2; `judging.judge` |
+| That a tool's declared flag list is an **opt-in list the operator steers by editing**: on a gated tool a flag outside it asks in its own right, so taking a flag out is how you make it ask | `D-056`; `declare.tool` |
+| That a tool's default verdict is a **fallback**, not a floor — a rule the operator wrote is never undercut by it, and an unconditional `deny()` rule is how a floor is spelled | `D-059`; `judging._default` |
+| That an undeclared flag's arity is an ambiguity, so a rule is matched against every operand alignment it admits and the strictest verdict stands — declaring the options is what makes an answer exact rather than the strictest of several readings | `D-060`; §4.2 as amended |
+| That an unparseable line asks when it names a tool carrying rules or grants, and is silent otherwise — and that this is the one place frisk scans raw text | §4.1; `judging._unparseable` |
+| That `$VAR` in command position is silence in the default posture, and the global default in secure mode | §4.2; `judging._unregistered`; §12 owes this one by name |
+| That secure mode exists as an engine capability with no switch to turn it on until `033`, so no configuration can reach it yet | `PLAN.md` `033`; `judging.judge` |
+| That a line earning an `allow` answers silence until the hedges ship, so `allow` is declarable and never returned | `D-051`; `judging.combined` |
