@@ -1571,6 +1571,9 @@ Detail in git history.
 
 ### D-052 — the default verdict is what no grant released, not what no rule matched
 
+- **Reversed by `D-059`:** the default is a fallback for "no rule
+  matched, no grant held", not a floor. Read this entry as the position
+  that was overturned, not as the engine's behaviour.
 - **Date:** 2026-08-26
 - **Step:** `009`
 - **Context:** §3.2 says a tool's default verdict is "the defined
@@ -1680,6 +1683,14 @@ Detail in git history.
 
 ### D-056 — what a closed world does, and what an ungranted tool defaults to
 
+- **Rewritten in place**, 2026-08-27, commit `3c60940`: an earlier
+  draft under this id proposed ask for any gated tool, and the operator
+  settled it differently at the case gate before the step was tagged.
+  The format above freezes an id and makes a reversal a *new* entry
+  citing the old, and that rule admits no exception for an untagged
+  step — the draft is recoverable only from git history, which is one
+  hop more than a reader should need. Recorded here rather than undone,
+  and not to be repeated: a settled entry is superseded, never edited.
 - **Date:** 2026-08-27
 - **Step:** `009`
 - **Context:** §3.2 enumerates the per-tool defaults as "silent for a
