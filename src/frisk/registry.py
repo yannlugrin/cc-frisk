@@ -67,7 +67,7 @@ from .declare import (
     end_recording,
 )
 from .errors import ConfigurationError
-from .matchers import Matcher, combine_all
+from .matchers import Matcher
 from .verdicts import Verdict
 
 # A collection's layer is `collection:<name>`; the other two are the
@@ -354,7 +354,6 @@ class Registry:
 
     def describe(
         self,
-        value: str | None = None,
         *,
         cases: Cases = Cases.HIDDEN,
         wrap: bool = True,
@@ -437,21 +436,15 @@ class Registry:
         that stays true whether or not §9's machine-readable option
         ever ships.
 
-        With `value`, every matcher line gains what that matcher
-        answers, as a trailing `[satisfied]`, `[unsatisfied]` or
-        `[unproven]`. Bracketed and suffixed because the three words
-        contain one another: an eye scanning the column must not have
-        to tell `satisfied` from `unsatisfied` by the letters in front
-        of it, and neither must an assertion.
-
-        A value also **narrows** what is printed to the declarations
-        that could answer it — an entry carrying no matcher at all, as
-        every engine wrapper does, can never be annotated and is not
-        part of the answer (`D-046`). Plain `describe()` remains the
-        whole boundary; this is the other question, asked of the same
-        registry.
+        There was a `value` probe here until `009`, annotating every
+        matcher with what it answered for one string. It existed
+        because `007` had nothing that judged a command line, so the
+        three-valued model would otherwise have been invisible from
+        outside; `frisk explain` now answers the question it was
+        standing in for, with the line's context it could never have
+        (`D-046`).
         """
-        return _rendered(self, value, cases, wrap)
+        return _rendered(self, cases, wrap)
 
 
 class Collection:
@@ -1094,19 +1087,6 @@ def _gating(entry: Entry) -> str:
     return "no"
 
 
-def _annotated(text: str, matchers: Sequence[Matcher], value: str) -> str:
-    """What these matchers answer for the probed value.
-
-    Bracketed and suffixed because the three words contain one another:
-    an eye scanning the column must not have to tell `satisfied` from
-    `unsatisfied` by the letters in front of it.
-    """
-    if not matchers:
-        return text
-    outcome = combine_all([each.evaluate(value) for each in matchers])
-    return f"{text} [{outcome.value}]"
-
-
 def _field(indent: int, key: str, text: str, wrap: bool) -> list[str]:
     """One `key: value` line, its continuations reserved to depth 8."""
     opening = f"{' ' * indent}{key}: "
@@ -1139,24 +1119,19 @@ def _flag_text(
     return " ".join(rendered)
 
 
-def _assignment_text(assignment: Assignment, value: str | None = None) -> str:
+def _assignment_text(assignment: Assignment) -> str:
     name = _assignment_key(assignment)
     if assignment.value is None:
         return name
-    described = f"{name}={assignment.value.describe()}"
-    if value is None:
-        return described
-    return _annotated(described, [assignment.value], value)
+    return f"{name}={assignment.value.describe()}"
 
 
 def _condition_lines(
-    indent: int, conditions: Sequence[Condition], value: str | None
+    indent: int, conditions: Sequence[Condition]
 ) -> list[str]:
     lines = []
     for condition in conditions:
         described = condition.describe()
-        if value is not None:
-            described = _annotated(described, condition.matchers(), value)
         lines.append(f"{' ' * indent}when: {described}")
     return lines
 
@@ -1169,18 +1144,14 @@ def _verdict_lines(
     reason: str,
     source: Source,
     target: Matcher | None,
-    value: str | None,
     wrap: bool,
 ) -> list[str]:
     """One rule or grant: its header, then its own fields one deeper."""
     inner = indent + 2
     lines = [f"{' ' * indent}{header}"]
     if target is not None:
-        described = target.describe()
-        if value is not None:
-            described = _annotated(described, [target], value)
-        lines.append(f"{' ' * inner}target: {described}")
-    lines.extend(_condition_lines(inner, conditions, value))
+        lines.append(f"{' ' * inner}target: {target.describe()}")
+    lines.extend(_condition_lines(inner, conditions))
     if not isinstance(scope, Anywhere):
         lines.append(f"{' ' * inner}scope: {scope.describe()}")
     if reason:
@@ -1189,9 +1160,7 @@ def _verdict_lines(
     return lines
 
 
-def _rule_lines(
-    indent: int, placed: PlacedRule, value: str | None, wrap: bool
-) -> list[str]:
+def _rule_lines(indent: int, placed: PlacedRule, wrap: bool) -> list[str]:
     subcommand = " ".join(placed.rule.subcommand)
     return _verdict_lines(
         indent,
@@ -1201,14 +1170,11 @@ def _rule_lines(
         placed.rule.reason,
         placed.source,
         placed.rule.target,
-        value,
         wrap,
     )
 
 
-def _grant_lines(
-    indent: int, placed: PlacedGrant, value: str | None, wrap: bool
-) -> list[str]:
+def _grant_lines(indent: int, placed: PlacedGrant, wrap: bool) -> list[str]:
     subcommand = " ".join(placed.grant.subcommand)
     return _verdict_lines(
         indent,
@@ -1218,7 +1184,6 @@ def _grant_lines(
         placed.grant.reason,
         placed.source,
         None,
-        value,
         wrap,
     )
 
@@ -1243,7 +1208,6 @@ def _alias_text(registry: Registry, entry: Entry, alias: str) -> str:
 def _entry_lines(
     registry: Registry,
     entry: Entry,
-    value: str | None,
     cases: Cases,
     wrap: bool,
 ) -> list[str]:
@@ -1285,9 +1249,7 @@ def _entry_lines(
     if entry.assignments:
         lines.append(
             "  assignments: "
-            + " ".join(
-                _assignment_text(each, value) for each in entry.assignments
-            )
+            + " ".join(_assignment_text(each) for each in entry.assignments)
         )
     if entry.keeps_operands:
         lines.append(f"  keeps operands: {entry.keeps_operands}")
@@ -1318,11 +1280,11 @@ def _entry_lines(
     if entry.rules:
         lines.append("  rules:")
         for rule in entry.rules:
-            lines.extend(_rule_lines(4, rule, value, wrap))
+            lines.extend(_rule_lines(4, rule, wrap))
     if entry.grants:
         lines.append("  grants:")
         for grant in entry.grants:
-            lines.extend(_grant_lines(4, grant, value, wrap))
+            lines.extend(_grant_lines(4, grant, wrap))
     if cases is Cases.SHOWN and entry.cases:
         lines.append("  cases:")
         for case in entry.cases:
@@ -1330,31 +1292,7 @@ def _entry_lines(
     return lines
 
 
-def _answers(entry: Entry) -> bool:
-    """Whether any matcher on this entry could read a probed value.
-
-    An entry with none of them can never carry an annotation, so under
-    `--value` it is 142 lines of registry standing between the reader
-    and four lines of answer (`D-046`).
-    """
-    for placed in entry.rules:
-        if placed.rule.target is not None:
-            return True
-        if any(each.matchers() for each in placed.rule.conditions):
-            return True
-    for granted in entry.grants:
-        if any(each.matchers() for each in granted.grant.conditions):
-            return True
-    if entry.default is not None and any(
-        each.matchers() for each in entry.default.rule.conditions
-    ):
-        return True
-    return any(each.value is not None for each in entry.assignments)
-
-
-def _rendered(
-    registry: Registry, value: str | None, cases: Cases, wrap: bool
-) -> str:
+def _rendered(registry: Registry, cases: Cases, wrap: bool) -> str:
     """The whole registry, as the text `describe` promises."""
     if cases is Cases.ONLY:
         return "\n".join(
@@ -1362,26 +1300,19 @@ def _rendered(
         )
     lines: list[str] = []
     for entry in registry.entries():
-        # With a value, only what can answer it: the question is what
-        # the value satisfies, and an entry carrying no matcher is not
-        # part of that answer (`D-046`).
-        if value is not None and not _answers(entry):
-            continue
         if lines:
             lines.append("")
-        lines.extend(_entry_lines(registry, entry, value, cases, wrap))
+        lines.extend(_entry_lines(registry, entry, cases, wrap))
     benign = registry.benign_assignments()
-    if value is not None:
-        benign = tuple(each for each in benign if each.value is not None)
     if benign:
         lines.extend(["", "benign assignments"])
         for assignment in benign:
-            lines.append("  " + _assignment_text(assignment, value))
+            lines.append("  " + _assignment_text(assignment))
     redirections = registry.redirections()
     if redirections:
         lines.extend(["", "redirections"])
         for placed in redirections:
-            lines.extend(_rule_lines(2, placed, value, wrap))
+            lines.extend(_rule_lines(2, placed, wrap))
     standalone = registry.standalone_cases()
     if cases is Cases.SHOWN and standalone:
         lines.extend(["", "cases"])

@@ -264,19 +264,22 @@ class ExplainReadingTest(unittest.TestCase):
         self.assertIn("git", body)
 
     def test_a_flag_is_reported_apart_from_the_operands(self) -> None:
-        # Apart, and each under its own label. Counting lines proves
-        # only that they are on different lines — a report that called
-        # `--force` an operand and `push` a flag would pass that, and
-        # tell the operator the opposite of what was read. §6.2's
-        # citation grows from this printer.
+        # Apart, and each under its own label. What this guards is the
+        # printer, not the parse: reading separates the two and
+        # `tests/test_reading.py` proves it, but a report that called
+        # `--force` an operand and `push` a flag would tell the
+        # operator the opposite of what was read, and the report is
+        # what the maintenance loop runs on (§10).
+        #
+        # Anchored to whole lines rather than counted across the body.
+        # Counting was scaffolding for picking *the* line, and it
+        # breaks on anything else that names the same token — §6.2's
+        # citation does, and so does a reason whose prose happens to
+        # say "push", as this one's does.
         _, out, _ = self.explain("git push --force")
         body = self.body(out)
-        flags = [line for line in body.splitlines() if "--force" in line]
-        operands = [line for line in body.splitlines() if "push" in line]
-        self.assertEqual(len(flags), 1, body)
-        self.assertEqual(len(operands), 1, body)
-        self.assertRegex(flags[0], r"^\s*flag:")
-        self.assertRegex(operands[0], r"^\s*operand:")
+        self.assertRegex(body, r"(?m)^\s*flag:\s+'--force'$")
+        self.assertRegex(body, r"(?m)^\s*operand:\s+'push'$")
 
     def test_a_declared_option_is_reported_with_its_value(self) -> None:
         # The plan's own test line: `git -C dir push`. Read without the

@@ -51,10 +51,13 @@ from typing import NoReturn
 
 from . import __version__
 from .config import config_path, deprecation, load, locate
+from .declare import Source
 from .errors import ConfigurationError
+from .judging import Citation, Judgment, judge
 from .matchers import Value
 from .reading import Doubt, Flag, Invocation, Reading, read, readable
 from .registry import Cases, Registry, engine_defaults, printable
+from .verdicts import Verdict
 
 PROGRAM = "frisk"
 
@@ -75,11 +78,14 @@ EXIT_DENY = 3
 #: nothing, which §5.4 requires be said unmissably rather than answered
 #: with an empty registry.
 EXIT_NO_CONFIG = 4
-#: The interim status of `explain` while judging is being built: it is
-#: deliberately none of the verdict statuses above, so that a case
-#: expecting a verdict cannot pass against a build that reaches none.
-#: It retires with the last commit of `009`.
-_UNJUDGED = 6
+#: What each verdict answers with. `allow` is absent because no line
+#: returns one before `017` (`D-051`); when it does, it gets a status
+#: of its own rather than borrowing silence's.
+_STATUS = {
+    Verdict.SILENT: EXIT_SILENT,
+    Verdict.ASK: EXIT_ASK,
+    Verdict.DENY: EXIT_DENY,
+}
 #: The configuration exists and could not be loaded (§7.1). Loud, and
 #: never an empty registry standing in for a boundary that failed.
 EXIT_CONFIG_ERROR = 5
@@ -198,37 +204,31 @@ def build_parser() -> argparse.ArgumentParser:
             "better and parse worse"
         ),
     )
-    registry.add_argument(
-        "--value",
-        metavar="<value>",
-        default=None,
-        help=(
-            "show what each matcher answers for this value — "
-            "satisfied, unsatisfied or unproven — and print only the "
-            "declarations that can answer it"
-        ),
-    )
     registry.set_defaults(handler=registry_command)
 
     return parser
 
 
 def explain_command(args: argparse.Namespace) -> int:
-    """`frisk explain <command-line>` — the invocations the line holds.
+    """`frisk explain <command-line>` — the verdict, and the analysis.
 
-    Three outcomes and two statuses. A configuration that will not load
-    is the loud failure of §7.1 and nothing is read. A project with no
-    configuration is read against the engine's default layers alone,
-    with §5.4's "this gates nothing" on stderr — visible, but not a
-    refusal to answer, because the report is still worth having.
-    Everything else reports the reading.
+    §9 asks for both: "the verdict the guard would return, with the
+    reason and citation of §6.2", and "it should also show its work —
+    which invocations were found through which walls of §4.3 — because
+    'why did this ask?' is the maintenance loop's opening question and
+    the answer is the analysis, not just the verdict."
 
-    The status is `_UNJUDGED` in both reading cases, and it is the
-    one true thing about this build: nothing here judges yet. `registry`
-    answers `EXIT_NO_CONFIG` for the unconfigured project because it has
-    nothing at all to print; this command does.
+    A configuration that will not load is §7.1's loud failure and
+    nothing is read. A project with **no** configuration is read
+    against the engine's default layers alone and answers
+    `EXIT_NO_CONFIG`: the verdict it reaches is real, but it was
+    reached against no boundary, and a status saying "no opinion" about
+    a project frisk was never told anything about would read as a
+    boundary having answered (§5.4, `D-055`). The report still prints —
+    it is worth having — and stderr says what is missing.
     """
     found = _configuration(args.project)
+    unconfigured = found is None
     if found is None:
         _unconfigured(
             args.project,
@@ -241,8 +241,10 @@ def explain_command(args: argparse.Namespace) -> int:
         if loaded is None:
             return EXIT_CONFIG_ERROR
         registry = loaded
-    print(_reported(args.command_line, read(args.command_line, registry)))
-    return _UNJUDGED
+    reading = read(args.command_line, registry)
+    judgment = judge(reading, registry)
+    print(_reported(args.command_line, reading, judgment))
+    return EXIT_NO_CONFIG if unconfigured else _STATUS[judgment.verdict]
 
 
 def _unconfigured(project: str | None, consequence: str) -> None:
@@ -281,27 +283,37 @@ def _loaded(found: Path) -> Registry | None:
     return registry
 
 
-#: The closing paragraph of every `explain`. It is what a caller who
-#: reads stdout instead of the exit status must not be able to
-#: misread, so it says the two things that are true of this build: the
-#: line was read, and nothing judged it.
-_NO_VERDICT = """\
-Nothing was judged: this build reads the line and reports what it found.
-This is not an allow: read a frisk of this version as absent from the
-permission path.\
+#: What a silent line closes with. Silence is a real answer — frisk has
+#: no opinion and the permission rules decide (§3.2) — and the sentence
+#: has to say that without letting a reader take it for approval.
+_NO_OPINION = """\
+frisk has no opinion on this line: the permission rules and the
+permission mode decide it. This is not an allow.\
 """
 
 
-def _reported(command_line: str, reading: Reading) -> str:
+def _reported(command_line: str, reading: Reading, judgment: Judgment) -> str:
     """The whole report for one command line.
 
+    The verdict first, then why, then the analysis behind it — §9 asks
+    for the answer and the work, and an operator reading top-down wants
+    them in that order.
+
     Every field goes through `printable`, because the command line is
-    attacker-controlled text printed above the sentence that says no
-    verdict was reached: a newline or a terminal escape inside an
-    operand must not be able to forge a line of frisk's own output or
-    erase one.
+    attacker-controlled text printed beside frisk's own verdict: a
+    newline or a terminal escape inside an operand must not be able to
+    forge a line of frisk's output or erase one.
     """
-    lines = ["", f"  command: {render(command_line)}", ""]
+    lines = [
+        "",
+        f"  command: {render(command_line)}",
+        "",
+        f"  verdict: {judgment.verdict.value}",
+        "",
+    ]
+    for citation in judgment.citations:
+        lines.extend(_citation_lines(citation))
+        lines.append("")
     if reading.unparseable:
         lines.extend(_unparseable_lines(reading))
     elif not reading.invocations:
@@ -309,8 +321,60 @@ def _reported(command_line: str, reading: Reading) -> str:
     for position, invocation in enumerate(reading.invocations, start=1):
         lines.extend(_invocation_lines(position, invocation))
         lines.append("")
-    lines.append(_NO_VERDICT)
+    if judgment.verdict is Verdict.SILENT:
+        lines.append(_NO_OPINION)
     return "\n".join(lines)
+
+
+def _citation_lines(citation: Citation) -> list[str]:
+    """One declaration that reached the returned rank (§6.2).
+
+    What was read, which declaration fired and where it was written,
+    then the reason — because the reason is prose and the fields above
+    it are what an operator greps for.
+    """
+    read_out = ", ".join(printable(phrase) for phrase in citation.read)
+    where = _read_as(citation)
+    lines = [f"  because: {where}" if where else "  because:"]
+    if read_out:
+        lines.append(f"    read:   {read_out}")
+    if citation.label is not None and citation.source is not None:
+        lines.append(
+            f"    rule:   '{printable(citation.label)}' at "
+            f"{printable(_written(citation.source))}"
+        )
+    for line in _wrapped(citation.reason):
+        lines.append(f"    {line}")
+    return lines
+
+
+def _read_as(citation: Citation) -> str:
+    """The tool and subcommand path a citation decided on."""
+    if not citation.tool:
+        return ""
+    path = " ".join(citation.subcommand)
+    return render(citation.tool) + (f" {printable(path)}" if path else "")
+
+
+def _written(source: Source) -> str:
+    """Where a declaration was written, as `file:line`."""
+    return f"{os.path.basename(source.file)}:{source.line}"
+
+
+def _wrapped(reason: str) -> list[str]:
+    """A reason as printable lines, wrapped to stay readable."""
+    words = printable(reason).split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        if current and len(current) + 1 + len(word) > 68:
+            lines.append(current)
+            current = word
+        else:
+            current = f"{current} {word}".strip()
+    if current:
+        lines.append(current)
+    return lines
 
 
 def _unparseable_lines(reading: Reading) -> list[str]:
@@ -438,20 +502,7 @@ def registry_command(args: argparse.Namespace) -> int:
         )
     )
     print()
-    described = registry.describe(
-        args.value,
-        cases=_shown(args),
-        wrap=not args.no_wrap,
-    )
-    print(described)
-    if args.value is not None and not described.strip():
-        # A value narrows the output to what can answer it, so nothing
-        # at all is a real answer — and one an empty page states badly.
-        print(
-            f"{PROGRAM}: no declaration in this registry reads a value, "
-            "so there is nothing for this one to answer.",
-            file=sys.stderr,
-        )
+    print(registry.describe(cases=_shown(args), wrap=not args.no_wrap))
     return 0
 
 
