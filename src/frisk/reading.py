@@ -183,6 +183,15 @@ class Invocation:
     #: second stays silent. Recorded here so `010` reads a parse fact
     #: instead of re-parsing the name.
     dynamic_name: bool = False
+    #: Indices into `operands` that an **undeclared** dashed token
+    #: immediately preceded (§4.2, `D-060`). Reading presumes such a
+    #: token bare — the guess that keeps a dangerous operand from
+    #: hiding in a flag's value — but the presumption is one reading,
+    #: not the only one the engine owes: the token may equally have
+    #: consumed the word after it. These are the words it could have
+    #: taken, so judging can try the alignment where it did and keep
+    #: the stricter answer. Empty where nothing was ambiguous.
+    displaceable: tuple[int, ...] = ()
     #: Everything reading could not establish about this invocation
     #: (§3.3), by source. Empty is a clean reading.
     #:
@@ -573,7 +582,9 @@ def _invocation(
 
     command = words[index]
     entry, by_path = _recognized(command.text, registry)
-    options, flags, operands, malformed = _bound(words[index + 1 :], entry)
+    options, flags, operands, malformed, displaceable = _bound(
+        words[index + 1 :], entry
+    )
     return Invocation(
         name=command.text,
         entry=entry,
@@ -583,6 +594,7 @@ def _invocation(
         operands=operands,
         context=context,
         dynamic_name=command.dynamic,
+        displaceable=displaceable,
         doubts=_doubts(
             entry=entry,
             # A thunk: the readability check is scoped to gated tools,
@@ -615,7 +627,13 @@ def _recognized(name: str, registry: Registry) -> tuple[Entry | None, bool]:
 
 def _bound(
     words: list[_Word], entry: Entry | None
-) -> tuple[tuple[Flag, ...], tuple[Flag, ...], tuple[Value, ...], bool]:
+) -> tuple[
+    tuple[Flag, ...],
+    tuple[Flag, ...],
+    tuple[Value, ...],
+    bool,
+    tuple[int, ...],
+]:
     """The options, flags and operands of one command (§4.2)."""
     options: list[Flag] = []
     flags: list[Flag] = []
@@ -623,10 +641,16 @@ def _bound(
     malformed = False
     subcommand_reached = False
     past_marker = False
+    #: Set when the token just read was a dashed one the declaration
+    #: does not know, so the *next* word is one it might have taken.
+    undeclared = False
+    displaceable: list[int] = []
     index = 0
     while index < len(words):
         word = words[index]
         index += 1
+        followed_undeclared = undeclared
+        undeclared = False
         if past_marker:
             operands.append(word.value())
             continue
@@ -637,6 +661,8 @@ def _bound(
             past_marker = True
             continue
         if not _flag_shaped(word.text):
+            if followed_undeclared:
+                displaceable.append(len(operands))
             operands.append(word.value())
             subcommand_reached = True
             continue
@@ -678,8 +704,18 @@ def _bound(
                     Flag(name, None if default is None else Value(default))
                 )
         else:
+            # An undeclared token falls through here too, and `bare` is
+            # a presumption rather than a reading of the declaration —
+            # so the word after it is one this token might have taken.
+            undeclared = name not in table
             target_list.append(Flag(name))
-    return tuple(options), tuple(flags), tuple(operands), malformed
+    return (
+        tuple(options),
+        tuple(flags),
+        tuple(operands),
+        malformed,
+        tuple(displaceable),
+    )
 
 
 def _bundled(
