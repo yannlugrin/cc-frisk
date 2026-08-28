@@ -1545,8 +1545,14 @@ Detail in git history.
   today and the engine has to answer for it.
 - **Decision:** an invocation earns `allow` exactly as it earns any
   other verdict — the rule fires, the per-invocation verdict is
-  `ALLOW`, `frisk explain` shows it — and the **line** answers
-  `SILENT`. That is not an interim invention: it is what §6.1's own
+  `ALLOW` — and the **line** answers `SILENT`. *(Corrected 2026-08-28:
+  this entry said `frisk explain` shows the earned allow. It does not —
+  the report prints the line's verdict and the reading, never a
+  per-invocation verdict, so an operator debugging an allow rule sees
+  nothing at all. That is a gap in the report, **not** a ruling against
+  showing it: `017`, where an allow can actually be released and the
+  distinction starts to matter, is where the per-invocation line
+  belongs.)* That is not an interim invention: it is what §6.1's own
   withholding rows say ("the line falls back to genuine silence"), and
   every condition that would release the allow is unmeasured, so every
   row that could apply is a withholding one. Nothing has to be undone
@@ -1874,3 +1880,103 @@ Detail in git history.
 - **Approved by:** operator, 2026-08-28 — "§4.2 is no sense, of course
   we have to amend that", after proposing the both-hypotheses
   evaluation and the strictest-verdict rule.
+
+### D-061 — `--` is structure, not a flag the closed world weighs
+
+- **Date:** 2026-08-28
+- **Step:** `009`
+- **Context:** the closed world compares every token in
+  `Invocation.flags` against the tool's declared flags, and reading
+  records the end-of-options marker there — deliberately, because §4.2
+  makes `--` "itself matchable (it is the explicit 'operand is a path'
+  signal some rules key on)", which context A's `git checkout -- file.py`
+  depends on. The consequence was that every gated tool asked on `--`:
+  `deploy --syntax-check -- file.yml` could never be proven safe unless
+  the operator declared `flag("--")` on every gated tool they wrote.
+  Found by `code-reviewer`.
+- **Decision:** `--` is exempt from the unaccounted-flag check. It stays
+  in `flags` and stays matchable by rules; what it stops being is a
+  *breach*, because the operator did not write it as a flag — the
+  reading layer put it there as structure, and a closed world is a claim
+  about the flags a tool may carry, not about the punctuation separating
+  them from its operands.
+- **Alternatives considered:** *have `tool()` add `--` to every gated
+  tool's flag list* — the same outcome by a longer route, and it puts a
+  token in the printed registry the operator never declared. *Leave it
+  and document that a gated tool must declare `flag("--")`* — rejected:
+  a trap that makes a correct configuration look wrong, guarding a
+  failure that does not exist.
+- **Approved by:** operator, 2026-08-28 — raised in the review round and
+  settled together with `D-062`.
+
+### D-062 — an engine reason explains; it never advises removing a token
+
+- **Date:** 2026-08-28
+- **Step:** `009`
+- **Context:** §6.2 requires a reason to be steering text, because the
+  model reads it: "name the objection *and* the acceptable path, so the
+  model's recovery is toward the safe alternative rather than toward
+  creative respelling". The engine's own reasons took that as licence to
+  say what to do, and the unaccounted-flag reason said "Drop the flag".
+  The operator refused it in one sentence: an unaccounted flag may be
+  `--check-file`, and telling the agent to remove the flag that protects
+  the deploy is the engine steering toward the danger it exists to stop.
+  The same reason also advised the *configuration author* ("add it to
+  the tool's declared flags"), which the model cannot act on at all.
+- **Decision:** a reason the **engine** writes says what is wrong and
+  why, and names a safe path only where the engine actually knows one.
+  "Run it in a shape this tool's grants cover" is such a path; "drop the
+  flag" is not, because by definition the engine does not know what an
+  unaccounted token is for. Advice addressed to the configuration author
+  belongs in the documentation, never in a runtime reason — the reader
+  is the model, and it cannot edit the configuration. Reasons a
+  *declaration* carries are unaffected: the operator knows what their
+  own rule is about, and §6.2 asks them for the acceptable path.
+- **Alternatives considered:** *keep the removal advice for tokens the
+  engine recognises* — there are none; the reasons that advised removal
+  are exactly the ones about tokens nothing accounted for. *State only
+  the objection and drop the steering half* — rejected: §6.2 requires
+  the acceptable path where one exists, and without it the model
+  respells the command creatively, which is the failure that
+  requirement names.
+- **Approved by:** operator, 2026-08-28 — "saying to the agent it should
+  remove the `--check-file` flag that protect the deploy look like a
+  defect of the engine".
+
+### D-063 — an unproven identity is cited where it explains, never where it decides
+
+- **Date:** 2026-08-28
+- **Step:** `009`
+- **Context:** `D-054` already said what an unresolved path costs — "a
+  deny it would otherwise have earned becomes an ask, **and a silence
+  stays a silence, since the tool is silent either way**" — and the
+  implementation did not honour the last clause: the doubt contributed
+  an ask of its own, so `cd /srv && ./tools/deploy.py status` on a
+  rules-only path-declared tool asked, though *both* readings of that
+  line are silent (the declared tool, where nothing names `status`; or
+  another file entirely, which is unregistered). A false ask, and
+  inconsistent under §4.2's own words: recognition degrades "like any
+  path match", and an unproven *path match*
+  (`MatchContext.relative_paths_unproven`) never invents a verdict — it
+  releases no grant and fires at ask strength a declaration that was
+  going to fire anyway. Found by `test-reviewer` as an unreached
+  branch, and put to the operator because a case would have frozen it.
+- **Decision:** the unresolved-path doubt decides nothing. It defeats
+  grants and caps the verdict, exactly as `D-054` says, and contributes
+  no verdict of its own — restoring the behaviour that entry already
+  described. What is new here is only how it is *cited*: it is named
+  among the citations wherever the invocation objected for some other
+  reason, marked `(unproven)` the way a value-level unproven marks its
+  token, and says nothing where nothing objected. An operator meeting
+  an ask on a line they believed granted is owed the token that could
+  not be resolved; an operator meeting silence has nothing to be told.
+- **Alternatives considered:** *drop the citation with the verdict* —
+  the first fix attempted, and rejected on inspection: the ask on
+  `cd /srv && ./tools/deploy.py /tmp/x` would then be explained only by
+  the tool's default reason, which says to point it at `/tmp` — advice
+  the operator had already followed. *Keep the free-standing ask and
+  amend `D-054`* — rejected: it contradicts §4.2's "like any path
+  match" and answers about a line neither reading gates.
+- **Approved by:** operator, 2026-08-28 — "go for it, but if you have
+  to change more tests than the test that was flagged as wrong it's a
+  signal we have an issue". No existing case changed.
