@@ -6,10 +6,11 @@ uses — because a diagnosis must never depend on which door was
 available. It runs without Claude Code: nothing here reads a hook-time
 environment variable or the plugin cache path.
 
-This build reads a line and reports it. `--version` answers, `registry`
-prints the composed boundary, and `explain` shows the invocations it
-found — with no verdict on any of them, and saying so in the direction
-that is safe to misread: not a verdict, not an allow.
+`--version` answers, `registry` prints the composed boundary, and
+`explain` answers with the verdict a command line earns — its reason
+and its citation above the analysis it was read from. What `explain`
+cannot yet see through is another program: a wrapper's command, a
+shell's `-c` payload, a substitution or a handoff.
 
 One cost is worth knowing before the hook door is designed: importing
 this module costs about 5 ms over a bare interpreter on a current
@@ -78,6 +79,10 @@ EXIT_DENY = 3
 #: nothing, which §5.4 requires be said unmissably rather than answered
 #: with an empty registry.
 EXIT_NO_CONFIG = 4
+#: The engine itself failed. Distinct from every verdict, because a
+#: caller reading `D-055`'s contract must never take a dead guard for a
+#: prompt — §3.3: "every death of the guard itself is made loud".
+EXIT_ENGINE_ERROR = 6
 #: What each verdict answers with. `allow` is absent because no line
 #: returns one before `017` (`D-051`); when it does, it gets a status
 #: of its own rather than borrowing silence's.
@@ -244,7 +249,11 @@ def explain_command(args: argparse.Namespace) -> int:
     reading = read(args.command_line, registry)
     judgment = judge(reading, registry)
     print(_reported(args.command_line, reading, judgment))
-    return EXIT_NO_CONFIG if unconfigured else _STATUS[judgment.verdict]
+    if unconfigured:
+        return EXIT_NO_CONFIG
+    # `.get` rather than a subscript: `allow` has no status until `017`
+    # and a `KeyError` here would exit 1, which is `ask`.
+    return _STATUS.get(judgment.verdict, EXIT_ENGINE_ERROR)
 
 
 def _unconfigured(project: str | None, consequence: str) -> None:
@@ -543,5 +552,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         parser.print_help(sys.stderr)
         return EXIT_USAGE
 
-    exit_status: int = handler(args)
+    try:
+        exit_status: int = handler(args)
+    except Exception as failure:  # noqa: BLE001 — see below
+        # Deliberately broad. Every status this CLI can return means
+        # something to a caller, and CPython's own default for an
+        # unhandled exception is 1 — which `D-055` defines as *ask*. A
+        # dead engine would then read as a prompt, and the caller would
+        # proceed. It is not hypothetical input either: `predicate()`
+        # runs a callable the configuration supplies, so an operator's
+        # own lambda raising on an unusual value lands here.
+        print(
+            f"{PROGRAM}: the engine failed on this line: "
+            f"{type(failure).__name__}: {printable(str(failure))}",
+            file=sys.stderr,
+        )
+        return EXIT_ENGINE_ERROR
     return exit_status
