@@ -33,8 +33,8 @@ later step, so no configuration can reach this argument yet.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from dataclasses import dataclass
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, replace
 
 from .declare import (
     AnyFlagUsed,
@@ -55,7 +55,7 @@ from .declare import (
 from .matchers import Matcher, Outcome, Value, combine_all, combine_any
 from .reading import Assigned, Doubt, Flag, Invocation, Reading
 from .registry import Entry, Registry
-from .verdicts import Verdict, fires_at, strongest
+from .verdicts import Verdict, fires_at, grant_holds, strongest
 
 
 @dataclass(frozen=True)
@@ -207,12 +207,19 @@ def _judged(
     # how the operands align, what they cost is the same under every
     # alignment, and what they defeat is every grant.
     fixed: list[Citation] = []
-    fixed.extend(_unaccounted_assignments(invocation, entry, registry))
+    unaccounted = _unaccounted_assignments(invocation, entry, registry)
+    fixed.extend(unaccounted)
     breaches = tuple(_unaccounted_flags(invocation, entry))
     fixed.extend(_breach_citations(invocation, breaches))
-    doubted, capped = _doubts(invocation)
+    doubted, unresolved = _doubts(invocation, entry)
     fixed.extend(doubted)
-    provable = not breaches and not _defeating(invocation)
+    # §3.2 makes the closed world "the load-bearing property: a flag or
+    # value nobody considered can only move a verdict *toward* the
+    # stricter outcome". All three of them defeat a grant, the
+    # assignment world included: a grant proving `--check` safe proves
+    # nothing about a run carrying `GIT_SSH_COMMAND=…`, which runs an
+    # arbitrary program.
+    provable = not unaccounted and not breaches and not _defeating(invocation)
 
     # §4.2: an undeclared dashed token leaves the operand alignment
     # ambiguous, so every alignment the ambiguity admits is judged and
@@ -221,28 +228,98 @@ def _judged(
     # the overwhelming majority of lines it is the only one.
     reached = [
         _aligned(invocation, entry, operands, secure, fixed, provable)
-        for operands in _alignments(invocation)
+        for operands in _alignments(invocation, entry)
     ]
-    verdict = strongest([each[0] for each in reached])
-    citations = next(each[1] for each in reached if each[0] is verdict)
-    if capped and verdict is Verdict.DENY:
+    if unresolved is not None:
         # §4.2: recognition degrades stricter, "like any path match" —
         # and an unproven path match fires a deny at ask strength
         # (§3.2). Producing the deny would refuse a file the line does
         # not identify, which is §4.3's wrong deny (`D-054`).
-        verdict = Verdict.ASK
+        #
+        # Applied to the citations too, and before either is combined.
+        # Dropping them instead would leave the operator and the model
+        # with the unresolved-path ask alone — whose steering text says
+        # to run the line where the path means what it says, which is
+        # exactly the line that denies. §6.2 makes a reason steering
+        # text; steering toward the refusal it hid is the opposite.
+        reached = [
+            (
+                _downgraded(answer),
+                tuple(_downgraded_citation(each) for each in cited),
+            )
+            for answer, cited in reached
+        ]
+    verdict = strongest([each[0] for each in reached])
+    # §6.2: "when several declarations independently reach the returned
+    # rank, the citation should name them all". Two alignments can
+    # reach it through *different* declarations, so the first
+    # alignment's list is not the answer.
+    citations = _deduplicated(
+        citation
+        for answer, cited in reached
+        if answer is verdict
+        for citation in cited
+    )
+    if unresolved is not None and verdict is not Verdict.SILENT:
+        # It explains, so it is named wherever something objected —
+        # the operator meeting an ask on a line they believed granted
+        # is owed the token that could not be resolved. It does not
+        # decide, so where nothing objected it says nothing.
+        citations = (replace(unresolved, verdict=verdict), *citations)
     return Judged(invocation=invocation, verdict=verdict, citations=citations)
 
 
-def _alignments(invocation: Invocation) -> list[tuple[Value, ...]]:
-    """Every operand alignment the undeclared tokens admit (§4.2).
+def _downgraded(verdict: Verdict) -> Verdict:
+    """A deny the engine declined to trust, at ask strength (`D-054`)."""
+    return Verdict.ASK if verdict is Verdict.DENY else verdict
+
+
+def _downgraded_citation(citation: Citation) -> Citation:
+    """The same declaration, cited at the rank it actually reached."""
+    if citation.verdict is not Verdict.DENY:
+        return citation
+    return replace(citation, verdict=Verdict.ASK)
+
+
+def _deduplicated(citations: Iterable[Citation]) -> tuple[Citation, ...]:
+    """These citations in order, with repeats dropped.
+
+    Two alignments of one invocation cite the same declaration for the
+    same reading of it, and naming it twice would tell the operator
+    there are two things to look at.
+    """
+    kept: list[Citation] = []
+    for citation in citations:
+        if citation not in kept:
+            kept.append(citation)
+    return tuple(kept)
+
+
+def _alignments(
+    invocation: Invocation, entry: Entry
+) -> list[tuple[Value, ...]]:
+    """The operand alignments this invocation is judged under (§4.2).
 
     Reading's own alignment first, then the ones in which the
-    undeclared tokens, taken from the left, consumed the word after
-    them. Bounded by the *number* of undeclared tokens and never by
-    their combinations, which is what keeps §4.5's budget: a line with
-    three of them is judged four times, not eight.
+    undeclared tokens, **taken from the left**, consumed the word after
+    them. That prefix-cumulative family is the bound `D-060` chose:
+    a line with three undeclared tokens is judged four times, not
+    eight, so the count is linear in their number rather than in their
+    combinations. It is therefore not literally every alignment the
+    ambiguity admits — the reading where only the *second* token took a
+    value is not tried — and §4.2's wider phrase should be read against
+    this bound.
+
+    The count is linear; the *work* is not. Each alignment re-runs
+    every rule and grant, and an operand quantifier walks the
+    alignment's operands, so per-invocation cost grows with undeclared
+    tokens times operands. Typical lines are microseconds, but an
+    under-declared tool on a long line is where both factors grow at
+    once — which is why the sweep is skipped outright below wherever it
+    could not change an answer.
     """
+    if not invocation.displaceable or not _operand_sensitive(entry):
+        return [invocation.operands]
     alignments = [invocation.operands]
     dropped: set[int] = set()
     for index in sorted(invocation.displaceable):
@@ -255,6 +332,32 @@ def _alignments(invocation: Invocation) -> list[tuple[Value, ...]]:
             )
         )
     return alignments
+
+
+def _operand_sensitive(entry: Entry) -> bool:
+    """Whether any declaration here reads the operand list at all.
+
+    A tool whose rules key only on flags and assignments answers the
+    same under every alignment, so re-judging it is pure cost. This is
+    the cheap half of §4.5: the sweep runs where it can decide
+    something and nowhere else.
+    """
+    for placed in entry.rules:
+        if placed.rule.subcommand or _reads_operands(placed.rule.conditions):
+            return True
+    for granted in entry.grants:
+        if granted.grant.subcommand or _reads_operands(
+            granted.grant.conditions
+        ):
+            return True
+    return False
+
+
+def _reads_operands(conditions: Sequence[Condition]) -> bool:
+    return any(
+        isinstance(condition, (EveryOperand, AtLeastOneOperand, NoOperands))
+        for condition in conditions
+    )
 
 
 def _aligned(
@@ -314,18 +417,25 @@ def _unregistered(invocation: Invocation, secure: Rule | None) -> Judged:
 # What they add on top is the ask §3.3 asks for.
 
 
+# The engine's own reasons, written under `D-062`: they say what is
+# wrong and why, and never tell the reader to remove a token whose
+# purpose the engine does not know — an unaccounted flag is by
+# definition one it does not know, and `--check-file` is exactly the
+# shape that makes "drop the flag" advice to disarm the safeguard.
+# Where there is a safe path the engine can actually name, it names it.
+
 _UNACCOUNTED_ASSIGNMENT = (
-    "{name} is set in front of {tool}, and nothing accounts for it. An "
-    "assignment can change what a command does without appearing among "
-    "its flags. Run {tool} without it, or add accounted('{name}') to "
-    "its declaration if this is expected here."
+    "{name} is set in front of {tool}, and {tool}'s declaration does "
+    "not account for it. An assignment can change what a command does "
+    "without appearing among its flags, so frisk cannot tell what this "
+    "run will do."
 )
 
 _UNACCOUNTED_FLAG = (
-    "{name} is not among the flags {tool} declares, and {tool} is gated: "
-    "an unlisted flag leaves the run unprovable, so no grant can release "
-    "it. Drop the flag, or add it to the tool's declared flags if it "
-    "belongs there."
+    "{name} is not among the flags {tool} declares, and {tool} is only "
+    "safe in the shapes its declaration proves, so nothing here can "
+    "establish what this run does. Run {tool} in one of those shapes, "
+    "or say what this use is."
 )
 
 
@@ -397,9 +507,20 @@ def _unaccounted_flags(invocation: Invocation, entry: Entry) -> list[str]:
     """
     if not entry.gated:
         return []
-    return [
-        flag.name for flag in invocation.flags if flag.name not in entry.flags
-    ]
+    unaccounted: list[str] = []
+    for flag in invocation.flags:
+        # `--` is the end-of-options marker, which §4.2 calls
+        # "matchable structure" — the reading layer synthesises it, the
+        # operator did not write it as a flag. Counting it here would
+        # make every gated tool ask on `deploy --check -- file.yml` and
+        # leave no shape a grant could ever prove (`D-061`).
+        if flag.name == "--" or flag.name in entry.flags:
+            continue
+        # One citation per name, however many times it was written:
+        # `-x -x` is one thing to look at, not two.
+        if flag.name not in unaccounted:
+            unaccounted.append(flag.name)
+    return unaccounted
 
 
 def _breach_citations(
@@ -429,33 +550,61 @@ def _breach_citations(
 
 
 _MALFORMED = (
-    "{flag} takes a value and nothing follows it, so this invocation "
-    "could not be read as written. Give it its value, or drop it."
+    "{flag} takes a value and nothing follows it, so this command line "
+    "could not be read as written and nothing about it is established."
 )
 
 _UNRESOLVED_PATH = (
-    "{name} is a relative path and an earlier `cd` on this line moved "
+    "{name} is a relative path, and an earlier `cd` on this line moved "
     "what it hangs off, so frisk cannot tell whether this is the file "
-    "its declaration names. Spell it from a fixed root, or run it on a "
-    "line of its own."
+    "its declaration names. Run it on a line of its own, where the "
+    "path means what it says."
+)
+
+_UNREADABLE = (
+    "A value on this line is not a plain word — it carries whitespace, "
+    "a glob or an expansion — so {tool}, which is only safe in the "
+    "shapes its declaration proves, cannot be proven to run one of "
+    "them."
 )
 
 
-def _doubts(invocation: Invocation) -> tuple[list[Citation], bool]:
+def _doubts(
+    invocation: Invocation, entry: Entry
+) -> tuple[list[Citation], Citation | None]:
     """What each doubt costs, and whether the verdict is capped at ask.
 
     The three are priced apart because §4.2 scopes them apart. An
-    unreadable token is stated *on gated invocations* and what it
-    defeats is a grant, so it costs nothing here — on a rules-only tool
-    `git commit -m 'a plain message'` is silent. A malformed invocation
-    is stated flat and is "unproven, not safe", so it asks whatever the
-    tool (`D-053`). An unresolved path is unproven *identity*, which
-    additionally caps the verdict (`D-054`).
+    unreadable token is stated *on gated invocations*, so it costs
+    nothing on a rules-only tool — `git commit -m 'a plain message'` is
+    silent — and on a gated one it asks in its own right, because §4.2
+    says it leaves the invocation unproven "**whatever the grants would
+    otherwise say**", and a tool gated by a closed world with no grants
+    has nothing for a defeated grant to fall back onto. A malformed
+    invocation is stated flat and is "unproven, not safe", so it asks
+    whatever the tool (`D-053`). An unresolved path is unproven
+    *identity*, and it is the one that **decides nothing of its own**
+    (`D-063`). §4.2 says recognition there degrades "like any path
+    match", and an unproven path match adds no verdict — it releases no
+    grant and fires a declaration that was going to fire anyway at ask
+    strength. So this one comes back separately: it caps the verdict,
+    it defeats grants through `_defeating`, and it is cited only where
+    something else already objected. On a rules-only tool where nothing
+    is gated, both readings of the line — this file or another — are
+    silent, and inventing an ask there would answer about neither.
     """
     citations = []
-    capped = False
+    unresolved = None
     for doubt in invocation.doubts:
-        if doubt is Doubt.MALFORMED:
+        if doubt is Doubt.UNREADABLE and entry.gated:
+            citations.append(
+                Citation(
+                    verdict=Verdict.ASK,
+                    reason=_UNREADABLE.format(tool=invocation.name),
+                    tool=invocation.name,
+                )
+            )
+        elif doubt is Doubt.MALFORMED:
             citations.append(
                 Citation(
                     verdict=Verdict.ASK,
@@ -465,16 +614,13 @@ def _doubts(invocation: Invocation) -> tuple[list[Citation], bool]:
                 )
             )
         elif doubt is Doubt.UNRESOLVED_PATH:
-            capped = True
-            citations.append(
-                Citation(
-                    verdict=Verdict.ASK,
-                    reason=_UNRESOLVED_PATH.format(name=invocation.name),
-                    tool=invocation.name,
-                    read=(f"command {invocation.name}",),
-                )
+            unresolved = Citation(
+                verdict=Verdict.ASK,
+                reason=_UNRESOLVED_PATH.format(name=invocation.name),
+                tool=invocation.name,
+                read=(f"command {invocation.name} (unproven)",),
             )
-    return citations, capped
+    return citations, unresolved
 
 
 def _starved(invocation: Invocation) -> str:
@@ -583,7 +729,10 @@ def _grant_holds(
             operands,
             strict=True,
         )
-        if outcome is Outcome.SATISFIED:
+        # `None` is "this grant does not apply here" — a different
+        # thing from applying and not being satisfied, and neither
+        # releases.
+        if outcome is not None and grant_holds(outcome):
             return True
     return False
 
