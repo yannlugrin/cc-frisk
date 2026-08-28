@@ -24,6 +24,7 @@ from frisk.cli import (
     EXIT_ASK,
     EXIT_CONFIG_ERROR,
     EXIT_DENY,
+    EXIT_ENGINE_ERROR,
     EXIT_NO_CONFIG,
     EXIT_SILENT,
     EXIT_USAGE,
@@ -421,6 +422,11 @@ class ExplainVerdictTest(unittest.TestCase):
         self.assertIn("deny", out)
         self.assertIn("A forced push rewrites remote history.", out)
         self.assertEqual(err, "")
+        # And the sentence that exists to stop silence reading as
+        # approval must not appear on a line frisk just refused —
+        # "frisk has no opinion" under a deny is the one contradiction
+        # this output cannot afford.
+        self.assertNotIn("no opinion", out)
 
     def test_an_asked_line_says_ask_and_why(self) -> None:
         #   tool("deploy", default=ask(...)) — no grant holds here
@@ -446,6 +452,11 @@ class ExplainVerdictTest(unittest.TestCase):
         _, out, _ = self.explain("git push --force")
         self.assertIn("forced push", out)
         self.assertIn("config.py:", out)
+        # §6.2 asks for "the specific flag, assignment, value or
+        # operand that matched", and this is the surface where that is
+        # actually delivered — the engine-level assertions are of a
+        # structure no user sees.
+        self.assertRegex(out, r"(?m)^\s*read:\s+flag --force$")
 
     def test_every_declaration_at_the_deciding_rank_is_printed(self) -> None:
         # "the citation names every declaration at the deciding rank
@@ -473,22 +484,65 @@ class ExplainVerdictTest(unittest.TestCase):
 
     def test_the_statuses_are_the_contract_D_055_wrote(self) -> None:
         # Every other case here compares a symbol to itself, so this is
-        # the one place the *numbers* are asserted. `D-055`: silence is
-        # 0 because silence is a real answer, and everything else is
-        # non-zero, so `frisk explain "$cmd" || refuse` refuses exactly
-        # where frisk objected or could not answer. Renumbering these
-        # inverts that shell idiom silently.
+        # the one place the *numbers* are asserted — and they are a
+        # contract the moment `PLAN.md` `028`'s README publishes them.
+        # `D-055`: silence is 0 because silence is a real answer, and
+        # everything else is non-zero, so `frisk explain "$cmd" ||
+        # refuse` refuses exactly where frisk objected or could not
+        # answer. Renumbering inverts that shell idiom silently.
         self.assertEqual(EXIT_SILENT, 0)
-        others = {
-            EXIT_ASK,
-            EXIT_USAGE,
-            EXIT_DENY,
-            EXIT_NO_CONFIG,
-            EXIT_CONFIG_ERROR,
-        }
-        self.assertNotIn(0, others)
-        # And a caller distinguishing deny from ask has only the status.
-        self.assertEqual(len(others), 5)
+        self.assertEqual(EXIT_ASK, 1)
+        self.assertEqual(EXIT_USAGE, 2)
+        self.assertEqual(EXIT_DENY, 3)
+        self.assertEqual(EXIT_NO_CONFIG, 4)
+        self.assertEqual(EXIT_CONFIG_ERROR, 5)
+        # And the engine's own failure is none of them: §3.3 makes the
+        # guard's death loud, and 1 would have been *ask*.
+        self.assertEqual(EXIT_ENGINE_ERROR, 6)
+
+
+class EngineFailureTest(unittest.TestCase):
+    """A dead engine must not answer with a verdict (§3.3, `D-055`)."""
+
+    def test_an_engine_failure_is_none_of_the_verdict_statuses(
+        self,
+    ) -> None:
+        # Not hypothetical input: `predicate()` runs a callable the
+        # *configuration* supplies, so an operator's own lambda raising
+        # on an unusual value lands in the decision path. CPython's
+        # default for an unhandled exception is 1, which `D-055`
+        # defines as **ask** — so a script written to that contract
+        # would read a dead guard as a prompt and proceed.
+        config = (
+            "from frisk.declare import (\n"
+            "    api_generation, deny, flag, predicate, takes_value, tool,\n"
+            ")\n"
+            "\n"
+            "api_generation(1)\n"
+            "\n"
+            "tool(\n"
+            '    "boom",\n'
+            '    flags=[takes_value("--x")],\n'
+            "    rules=[\n"
+            "        deny(\n"
+            '            when=flag("--x", predicate("raises", _raise)),\n'
+            '            reason="Unreachable: the matcher raises first.",\n'
+            "        )\n"
+            "    ],\n"
+            ")\n"
+        )
+        with configured(
+            "def _raise(value):\n"
+            "    raise RuntimeError('the configuration blew up')\n"
+            "\n\n" + config
+        ) as project:
+            status, out, err = run(
+                "explain", "--project", project, "boom --x y"
+            )
+        self.assertEqual(status, EXIT_ENGINE_ERROR)
+        self.assertNotIn(status, (EXIT_SILENT, EXIT_ASK, EXIT_DENY))
+        self.assertEqual(out, "")
+        self.assertIn("RuntimeError", err)
 
 
 class UsageTest(unittest.TestCase):

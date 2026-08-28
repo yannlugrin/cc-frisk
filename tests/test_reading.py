@@ -708,10 +708,37 @@ class OptionTests(Reads):
     """Options preceding a subcommand are recognized and stripped (§4.2)."""
 
     def test_a_declared_option_leaves_the_subcommand_first(self) -> None:
-        # Corpus: `git -C /srv/repo push` → ask. §4.2: undeclared, it
-        # "parses as operands `dir push` and no push rule matches".
+        # Corpus: `git -C /srv/repo push` → ask.
         invocation = self.one("git -C /srv/repo push")
         self.assertEqual(self.operands(invocation), ["push"])
+        # Nothing was presumed, so no alignment is in doubt.
+        self.assertEqual(invocation.displaceable, ())
+
+    def test_an_undeclared_option_marks_the_word_it_might_have_taken(
+        self,
+    ) -> None:
+        # §4.2 as amended (`D-060`): reading still presumes an
+        # undeclared token bare — the guess that keeps a dangerous
+        # operand from hiding in a flag's value — but it records which
+        # word that token could have taken instead, so judging can try
+        # the alignment where it did and keep the stricter answer.
+        #
+        # This half and judging's half must be able to fail apart: with
+        # the index unrecorded, the whole amendment is inert, and a
+        # verdict case alone cannot say which layer lost it.
+        invocation = self.one("git --unheard-of dir push")
+        self.assertEqual(self.operands(invocation), ["dir", "push"])
+        self.assertEqual(invocation.displaceable, (0,))
+
+    def test_nothing_is_displaceable_behind_a_declared_option(
+        self,
+    ) -> None:
+        # The presumption is what creates the doubt, so a declaration
+        # removes it. `-m` is declared value-taking here, and the word
+        # it took is its value rather than an operand at all.
+        self.assertEqual(self.one("git commit -m wip").displaceable, ())
+        # And a token with nothing after it could have taken nothing.
+        self.assertEqual(self.one("git push --unheard-of").displaceable, ())
 
     def test_the_option_value_is_remembered(self) -> None:
         # §4.2: rule and grant conditions "must be able to constrain

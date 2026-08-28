@@ -49,13 +49,17 @@ from frisk.declare import (
     allow,
     any_flag,
     ask,
+    at_least_one_operand,
     bare,
     deny,
     every_operand,
     flag,
     grant,
     handoff,
+    host_only,
     inside,
+    matching,
+    may_take_value,
     no_operands,
     one_of,
     option,
@@ -445,6 +449,24 @@ class GrantTests(Judges):
             # host line is reachable here, and it is the one that
             # matters: an engine ignoring `scope=` would let the grant
             # release a playbook hitting production.
+            # A gated tool with a **deny** default, which is the shape
+            # `D-056` names and the one context C's `osmp` and
+            # `ansible-playbook` both have. On an ask-default tool the
+            # breach's own ask and the defeated grant's default are the
+            # same rank, so neither mechanism can be seen alone.
+            tool(
+                "osmp",
+                default=deny(
+                    reason="openstack reaches shared infrastructure."
+                ),
+                flags=[bare("--quiet"), takes_value("--os-cloud")],
+                grants=[
+                    grant(
+                        when=at_least_one_operand(matching(r"^list$")),
+                        reason="A read-only verb.",
+                    ),
+                ],
+            )
             tool("runner", handoffs=[handoff("run", keeps_operands=1)])
             tool(
                 "playbook",
@@ -457,6 +479,21 @@ class GrantTests(Judges):
                         scope=inside("runner run"),
                         reason="Inside a throwaway container the playbook "
                         "reaches nothing that outlives it.",
+                    ),
+                    grant(
+                        "check",
+                        scope=host_only,
+                        reason="A check run on this machine reads the "
+                        "inventory and applies nothing.",
+                    ),
+                ],
+                rules=[
+                    ask(
+                        "lint",
+                        scope=host_only,
+                        reason="Linting reads every file the playbook "
+                        "names, on this machine.",
+                        label="host lint",
                     ),
                 ],
             )
@@ -533,6 +570,44 @@ class GrantTests(Judges):
         self.assertEqual(len(judgment.citations), 1)
         self.assertIn("reaches real machines", judgment.citations[0].reason)
 
+    def test_a_host_only_declaration_applies_outside_every_handoff(
+        self,
+    ) -> None:
+        # The other half of §5.2's scope vocabulary, and the half
+        # nothing proved: `009` walks into no handoff, so `host_only`
+        # and `anywhere` must answer alike here. Without a case,
+        # `_here` could ignore `host_only` entirely — every such rule
+        # and grant silently dead — and the suite would stay green.
+        #   grant("check", scope=host_only)
+        #   ask("lint", scope=host_only) — label "host lint"
+        self.assertVerdict(
+            "playbook check playbooks/nodes.yml", Verdict.SILENT
+        )
+        judgment = self.judgment("playbook lint playbooks/nodes.yml")
+        self.assertIs(judgment.verdict, Verdict.ASK)
+        self.assertEqual(self.labels(judgment), ["host lint"])
+
+    def test_a_breach_defeats_a_grant_on_a_deny_default_tool(self) -> None:
+        # §3.2: "The closed world is the load-bearing property: a flag
+        # or value nobody considered can only move a verdict *toward*
+        # the stricter outcome, never away from it."
+        #
+        # The deny default is what makes the two mechanisms separable.
+        # If the breach only asked and did not defeat the grant, the
+        # grant would hold, the base would become silence, and the line
+        # would answer **ask** — a deny softened by a token nobody
+        # accounted for.
+        #   default=deny(...) ; grant(when=at_least_one_operand(^list$))
+        self.assertVerdict("osmp server list", Verdict.SILENT)
+        self.assertVerdict("osmp server list --unknown", Verdict.DENY)
+
+    def test_the_end_of_options_marker_is_not_a_breach(self) -> None:
+        # §4.2 makes `--` "matchable structure" — the reading layer puts
+        # it there, the operator did not write it as a flag. Counting it
+        # as unaccounted would leave a gated tool no shape a grant could
+        # ever prove (`D-061`).
+        self.assertVerdict("osmp -- list", Verdict.SILENT)
+
     def test_rules_hold_even_where_a_grant_would_release(self) -> None:
         # Corpus: `stubtool touch --syntax-check` → **ask**, though
         # grant (1) holds on `--syntax-check`.
@@ -553,6 +628,88 @@ class GrantTests(Judges):
         self.assertVerdict(
             "stubtool clean /tmp/x", Verdict.SILENT, registry=CORPUS
         )
+
+
+class AlignmentTests(Judges):
+    """§4.2 as amended this step: an undeclared token's arity is an
+    ambiguity, not a guess to rest on (`D-060`).
+
+    Reading presumes an undeclared dashed token bare — the guess that
+    stops a dangerous operand hiding in a flag's value — but the
+    presumption is one reading, so rules and grants are evaluated
+    against every alignment it admits and the strictest verdict stands.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        def declare() -> None:
+            # Rules-only: the shape the amendment was written to close.
+            # A gated tool's closed world already asks on an undeclared
+            # flag; here nothing does, so before `D-060` an undeclared
+            # option shifted the operands and the push rule answered
+            # **silence** on a forced push.
+            tool(
+                "git",
+                options=[takes_value("-C")],
+                rules=[
+                    deny(
+                        "push",
+                        when=any_flag("-f", "--force"),
+                        reason="A forced push rewrites remote history.",
+                        label="forced push",
+                    ),
+                ],
+            )
+            tool(
+                "gitlike",
+                rules=[
+                    deny(
+                        "push",
+                        when=any_flag("-f", "--force"),
+                        reason="A forced push rewrites remote history.",
+                        label="forced push",
+                    ),
+                ],
+            )
+
+        cls.registry = composed(declare)
+
+    def test_the_amendments_own_example(self) -> None:
+        # §4.2 as amended: "`git -C dir push --force` denies whether or
+        # not `-C` was declared; the cost of declaring nothing is a
+        # prompt, never a lost deny."
+        #
+        # Declared, `-C` takes `dir` and `push` leads the operands.
+        # Undeclared, reading presumes it bare and `dir` becomes an
+        # operand, so the presumed alignment misses — and the
+        # alternative one, where `-C` took `dir`, is what fires.
+        self.assertVerdict("git -C dir push --force", Verdict.DENY)
+        self.assertVerdict("gitlike -C dir push --force", Verdict.DENY)
+
+    def test_the_presumed_alignment_still_decides_what_it_can(
+        self,
+    ) -> None:
+        # The sweep adds readings; it never removes the one reading
+        # already had.
+        self.assertVerdict("gitlike push --force", Verdict.DENY)
+        self.assertVerdict("gitlike push", Verdict.SILENT)
+
+    def test_an_undeclared_token_at_the_end_displaces_nothing(
+        self,
+    ) -> None:
+        # Nothing follows it, so there is no second reading and the
+        # answer is the presumed one.
+        self.assertVerdict("gitlike status --unknown", Verdict.SILENT)
+
+    def test_the_accepted_cost_of_the_amendment(self) -> None:
+        # §4.2 states it rather than leaving it to be found: "an
+        # undeclared option whose *value* is literally a gated
+        # subcommand word (`tool --output push`) will reach that
+        # subcommand's verdict." Here `--output`'s value is `push`, so
+        # the presumed-bare alignment reads `push --force` as the
+        # command and denies. Declaring the option is what makes the
+        # answer exact rather than the strictest of several readings.
+        self.assertVerdict("gitlike --output push --force", Verdict.DENY)
 
 
 class AssignmentWorldTests(Judges):
@@ -593,6 +750,12 @@ class AssignmentWorldTests(Judges):
         #   accounted("PAGER", one_of("cat"))
         self.assertVerdict("PAGER=cat psql -l", Verdict.SILENT)
         self.assertVerdict("PAGER=less psql -l", Verdict.ASK)
+        # And the third answer, which is the one the accounting exists
+        # for: a value that could be anything is not `cat`, so it does
+        # not pass. Accepting unproven here would let
+        # `GIT_PAGER=$WHATEVER` through the closed world written to
+        # catch exactly that shape (§3.3).
+        self.assertVerdict("PAGER=$WHATEVER psql -l", Verdict.ASK)
 
     def test_assignments_ahead_of_an_unregistered_tool_keep_its_posture(
         self,
@@ -817,6 +980,24 @@ class ThreeValuedTests(Judges):
             "kubectl delete pod api --context $CTX", Verdict.ASK
         )
 
+    def test_a_dynamic_token_in_subcommand_position_is_unproven(
+        self,
+    ) -> None:
+        # §4.2, and the half no case reached: "an unknown never
+        # satisfies a positive condition nor weakens a boundary … so
+        # `tool $SUB --force` leaves a deny on `$SUB` unproven rather
+        # than ruled out." Both wrong answers are silent failures of a
+        # kind — reading it as never matching hides a gated subcommand
+        # behind a variable, reading it as always matching denies every
+        # dynamic word.
+        #   deny("delete", when=flag("--context", one_of("production")))
+        self.assertVerdict(
+            "kubectl $SUB pod api --context production", Verdict.ASK
+        )
+        self.assertVerdict(
+            "kubectl get pod api --context production", Verdict.SILENT
+        )
+
     def test_unproven_releases_no_grant(self) -> None:
         # "it fails a grant condition (no release)". The contrast is
         # what makes it bite: the same grant holds on a literal path.
@@ -855,6 +1036,45 @@ class ThreeValuedTests(Judges):
             Verdict.SILENT,
             registry=CORPUS,
         )
+
+
+class ValueOptionalTests(Judges):
+    """§4.2's third arity, at judging (`D-039`).
+
+    "some hand-rolled CLIs accept both `--argument custom --check` and
+    `--argument --check`, taking a default when the next token looks
+    like a flag" — and where the declaration named no default, a
+    condition on that value can be neither proven nor ruled out.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        def declare() -> None:
+            tool(
+                "deployer",
+                flags=[may_take_value("--mode")],
+                rules=[
+                    deny(
+                        "apply",
+                        when=flag("--mode", one_of("destroy")),
+                        reason="Destroying rebuilds every node from scratch.",
+                        label="destroying mode",
+                    ),
+                ],
+            )
+
+        cls.registry = composed(declare)
+
+    def test_a_value_that_decides_decides(self) -> None:
+        self.assertVerdict("deployer apply --mode destroy", Verdict.DENY)
+        self.assertVerdict("deployer apply --mode rolling", Verdict.SILENT)
+
+    def test_a_bare_use_with_no_declared_default_is_unproven(self) -> None:
+        # Neither proven nor ruled out, so §3.3 puts it at ask: the
+        # deny fires at ask strength rather than vanishing. Reading it
+        # as unsatisfied would answer **silence** on a line whose mode
+        # could be anything.
+        self.assertVerdict("deployer apply --mode", Verdict.ASK)
 
 
 class DoubtTests(Judges):
@@ -901,6 +1121,20 @@ class DoubtTests(Judges):
                     ),
                 ],
             )
+            # The same declaration shape with **no default**, so the
+            # implicit one is §3.2's silence. It is the only shape on
+            # which an unresolved path can be seen to decide nothing:
+            # where the tool declares `ask`, the ask is the default's.
+            tool(
+                "tools/lint.py",
+                rules=[
+                    deny(
+                        "wipe",
+                        reason="Wiping the target is refused.",
+                        label="lint wipe",
+                    ),
+                ],
+            )
 
         cls.registry = composed(declare)
 
@@ -930,8 +1164,14 @@ class DoubtTests(Judges):
         # makes the invocation malformed, which is unproven, not safe",
         # stated flat rather than on gated tools — so it costs an ask
         # even where the tool is silent by default (`D-053`).
-        #   options=[takes_value("-C")]
+        #   options=[takes_value("-C")] ; flags=[takes_value("-m")]
         self.assertVerdict("git -C", Verdict.ASK)
+        # §6.2 owes the token, not the category: a citation reading
+        # "flag a flag" would ship without this.
+        self.assertEqual(self.phrases(self.judgment("git -C")), ["flag -C"])
+        self.assertEqual(
+            self.phrases(self.judgment("git commit -m")), ["flag -m"]
+        )
 
     def test_a_relative_spelling_after_a_cd_degrades_recognition(
         self,
@@ -947,6 +1187,36 @@ class DoubtTests(Judges):
         self.assertVerdict("tools/deploy.py wipe", Verdict.DENY)
         self.assertVerdict("cd /srv && ./tools/deploy.py /tmp/x", Verdict.ASK)
         self.assertVerdict("cd /srv && ./tools/deploy.py wipe", Verdict.ASK)
+
+    def test_an_unproven_identity_decides_nothing_by_itself(self) -> None:
+        # `D-054`: "a deny it would otherwise have earned becomes an
+        # ask, **and a silence stays a silence, since the tool is
+        # silent either way**". §4.2 puts it the same way — recognition
+        # degrades "like any path match", and an unproven path match
+        # never invents a verdict.
+        #
+        # Both readings of this line are silent: the declared tool,
+        # where nothing names `status`, or another file entirely, which
+        # is unregistered. An ask here would answer about neither
+        # (`D-063`).
+        #   tool("tools/lint.py", rules=[deny("wipe", ...)])  — no default=
+        self.assertVerdict("tools/lint.py status", Verdict.SILENT)
+        self.assertVerdict("cd /srv && ./tools/lint.py status", Verdict.SILENT)
+        # The cap still applies where something *was* gated.
+        self.assertVerdict("tools/lint.py wipe", Verdict.DENY)
+        self.assertVerdict("cd /srv && ./tools/lint.py wipe", Verdict.ASK)
+
+    def test_a_capped_deny_still_says_which_rule_was_capped(self) -> None:
+        # The cap is applied to the citations as well as the verdict.
+        # Dropping them instead would leave the model with the
+        # unresolved-path reason alone — which steers it to run the
+        # line where the path means what it says, i.e. the line that
+        # denies. §6.2 makes a reason steering text; steering toward
+        # the refusal it hid is the opposite of one.
+        #   deny("wipe", ...) — label "deploy wipe"
+        judgment = self.judgment("cd /srv && ./tools/deploy.py wipe")
+        self.assertIs(judgment.verdict, Verdict.ASK)
+        self.assertIn("deploy wipe", self.labels(judgment))
 
 
 class UnparseableTests(Judges):
