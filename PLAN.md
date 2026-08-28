@@ -294,45 +294,29 @@ behaviour done.
   Nothing judges a line yet. Detail in git history between tags
   `step-007` and `step-008`.
 
-### 009 — Judging and combining — `awaiting test`
+### 009 — Judging and combining — `done`
 
-**Objective.** Verdicts: per invocation, then over the line.
-
-**Spec sections.** §3.2 (the decision model, closed worlds, the
-assignment closed world, secure mode's engine-level capability), §6.1's
-combination table (every row except the allow rows), §6.2 (reasons and
-citations), §3.3.
-
-**Deliverables.** Rules checked existentially, grants checked universally
-and closed-world, per-tool default verdicts, the gated/registered/
-rule-bearing distinction, condition evaluation for every kind `007`
-declared — including the operand quantifiers, where "every operand"
-requires at least one and an empty operand list is unsatisfied rather
-than unproven, and the environment-assignment closed world for
-**every** registered tool with the universal benign list as a shadowable
-default layer. Each invocation judged alone: a safe command never vouches
-for its neighbour. The strict ranking deny > ask > allow > silence, and
-**order-freedom within one declaration source**. Line-level combination
-per §6.1's table, minus the allow rows, which wait on open fact (c) at
-`015`. Exhaustive evaluation — no short-circuit at the first deciding
-match — with the citation naming **every** declaration at the deciding
-rank across the whole line, embedded invocations included. Reasons
-written as steering text: the objection *and* the acceptable path, since
-the model reads them. Secure mode's engine-level plumbing — the global
-default verdict replacing every implicit silence — built here because it
-shapes the decision model and could not be retrofitted; the operator-
-facing switch and its guidance are 1.0.
-
-Also **retire `frisk registry --value`** (`D-046`). It exists because
-`007` had no verdict to observe and the three-valued model needed a
-window; `explain` on a real command line is that window from here on,
-with the line's context the flag can never have. Removing it takes the
-flag, `describe`'s `value` parameter and the cases that pin them.
-
-**How the operator tests it.** `frisk explain` on lines that should deny,
-ask and stay silent under a hand-written config, reading the reason and
-the citation each time; §4.5's budget observable in the command's own
-timing. Local and free.
+- **Outcome (approved 2026-08-28, tag `step-009`):** `frisk explain`
+  answers with a verdict, its reason and its citation — §3.2 per
+  invocation, §6.1 over the line minus the allow rows, §6.2's
+  citations naming every declaration at the deciding rank across it.
+  Rules existential, grants universal and closed-world, three closed
+  worlds that each defeat a grant, the three-valued model priced by
+  role, §4.1's unparseable fallback, and secure mode as an engine
+  capability with no switch until `033`. `registry --value` retired
+  with `describe`'s parameter and the machinery behind it (`D-046`).
+  It amended §4.2 once: an undeclared token's arity is an ambiguity,
+  so rules are matched against every operand alignment it admits and
+  the strictest verdict stands (`D-060`) — without it a forced push
+  behind an undeclared option answered silence. Twelve decisions:
+  `D-051` allow withheld at the line, `D-052` reversed by `D-059` (the
+  default is a fallback, not a floor), `D-053` a malformed invocation
+  asks on every tool, `D-054` and `D-063` an unproven identity caps
+  but decides nothing, `D-055` the exit statuses, `D-056` the closed
+  world as an opt-in list, `D-057` secure mode against the default
+  layers deferred to `010`, `D-058` the `/review-step` ritual, `D-061`
+  `--` is structure, `D-062` an engine reason never advises removing a
+  token. Detail in git history between tags `step-008` and `step-009`.
 
 ## 4. Milestone 3 — Seeing through
 
