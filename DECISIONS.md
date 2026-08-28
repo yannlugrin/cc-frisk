@@ -1783,3 +1783,45 @@ Detail in git history.
 - **Approved by:** operator, 2026-08-27 — requested during `009`'s case
   review, "to enable this mode easily on any step, that could also be
   for my final review of a non-code step".
+
+### D-059 — the default verdict is a fallback, not a floor (reversing `D-052`)
+
+- **Date:** 2026-08-27
+- **Step:** `009`
+- **Context:** `D-052` read §3.2's "a defined outcome for *no rule
+  matched, no grant held*" as a floor: the base contribution was
+  silence where a grant held and the tool's default otherwise, always,
+  with rules combining on top. The argument was §3.3 — a fired rule is
+  not evidence of safety, so a matching *ask* rule should not let a
+  deny-default tool answer weaker than it would with no rule at all.
+  The operator rejected it at the case gate: "default is for what is
+  not matched by any rules/grants — else it's not a default, it's an
+  enforcing minimal rule."
+- **Decision:** the default is consulted **only** where no rule matched
+  and no grant held. Two arguments carry it beyond the wording. First,
+  the floor reading makes a declaration dead: on a tool with
+  `default=deny(...)`, no rule weaker than deny could ever change an
+  answer, so `ask("get", …)` — an operator's deliberate carve-out —
+  would silently do nothing, which is the failure `D-056` rejected for
+  `closed_world=True` an hour earlier. Second, **the model already has
+  a floor and keeps it separate**: an unconditional `deny(reason=…)`
+  rule fires on every invocation, which is exactly "an enforcing
+  minimal rule". Reading `default=` as a floor collapses two constructs
+  into one and deletes the fallback. §3.3 does not license it either:
+  §3.3 is about *uncertainty* moving stricter, and an explicit weaker
+  rule the operator wrote is not uncertainty.
+  **The refinement that keeps it safe:** "no rule matched" means the
+  rule's conditions were **satisfied**, never merely that the rule
+  contributed. A deny or ask rule fired at ask strength by an
+  *unproven* condition (§4.2) has not matched, so the default still
+  applies and the two combine by rank — `stubcli server $VERB x`
+  answers deny, not ask. Without that, uncertainty would soften a
+  deny-default tool, which is the one direction §3.3 forbids and the
+  real risk `D-052` was reaching for.
+- **Alternatives considered:** `D-052`'s floor reading — rejected
+  above. *A floor only for gated tools* — the same collapse with a
+  special case in it, and it still kills the carve-out. *Keep the floor
+  and add a separate "carve-out" construct* — a new declaration form
+  for something `ask()` already spells, rejected under rule 11.
+- **Approved by:** operator, 2026-08-27 — "default is for what is not
+  matched by any rules/grants".
