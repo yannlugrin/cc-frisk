@@ -63,3 +63,7 @@ specification. This file is what accumulated *beside* it.
 | That `$VAR` in command position is silence in the default posture, and the global default in secure mode | §4.2; `judging._unregistered`; §12 owes this one by name |
 | That secure mode exists as an engine capability with no switch to turn it on until `033`, so no configuration can reach it yet | `PLAN.md` `033`; `judging.judge` |
 | That a line earning an `allow` answers silence until the hedges ship, so `allow` is declarable and never returned | `D-051`; `judging.combined` |
+| That `--` is structure rather than a flag, so a gated tool does not have to declare it and `deploy --check -- file.yml` stays provable | `D-061`; `judging._unaccounted_flags` |
+| That a reason **frisk itself** writes explains what is wrong and never tells the agent to remove a token — an unaccounted flag may be the one protecting the deploy | `D-062`; `judging.py`'s reason constants |
+| That an unproven tool identity (a relative spelling after a `cd`) defeats grants and caps a deny at ask, but adds no verdict of its own — a line nothing gates stays silent, and the unresolved token is named only where something else objected | `D-054`; `D-063`; `judging._doubts` |
+| That the engine's own failure answers 6, distinct from every verdict, because 1 is `ask` and a dead guard must not read as a prompt | `D-055`; `cli.EXIT_ENGINE_ERROR` |
