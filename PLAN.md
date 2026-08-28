@@ -1410,3 +1410,31 @@ silent assumptions.
    the transcription is the real cost of adoption and it lands entirely
    on the operator. Say so and it becomes a step with its own gate,
    placed after `024`; say nothing and the plan assumes hand work.
+
+11. **Per-inner-command wrapper policy — the sudoers shape.** Raised by
+   the operator during `009`'s case review, and recorded so `012` does
+   not design past it. `sudoers` grants an **exact command with its
+   arguments** — `deploy ./my/path`, not merely `deploy` — and frisk
+   cannot express anything like it. §4.3 gives two levers and no third:
+   "shadowing the wrapper into a tool with an ask default gates
+   everything it runs; a rule on the inner command gates just that
+   act." So "sudo is refused except for these commands" is
+   all-or-nothing, and its mirror — safe as you, refused as root — is
+   absent too. `scope=` does not reach it: §4.3 gives handoffs a
+   *different world*, which is why judgment is scopable there, while a
+   wrapper runs on the host and its inner command is judged as such.
+   §5.2's list of what the configuration must express does not name
+   this, §14 of the specification does not either, and neither does
+   §15's non-goals. The operator's reading: a future enhancement, not
+   something `009`–`012` must solve. What `012` owes it is only that it
+   **not foreclose it**: keep `host_only` meaning "outside every
+   handoff" and never "unelevated", so an execution-context axis can be
+   added orthogonally rather than by redefining what existing rules
+   mean; keep handoff names tool-qualified (`inside("docker run")`, as
+   `declare.py`'s docstring already writes and as
+   `registry.py`'s `_handoff_position` currently contradicts by
+   computing `"run"`), so a wrapper context has a namespace to live in;
+   and have the walk **record what a wrapper reached**, since a
+   condition matching the inner invocation is the natural shape and it
+   gets expensive to add once the walk has thrown that away. Decide
+   whether it becomes a specification §14 item after `012`.
