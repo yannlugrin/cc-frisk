@@ -245,15 +245,6 @@ class Condition:
     def describe(self) -> str:
         raise NotImplementedError
 
-    def matchers(self) -> Sequence[Matcher]:
-        """The value matchers inside this condition, if any.
-
-        `frisk registry --value` walks these to show what each matcher
-        answers for a value, which is how composition is inspected
-        (§3.4) without a command line to judge yet.
-        """
-        raise NotImplementedError
-
 
 #: What a rule or grant accepts for `when`.
 When = Union[Condition, Sequence[Condition], None]
@@ -271,9 +262,6 @@ class FlagUsed(Condition):
             return f"flag {self.name}"
         return f"flag {self.name} is {self.value.describe()}"
 
-    def matchers(self) -> Sequence[Matcher]:
-        return () if self.value is None else (self.value,)
-
 
 @dataclass(frozen=True)
 class AnyFlagUsed(Condition):
@@ -283,9 +271,6 @@ class AnyFlagUsed(Condition):
 
     def describe(self) -> str:
         return "any flag in " + ", ".join(self.names)
-
-    def matchers(self) -> Sequence[Matcher]:
-        return ()
 
 
 @dataclass(frozen=True)
@@ -300,9 +285,6 @@ class EnvSet(Condition):
             return f"environment {self.name}"
         return f"environment {self.name} is {self.value.describe()}"
 
-    def matchers(self) -> Sequence[Matcher]:
-        return () if self.value is None else (self.value,)
-
 
 @dataclass(frozen=True)
 class OptionUsed(Condition):
@@ -316,9 +298,6 @@ class OptionUsed(Condition):
             return f"option {self.name}"
         return f"option {self.name} is {self.value.describe()}"
 
-    def matchers(self) -> Sequence[Matcher]:
-        return () if self.value is None else (self.value,)
-
 
 @dataclass(frozen=True)
 class EveryOperand(Condition):
@@ -328,9 +307,6 @@ class EveryOperand(Condition):
 
     def describe(self) -> str:
         return f"every operand is {self.value.describe()}"
-
-    def matchers(self) -> Sequence[Matcher]:
-        return (self.value,)
 
 
 @dataclass(frozen=True)
@@ -342,9 +318,6 @@ class AtLeastOneOperand(Condition):
     def describe(self) -> str:
         return f"at least one operand is {self.value.describe()}"
 
-    def matchers(self) -> Sequence[Matcher]:
-        return (self.value,)
-
 
 @dataclass(frozen=True)
 class NoOperands(Condition):
@@ -352,9 +325,6 @@ class NoOperands(Condition):
 
     def describe(self) -> str:
         return "no operands"
-
-    def matchers(self) -> Sequence[Matcher]:
-        return ()
 
 
 def flag(name: str, value: Matcher | None = None) -> Condition:

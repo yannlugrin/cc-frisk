@@ -436,13 +436,6 @@ class Registry:
         that stays true whether or not §9's machine-readable option
         ever ships.
 
-        There was a `value` probe here until `009`, annotating every
-        matcher with what it answered for one string. It existed
-        because `007` had nothing that judged a command line, so the
-        three-valued model would otherwise have been invisible from
-        outside; `frisk explain` now answers the question it was
-        standing in for, with the line's context it could never have
-        (`D-046`).
         """
         return _rendered(self, cases, wrap)
 

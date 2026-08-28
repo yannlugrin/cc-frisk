@@ -513,11 +513,6 @@ class ConditionTests(unittest.TestCase):
         marker = flag("--")
         self.assertTrue(marker.describe().strip())
 
-    def test_a_condition_exposes_the_matchers_inside_it(self) -> None:
-        # `frisk registry --value` walks these (§3.4's inspection).
-        self.assertEqual(len(flag("--mode", one_of("a")).matchers()), 1)
-        self.assertEqual(len(flag("--force").matchers()), 0)
-
     def test_several_conditions_on_one_rule_all_hold(self) -> None:
         rule = deny(
             "push",
@@ -562,7 +557,7 @@ class OperandQuantifierTests(unittest.TestCase):
             at_least_one_operand(scratch),
         ):
             with self.subTest(condition=condition.describe()):
-                self.assertEqual(list(condition.matchers()), [scratch])
+                self.assertIn(scratch.describe(), condition.describe())
 
     def test_the_two_quantifiers_are_different_conditions(self) -> None:
         # Both constrain the operands with one matcher, and §5.2 asks
@@ -580,10 +575,9 @@ class OperandQuantifierTests(unittest.TestCase):
 
     def test_no_operands_constrains_the_count_not_a_value(self) -> None:
         # §5.2 names it separately so that granting the empty case is a
-        # decision rather than a side effect of a quantifier — and it
-        # has no matcher at all, so nothing probes it for a value.
+        # decision rather than a side effect of a quantifier — it
+        # constrains how many operands there are, never what one says.
         empty = no_operands()
-        self.assertEqual(list(empty.matchers()), [])
         self.assertTrue(empty.describe().strip())
 
 
