@@ -412,6 +412,7 @@ class ExplainVerdictTest(unittest.TestCase):
             return run("explain", "--project", project, command_line)
 
     def test_a_denied_line_says_deny_and_why(self) -> None:
+        #   deny("push", when=any_flag("--force")) — label "forced push"
         status, out, err = self.explain("git push --force")
         self.assertEqual(status, EXIT_DENY)
         self.assertIn("deny", out)
@@ -419,6 +420,7 @@ class ExplainVerdictTest(unittest.TestCase):
         self.assertEqual(err, "")
 
     def test_an_asked_line_says_ask_and_why(self) -> None:
+        #   tool("deploy", default=ask(...)) — no grant holds here
         status, out, _ = self.explain("deploy site.yml")
         self.assertEqual(status, EXIT_ASK)
         self.assertIn("ask", out)
@@ -428,6 +430,7 @@ class ExplainVerdictTest(unittest.TestCase):
         # §3.2: "silence means 'no opinion' and hands the call to the
         # permission rules and mode". A status of 0 is that answer, and
         # the text must not let it read as approval.
+        #   grant(when=any_flag("--syntax-check"))
         status, out, _ = self.explain("deploy --syntax-check site.yml")
         self.assertEqual(status, EXIT_SILENT)
         self.assertIn("silent", out)
@@ -436,6 +439,7 @@ class ExplainVerdictTest(unittest.TestCase):
     def test_the_citation_names_the_declaration_that_fired(self) -> None:
         # §6.2: "Without the citation, a wrong verdict is a sentence
         # with nothing to grep for, and the maintenance loop starves."
+        #   deny("push", when=any_flag("--force")) — label "forced push"
         _, out, _ = self.explain("git push --force")
         self.assertIn("forced push", out)
         self.assertIn("config.py:", out)
@@ -446,6 +450,8 @@ class ExplainVerdictTest(unittest.TestCase):
         # (`git push -f && git reset --hard` cites both)" — §6.2's own
         # example, and two *different* declarations, which is what the
         # sentence is about.
+        #   deny("push",  when=any_flag("--force")) — label "forced push"
+        #   deny("reset", when=any_flag("--hard"))  — label "hard reset"
         _, out, _ = self.explain("git push --force && git reset --hard")
         self.assertIn("forced push", out)
         self.assertIn("hard reset", out)
@@ -454,6 +460,7 @@ class ExplainVerdictTest(unittest.TestCase):
         # §5.3: "a declared silence refuses nothing and so has nothing
         # to explain". Paired with the deny above, which prints both,
         # so this is the absence of something the same build produces.
+        #   nothing in PROJECT_CONFIG names `git status`
         _, denied, _ = self.explain("git push --force")
         self.assertIn("forced push", denied)
         self.assertIn("A forced push rewrites remote history.", denied)
