@@ -348,7 +348,12 @@ combined-flag spellings included; a registered shell or walked
 interpreter with no `-c`/`-e` payload and no file operand **asks**;
 `eval`'s joined arguments re-analysed; other languages' interpreters
 never read as shell. Depth bounding, with a line cut short by the bound
-treated as §4.1's unparseable line.
+treated as §4.1's unparseable line. **Secure mode's treatment of the
+engine's default layers, deferred from `009` (`D-057`)**: whether a
+wrapper, shell or interpreter entry — every one registered with no
+declared default — answers the global default in secure mode or keeps
+an implicit exemption is settled here, now that the wrapper's own
+contribution to a line has a design to settle it against.
 
 **How the operator tests it.** `frisk explain 'sudo git push --force'`,
 `'sudo --unknown-flag git push -f'`, `'curl url | sh'`,
@@ -861,7 +866,7 @@ path and the engine suite can be forbidden from importing it.
   prove the engine expresses it, and a **worked example** in the operator
   configuration reference (`039`), which is how an operator who wants
   docker gated writes it. This is a deviation from a specification
-  *should*; `D-009` carries the reason, and §14 Q9 asks whether §5.4's
+  *should*; `D-009` carries the reason, and §14 Q7 asks whether §5.4's
   text should be amended to match rather than merely deviated from.
 - Starter cases covering **every** starter rule, beside the rules they
   prove, so the coverage gate passes from day one.
@@ -932,7 +937,7 @@ supported install path, the resolution rule and both CLI doors. The proof
 that *this project's* verdicts did not move is its own cases re-running
 under `019`'s selftest, which is exactly the mechanism §3.5's third layer
 and §8.2 exist for. Transcribing an existing prototype registry into
-frisk's declaration form remains hand work; see §14 Q10.
+frisk's declaration form remains hand work; see §14 Q8.
 
 **How the operator tests it.** Scaffold a throwaway project, read the
 generated config in one pass (the legibility requirement is this test),
@@ -1321,17 +1326,11 @@ The behavior corpus is already delivered at
 ## 14. Open questions
 
 Underspecified, risky, or worth reordering — for the operator, never
-silent assumptions.
+silent assumptions. An item the operator has ruled on is deleted, not
+annotated: the ruling lives in its decision entry, and a question kept
+past its answer is one a later session re-asks.
 
-1. **The foundation splits (`D-003`).** This plan turns the prescribed
-   `001` into two gates and the prescribed tooling step into two more, on
-   the bootstrap instructions' own invitation to split what is too big.
-   Six foundation steps instead of four. If the operator would rather
-   review fewer, larger gates, they merge back and the numbering shifts.
-2. **The §13 re-inventory ruling (`D-004`).** Section 1 recommends the
-   bar stands as drawn. The operator rules; a "move" on any row
-   re-stages that item into Milestone 9.
-3. **Milestone 4's placement.** The verification pass sits after the
+1. **Milestone 4's placement.** The verification pass sits after the
    engine's spine rather than before it, because none of the parsing work
    depends on its outcomes and the cheap-first rule applies. The risk is
    that a surprising outcome — (b) demoting pairing rule 2, (d) finding a
@@ -1339,28 +1338,28 @@ silent assumptions.
    written. Nothing in `007`–`014` would change; only `017`, `024` and
    the documentation would. Confirm the trade is the one the operator
    wants.
-4. **`017` may become a retirement.** If open fact (c) says the platform
+2. **`017` may become a retirement.** If open fact (c) says the platform
    no longer prompts on substitutions, §6.3's whole apparatus retires to
    silence. The plan does not pre-judge, but the operator should know
    that one measurement can delete a milestone.
-5. **Milestone 9's grain (`D-008`).** Steps `030`–`041` carry objective
+3. **Milestone 9's grain (`D-008`).** Steps `030`–`041` carry objective
    and deliverables only, without the spec-section list, locations and
    test statement an open entry owes. They are expanded when Milestone 8
    closes. If the operator wants them sized now, say so.
-6. **The interim honesty obligations.** §4.3 and §4.4 require interim
+4. **The interim honesty obligations.** §4.3 and §4.4 require interim
    gaps to be *named in the honesty documentation* — a 1.0 deliverable
    (`039`) — while the gaps exist from parity. This plan names them in
    the pre-1.0 README (`028`). If the operator would rather a minimal
    honesty document ship at parity, that is a small step to add before
    `028`.
-7. **Packaging shape and the plugin's second door.** This plan assumes
+5. **Packaging shape and the plugin's second door.** This plan assumes
    `pyproject.toml` with a `src/frisk/` layout and a `frisk` console
    entry point for the repository-installable door — but §2.2 forbids the
    plugin from requiring an install, so the plugin-side door needs a
    different, build-free mechanism, decided at `021`. Flagged because it
    decides how the CI matrix, the sentinel's probe and the
    repository-installable door all look.
-8. **The sentinel's restaging (`D-007`).** An earlier draft built the
+6. **The sentinel's restaging (`D-007`).** An earlier draft built the
    sentinel and its kill switches before parity. §13 names the sentinel
    offer as a 1.0 item and the pre-1.0 bar does not mention it, so this
    plan moves it to `035` — with the honest consequence that before 1.0,
@@ -1368,7 +1367,7 @@ silent assumptions.
    the seatbelt earlier, it is a deliberate quick win under §13's
    "everything else may ship here as a quick win" and moves back.
 
-9. **Should §5.4 be amended, or merely deviated from (`D-009`)?** The
+7. **Should §5.4 be amended, or merely deviated from (`D-009`)?** The
    starter registry now ships git ground rules only. Two clauses of §5.4
    describe a world where it also ships docker: "a small set of
    additional common tools… docker is the recommended candidate", and the
@@ -1385,7 +1384,7 @@ silent assumptions.
    does not ship is the drift rule 1 exists to prevent, and the amendment
    is two sentences.
 
-10. **A prototype-to-frisk migration aid — wanted, or hand work?** Parity
+8. **A prototype-to-frisk migration aid — wanted, or hand work?** Parity
    proves the engine and the configuration API can *express* what a
    prototype-generation registry expressed; it does not transcribe one.
    §10's migration capability is engine-version migration inside frisk,
@@ -1395,7 +1394,7 @@ silent assumptions.
    on the operator. Say so and it becomes a step with its own gate,
    placed after `024`; say nothing and the plan assumes hand work.
 
-11. **Per-inner-command wrapper policy — the sudoers shape.** Raised by
+9. **Per-inner-command wrapper policy — the sudoers shape.** Raised by
    the operator during `009`'s case review, and recorded so `012` does
    not design past it. `sudoers` grants an **exact command with its
    arguments** — `deploy ./my/path`, not merely `deploy` — and frisk
